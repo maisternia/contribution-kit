@@ -1,0 +1,28 @@
+{
+  "target_expr": "col('GT SF')",
+  "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
+  "hypotheses": [
+    {
+      "name": "class_sf",
+      "label": "Nominal class SF (detected vs GT SF)",
+      "actual_expr": "col('Detected SF')",
+      "baseline_expr": "col('GT SF')",
+      "kind": "categorical"
+    },
+    {
+      "name": "class_bw",
+      "label": "Nominal class BW (detected vs GT BW)",
+      "actual_expr": "col('Detected BW (Hz)')",
+      "baseline_expr": "col('GT BW (Hz)')",
+      "kind": "continuous"
+    },
+    {
+      "name": "measured_bw",
+      "label": "Measured BW (box estimate vs GT BW)",
+      "actual_expr": "col('Measured BW (Hz)')",
+      "baseline_expr": "col('GT BW (Hz)')",
+      "kind": "continuous"
+    }
+  ],
+  "score_mode": "absolute_error"
+}
