@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
+from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
+from .contributor import combine_contributors, rank_contributors
 from .estimator import Estimator
+from .expr import build_row_context, evaluate_expression
+from .hypothesis import evaluate_binary_hypothesis
 from .spec import AttributionSpec, CategoricalHypothesis, ContinuousHypothesis, HypothesisSpec
 
 
@@ -53,7 +59,48 @@ def build_parser() -> argparse.ArgumentParser:
     report_parser.add_argument("--run", required=True)
     report_parser.add_argument("--out", required=True)
 
+    contributor_parser = subcommands.add_parser("contributor", help="Run contributor bucket ranking")
+    contributor_parser.add_argument("--input", required=True)
+    contributor_parser.add_argument("--mismatch-expr", required=True)
+    contributor_parser.add_argument("--feature", action="append", required=True, help="feature_name:row_expression")
+    contributor_parser.add_argument("--out", required=True)
+    contributor_parser.add_argument("--min-count", type=int, default=20)
+
+    hypothesis_parser = subcommands.add_parser("hypothesis", help="Run a binary hypothesis test")
+    hypothesis_parser.add_argument("--input", required=True)
+    hypothesis_parser.add_argument("--mismatch-expr", required=True)
+    hypothesis_parser.add_argument("--name", required=True)
+    hypothesis_parser.add_argument("--group-a", required=True)
+    hypothesis_parser.add_argument("--group-b", required=True)
+    hypothesis_parser.add_argument("--group-a-label", required=True)
+    hypothesis_parser.add_argument("--group-b-label", required=True)
+    hypothesis_parser.add_argument("--scope", default="global")
+    hypothesis_parser.add_argument("--out", required=True)
+
     return parser
+
+
+def _parse_scalar(value: str) -> Any:
+    text = value.strip()
+    if text == "":
+        return None
+    if text.lower() in {"true", "false"}:
+        return text.lower() == "true"
+    try:
+        if "." not in text and "e" not in text.lower():
+            return int(text)
+    except ValueError:
+        pass
+    try:
+        return float(text)
+    except ValueError:
+        return text
+
+
+def _load_rows(path: str | Path) -> list[dict[str, Any]]:
+    with Path(path).open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        return [{key: _parse_scalar(value) for key, value in row.items()} for row in reader]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -91,6 +138,63 @@ def main(argv: list[str] | None = None) -> int:
         for row in payload["feature_attributions"]:
             lines.append(f"| {row['name']} | {row['label']} | {row['mean_abs_shapley']:.6f} | {row['mean_signed_shapley']:.6f} | {row['total_signed_shapley']:.6f} | {row['net_error_share_pct']:.2f} |")
         Path(args.out).write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return 0
+
+    if args.command == "contributor":
+        rows = _load_rows(args.input)
+
+        def mismatch_fn_contributor(row: dict[str, Any]) -> bool:
+            return bool(evaluate_expression(args.mismatch_expr, build_row_context(row)))
+
+        groups = []
+        for item in args.feature:
+            if ":" not in item:
+                raise ValueError("--feature entries must be in format feature_name:row_expression")
+            feature_name, feature_expr = item.split(":", 1)
+            groups.append(
+                rank_contributors(
+                    rows,
+                    feature=feature_name,
+                    value_fn=lambda row, expr=feature_expr: str(evaluate_expression(expr, build_row_context(row))),
+                    mismatch_fn=mismatch_fn_contributor,
+                    min_count=args.min_count,
+                )
+            )
+        combined = combine_contributors(groups)
+        payload = [
+            {
+                "feature": row.feature,
+                "value": row.value,
+                "count": row.count,
+                "mismatches": row.mismatches,
+                "mismatch_rate": row.mismatch_rate,
+                "lift": row.lift,
+                "mismatch_share": row.mismatch_share,
+                "score": row.score,
+            }
+            for row in combined
+        ]
+        Path(args.out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return 0
+
+    if args.command == "hypothesis":
+        rows = _load_rows(args.input)
+
+        def mismatch_fn_hypothesis(row: dict[str, Any]) -> bool:
+            return bool(evaluate_expression(args.mismatch_expr, build_row_context(row)))
+
+        group_a_rows = [row for row in rows if bool(evaluate_expression(args.group_a, build_row_context(row)))]
+        group_b_rows = [row for row in rows if bool(evaluate_expression(args.group_b, build_row_context(row)))]
+        result = evaluate_binary_hypothesis(
+            scope=args.scope,
+            test_name=args.name,
+            group_a_label=args.group_a_label,
+            group_b_label=args.group_b_label,
+            group_a_rows=group_a_rows,
+            group_b_rows=group_b_rows,
+            mismatch_fn=mismatch_fn_hypothesis,
+        )
+        Path(args.out).write_text(json.dumps(asdict(result), indent=2), encoding="utf-8")
         return 0
 
     return 1
