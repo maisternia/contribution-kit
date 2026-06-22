@@ -164,10 +164,11 @@ pip install -e .
 
 ## Using as a submodule
 
-This repository is mounted as a git submodule in the [Unchirp](https://github.com/maisternia/Unchirp) workspace at `ultralytics-lora/ResearchData/external/error-attribution-kit`.
+You can add this repository as a git submodule in your own project:
 
 ```bash
-git submodule update --init ultralytics-lora/ResearchData/external/error-attribution-kit
+git submodule add https://github.com/maisternia/error-attribution-kit.git path/to/error-attribution-kit
+git submodule update --init path/to/error-attribution-kit
 ```
 
 ## Layout
