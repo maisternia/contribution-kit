@@ -3,46 +3,34 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
-
-HypothesisKind = Literal["continuous", "categorical"]
 
 
 @dataclass(slots=True)
 class Hypothesis:
     """A single declarative hypothesis about what may contribute to formula error.
 
-    Callers describe each hypothesis with one boolean ``condition`` DSL string.
-    The estimator privately decides how to analyse it, based on the shape of the
-    condition:
+    ``Hypothesis`` is the one type callers need to construct. Each hypothesis is a
+    ``name`` plus one boolean ``condition`` DSL string. The estimator privately
+    decides how to analyse it from a single classification rule:
 
-    * A top-level equality (``actual == baseline``) declares a *formula feature*.
-      The left operand is the model-produced value, the right operand is the
-      ground-truth baseline, and the feature joins the Shapley attribution of the
-      prediction-formula error. The feature ``name`` must appear in
-      ``AttributionSpec.prediction_expr``.
-    * Any other boolean expression declares an *error regime*: the rows where the
-      condition holds form a subset whose observed-error share and mismatch risk
-      (versus the remaining rows) are reported.
+    * A hypothesis whose ``condition`` is a top-level equality (``actual ==
+      baseline``) and whose ``name`` appears in
+      ``AttributionSpec.prediction_expr`` becomes a *Shapley feature*. The left
+      operand is the model-produced value, the right operand is the ground-truth
+      baseline, and the feature joins the Shapley attribution of the
+      prediction-formula error.
+    * Every other hypothesis is an *error regime*: the rows where the condition
+      holds form a subset whose observed-error share and mismatch risk (versus
+      the remaining rows) are reported.
 
-    Callers never declare regimes or binary tests directly; they only declare
-    conditions.
+    Routing depends only on the ``condition`` shape and ``prediction_expr``
+    membership. Callers never declare regimes or binary tests directly; they only
+    declare conditions.
     """
 
     name: str
     condition: str
     label: str | None = None
-    kind: HypothesisKind = "continuous"
-
-
-@dataclass(slots=True)
-class ContinuousHypothesis(Hypothesis):
-    kind: HypothesisKind = "continuous"
-
-
-@dataclass(slots=True)
-class CategoricalHypothesis(Hypothesis):
-    kind: HypothesisKind = "categorical"
 
 
 @dataclass(slots=True)

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from error_attribution import AttributionSpec, CategoricalHypothesis, ContinuousHypothesis, Estimator
+from error_attribution import AttributionSpec, Estimator, Hypothesis
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -16,17 +16,17 @@ def _ungated_sf_spec() -> AttributionSpec:
         target_expr="col('GT SF')",
         prediction_expr="class_sf + round(2 * log2(measured_bw / class_bw))",
         hypotheses=[
-            CategoricalHypothesis(
+            Hypothesis(
                 name="class_sf",
                 label="Nominal class SF",
                 condition="col('Detected SF') == col('GT SF')",
             ),
-            ContinuousHypothesis(
+            Hypothesis(
                 name="class_bw",
                 label="Nominal class BW",
                 condition="col('Detected BW (Hz)') == col('GT BW (Hz)')",
             ),
-            ContinuousHypothesis(
+            Hypothesis(
                 name="measured_bw",
                 label="Measured BW",
                 condition="col('Measured BW (Hz)') == col('GT BW (Hz)')",

@@ -15,8 +15,6 @@ from .expr import build_row_context, evaluate_expression
 from .hypothesis import evaluate_binary_hypothesis
 from .spec import (
     AttributionSpec,
-    CategoricalHypothesis,
-    ContinuousHypothesis,
     Hypothesis,
 )
 
@@ -32,8 +30,7 @@ def _load_spec(path: str | Path) -> AttributionSpec:
         payload = json.loads(raw_text)
     hypotheses: list[Hypothesis] = []
     for item in payload.get("hypotheses", []):
-        hypothesis_cls = CategoricalHypothesis if item.get("kind", "continuous") == "categorical" else ContinuousHypothesis
-        hypotheses.append(hypothesis_cls(**item))
+        hypotheses.append(Hypothesis(**item))
     return AttributionSpec(
         target_expr=payload["target_expr"],
         prediction_expr=payload["prediction_expr"],
@@ -123,9 +120,9 @@ def main(argv: list[str] | None = None) -> int:
                 {"name": "class_bw > gt_bw (beyond tol)", "condition": "col('Detected BW (Hz)') > col('GT BW (Hz)') * (1 + 0.10)"},
                 {"name": "class_bw within tol & sf wrong", "condition": "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 and col('Detected SF') != col('GT SF')"},
                 {"name": "class_bw & sf ok, measured_bw off", "condition": "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 and col('Detected SF') == col('GT SF') and abs(col('Measured BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') > 0.10"},
-                {"name": "class_sf", "condition": "col('Detected SF') == col('GT SF')", "kind": "categorical"},
-                {"name": "class_bw", "condition": "col('Detected BW (Hz)') == col('GT BW (Hz)')", "kind": "continuous"},
-                {"name": "measured_bw", "condition": "col('Measured BW (Hz)') == col('GT BW (Hz)')", "kind": "continuous"},
+                {"name": "class_sf", "condition": "col('Detected SF') == col('GT SF')"},
+                {"name": "class_bw", "condition": "col('Detected BW (Hz)') == col('GT BW (Hz)')"},
+                {"name": "measured_bw", "condition": "col('Measured BW (Hz)') == col('GT BW (Hz)')"},
             ],
             "score_mode": "absolute_error",
         }

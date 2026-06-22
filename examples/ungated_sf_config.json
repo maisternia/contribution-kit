@@ -1,5 +1,4 @@
 {
-  "description": "Continuous-LoRa Sobel example using formula (2.7) and experimental data from Dudarek and Martyniuk's pre-print on discrete-to-continuous LoRa parameter estimation.",
   "target_expr": "col('GT SF')",
   "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
   "mismatch_expr": "col('Measured SF (ungated)') != col('GT SF')",
@@ -24,11 +23,6 @@
       "name": "class_bw & sf ok, measured_bw off",
       "label": "Detected BW and SF correct but measured BW off GT BW (beyond 10%)",
       "condition": "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 and col('Detected SF') == col('GT SF') and abs(col('Measured BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') > 0.10"
-    },
-    {
-      "name": "class_bw & sf ok & measured ok (baseline)",
-      "label": "All inputs correct: detected BW, SF, and measured BW within tolerance (sanity check)",
-      "condition": "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 and col('Detected SF') == col('GT SF') and abs(col('Measured BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10"
     },
     {
       "name": "class_sf",

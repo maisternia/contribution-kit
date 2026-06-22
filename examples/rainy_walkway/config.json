@@ -1,0 +1,45 @@
+{
+  "description": "AI-generated rainy-walkway example: the formula combines detector wetness, moisture probe output, rain-rate estimate, and camera exposure to study slip-risk style wet-surface errors.",
+  "target_expr": "col('GT Wetness (%)')",
+  "prediction_expr": "detected_wetness + round((measured_wetness - detected_wetness) * 0.5) + round((estimated_rain_rate - 3) * 3) - round(camera_exposure / 20)",
+  "mismatch_expr": "abs(col('Detected Wetness (%)') - col('GT Wetness (%)')) >= 12",
+  "scope": "vision",
+  "hypotheses": [
+    {
+      "name": "detected_wetness",
+      "label": "Wetness detector vs GT wetness",
+      "condition": "col('Detected Wetness (%)') == col('GT Wetness (%)')"
+    },
+    {
+      "name": "measured_wetness",
+      "label": "Moisture probe vs GT wetness",
+      "condition": "col('Measured Wetness (%)') == col('GT Wetness (%)')"
+    },
+    {
+      "name": "estimated_rain_rate",
+      "label": "Rain-rate estimate vs GT rain-rate",
+      "condition": "col('Estimated Rain Rate (mm/h)') == col('GT Rain Rate (mm/h)')"
+    },
+    {
+      "name": "camera_exposure",
+      "label": "Camera exposure vs GT exposure",
+      "condition": "col('Camera Exposure') == col('GT Exposure')"
+    },
+    {
+      "name": "heavy_rain_and_gusts",
+      "label": "Heavy rain with gusty wind",
+      "condition": "col('Estimated Rain Rate (mm/h)') >= 7 and col('Wind Speed (m/s)') >= 5"
+    },
+    {
+      "name": "shadowed_camera_at_dusk",
+      "label": "Shadowed camera at dusk",
+      "condition": "col('Camera Exposure') <= col('GT Exposure') - 15 and col('GT Exposure') >= 110"
+    },
+    {
+      "name": "spray_from_traffic",
+      "label": "Traffic spray raises local wetness",
+      "condition": "col('Wind Speed (m/s)') >= 6 and col('Measured Wetness (%)') - col('GT Wetness (%)') >= 15"
+    }
+  ],
+  "score_mode": "absolute_error"
+}

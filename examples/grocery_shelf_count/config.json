@@ -1,0 +1,60 @@
+{
+  "description": "AI-generated shelf-counting example: the formula fuses object counts, brightness, blur, and occlusion to model common grocery-store vision errors under low light.",
+  "target_expr": "col('GT Item Count')",
+  "prediction_expr": "detected_count + round((measured_count - detected_count) * 0.6) + round((estimated_brightness - 70) / 25) - round(estimated_blur) - round(occlusion / 18) - round(low_light * 1.0)",
+  "mismatch_expr": "abs(col('Detected Item Count') - col('GT Item Count')) >= 2",
+  "scope": "vision",
+  "hypotheses": [
+    {
+      "name": "detected_count",
+      "label": "Shelf counter vs GT item count",
+      "condition": "col('Detected Item Count') == col('GT Item Count')"
+    },
+    {
+      "name": "measured_count",
+      "label": "Secondary pass count vs GT item count",
+      "condition": "col('Measured Item Count') == col('GT Item Count')"
+    },
+    {
+      "name": "estimated_brightness",
+      "label": "Estimated brightness vs GT brightness",
+      "condition": "col('Estimated Brightness') == col('GT Brightness')"
+    },
+    {
+      "name": "estimated_blur",
+      "label": "Estimated blur vs GT blur",
+      "condition": "col('Estimated Blur') == col('GT Blur')"
+    },
+    {
+      "name": "occlusion",
+      "label": "Estimated occlusion vs GT occlusion",
+      "condition": "col('Estimated Occlusion (%)') == col('GT Occlusion (%)')"
+    },
+    {
+      "name": "low_light",
+      "label": "Low-light flag vs GT low-light flag",
+      "condition": "col('Low Light (0/1)') == col('GT Low Light (0/1)')"
+    },
+    {
+      "name": "low_light_scene",
+      "label": "Low-light shelf scene",
+      "condition": "col('Low Light (0/1)') == 1 and col('GT Brightness') < 65"
+    },
+    {
+      "name": "heavy_occlusion",
+      "label": "High occlusion on crowded shelf",
+      "condition": "col('Estimated Occlusion (%)') >= 25"
+    },
+    {
+      "name": "blurred_motion",
+      "label": "Motion blur under low light",
+      "condition": "col('Estimated Blur') >= col('GT Blur') + 2 and col('Low Light (0/1)') == 1"
+    },
+    {
+      "name": "crowded_shelf",
+      "label": "Crowded shelf with undercounting risk",
+      "condition": "col('GT Item Count') >= 8 and col('Detected Item Count') < col('GT Item Count')"
+    }
+  ],
+  "score_mode": "absolute_error"
+}

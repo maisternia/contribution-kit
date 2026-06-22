@@ -11,8 +11,6 @@ from .hypothesis import (
 from .results import AssessmentResult, ErrorRegimeSummary, FeatureAttribution, HypothesisAssessment
 from .spec import (
     AttributionSpec,
-    CategoricalHypothesis,
-    ContinuousHypothesis,
     Hypothesis,
 )
 from .stats import OddsRatioResult, RiskRatioResult, haldane_anscombe_odds_ratio, katz_risk_ratio
@@ -22,9 +20,7 @@ __all__ = [
     "AttributionSpec",
     "BinaryHypothesisResult",
     "BinaryHypothesisTest",
-    "CategoricalHypothesis",
     "ContributorRow",
-    "ContinuousHypothesis",
     "ErrorRegimeSummary",
     "Estimator",
     "FeatureAttribution",

@@ -1,0 +1,50 @@
+{
+  "description": "AI-generated smart-home thermostat example: the formula blends thermostat, wall sensor, humidity, window state, and occupancy to estimate room temperature error in a normal household setting.",
+  "target_expr": "col('GT Temp (C)')",
+  "prediction_expr": "thermostat_temp + round((room_sensor_temp - thermostat_temp) * 0.5) + round((measured_humidity - 50) / 20) - round(window_open * 0.8) + round(occupancy * 0.3)",
+  "mismatch_expr": "abs(col('Measured Temp (C)') - col('GT Temp (C)')) > 1.5",
+  "scope": "home",
+  "hypotheses": [
+    {
+      "name": "thermostat_temp",
+      "label": "Thermostat reading vs GT temp",
+      "condition": "col('Thermostat Temp (C)') == col('GT Temp (C)')"
+    },
+    {
+      "name": "room_sensor_temp",
+      "label": "Wall sensor reading vs GT temp",
+      "condition": "col('Room Sensor Temp (C)') == col('GT Temp (C)')"
+    },
+    {
+      "name": "measured_humidity",
+      "label": "Humidity probe vs GT humidity",
+      "condition": "col('Measured Humidity (%)') == col('GT Humidity (%)')"
+    },
+    {
+      "name": "window_open",
+      "label": "Window state vs GT state",
+      "condition": "col('Window Open') == col('GT Window Open')"
+    },
+    {
+      "name": "occupancy",
+      "label": "Occupancy flag vs GT occupancy",
+      "condition": "col('Occupancy') == col('GT Occupancy')"
+    },
+    {
+      "name": "thermostat_lags_during_draft",
+      "label": "Thermostat lags while a draft is active",
+      "condition": "abs(col('Thermostat Temp (C)') - col('GT Temp (C)')) > 1.0 and col('Window Open') == 1"
+    },
+    {
+      "name": "humid_occupied_evenings",
+      "label": "High humidity during occupied evenings",
+      "condition": "col('Measured Humidity (%)') >= 60 and col('Occupancy') == 1"
+    },
+    {
+      "name": "window_left_open_while_cold",
+      "label": "Window left open while the room is cool",
+      "condition": "col('Window Open') == 1 and col('GT Temp (C)') <= 21"
+    }
+  ],
+  "score_mode": "absolute_error"
+}
