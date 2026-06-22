@@ -19,20 +19,17 @@ def _ungated_sf_spec() -> AttributionSpec:
             CategoricalHypothesis(
                 name="class_sf",
                 label="Nominal class SF",
-                actual_expr="col('Detected SF')",
-                baseline_expr="col('GT SF')",
+                condition="col('Detected SF') == col('GT SF')",
             ),
             ContinuousHypothesis(
                 name="class_bw",
                 label="Nominal class BW",
-                actual_expr="col('Detected BW (Hz)')",
-                baseline_expr="col('GT BW (Hz)')",
+                condition="col('Detected BW (Hz)') == col('GT BW (Hz)')",
             ),
             ContinuousHypothesis(
                 name="measured_bw",
                 label="Measured BW",
-                actual_expr="col('Measured BW (Hz)')",
-                baseline_expr="col('GT BW (Hz)')",
+                condition="col('Measured BW (Hz)') == col('GT BW (Hz)')",
             ),
         ],
     )

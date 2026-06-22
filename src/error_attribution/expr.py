@@ -41,6 +41,26 @@ def evaluate_expression(source: str, context: Mapping[str, Any]) -> Any:
     return compile_expression(source).evaluate(context)
 
 
+def split_equality(expression: CompiledExpression) -> tuple[CompiledExpression, CompiledExpression] | None:
+    """Split a top-level equality into its two operands.
+
+    ``a == b`` returns compiled expressions for ``a`` (the model-produced value)
+    and ``b`` (the ground-truth baseline). Any other expression returns ``None``.
+    """
+
+    body = expression.tree.body
+    if isinstance(body, ast.Compare) and len(body.ops) == 1 and isinstance(body.ops[0], ast.Eq):
+        left = ast.Expression(body=body.left)
+        right = ast.Expression(body=body.comparators[0])
+        ast.fix_missing_locations(left)
+        ast.fix_missing_locations(right)
+        return (
+            CompiledExpression(source=ast.unparse(body.left), tree=left),
+            CompiledExpression(source=ast.unparse(body.comparators[0]), tree=right),
+        )
+    return None
+
+
 def build_row_context(row: Mapping[str, Any], extra: Mapping[str, Any] | None = None) -> dict[str, Any]:
     context = dict(row)
     if extra:

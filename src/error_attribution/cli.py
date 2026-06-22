@@ -13,7 +13,12 @@ from .contributor import combine_contributors, rank_contributors
 from .estimator import Estimator
 from .expr import build_row_context, evaluate_expression
 from .hypothesis import evaluate_binary_hypothesis
-from .spec import AttributionSpec, CategoricalHypothesis, ContinuousHypothesis, HypothesisSpec
+from .spec import (
+    AttributionSpec,
+    CategoricalHypothesis,
+    ContinuousHypothesis,
+    Hypothesis,
+)
 
 
 def _load_spec(path: str | Path) -> AttributionSpec:
@@ -25,7 +30,7 @@ def _load_spec(path: str | Path) -> AttributionSpec:
         payload = yaml.safe_load(raw_text)
     else:
         payload = json.loads(raw_text)
-    hypotheses: list[HypothesisSpec] = []
+    hypotheses: list[Hypothesis] = []
     for item in payload.get("hypotheses", []):
         hypothesis_cls = CategoricalHypothesis if item.get("kind", "continuous") == "categorical" else ContinuousHypothesis
         hypotheses.append(hypothesis_cls(**item))
@@ -33,7 +38,8 @@ def _load_spec(path: str | Path) -> AttributionSpec:
         target_expr=payload["target_expr"],
         prediction_expr=payload["prediction_expr"],
         hypotheses=hypotheses,
-        stratify_by=list(payload.get("stratify_by", [])),
+        mismatch_expr=payload.get("mismatch_expr"),
+        scope=payload.get("scope", "global"),
         score_mode=payload.get("score_mode", "absolute_error"),
     )
 
@@ -110,10 +116,16 @@ def main(argv: list[str] | None = None) -> int:
         sample = {
             "target_expr": "col('GT SF')",
             "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
+            "mismatch_expr": "col('Measured SF (ungated)') != col('GT SF')",
+            "scope": "sobel",
             "hypotheses": [
-                {"name": "class_sf", "actual_expr": "col('Detected SF')", "baseline_expr": "col('GT SF')", "kind": "categorical"},
-                {"name": "class_bw", "actual_expr": "col('Detected BW (Hz)')", "baseline_expr": "col('GT BW (Hz)')", "kind": "continuous"},
-                {"name": "measured_bw", "actual_expr": "col('Measured BW (Hz)')", "baseline_expr": "col('GT BW (Hz)')", "kind": "continuous"},
+                {"name": "class_bw < gt_bw (beyond tol)", "condition": "col('Detected BW (Hz)') < col('GT BW (Hz)') * (1 - 0.10)"},
+                {"name": "class_bw > gt_bw (beyond tol)", "condition": "col('Detected BW (Hz)') > col('GT BW (Hz)') * (1 + 0.10)"},
+                {"name": "class_bw within tol & sf wrong", "condition": "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 and col('Detected SF') != col('GT SF')"},
+                {"name": "class_bw & sf ok, measured_bw off", "condition": "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 and col('Detected SF') == col('GT SF') and abs(col('Measured BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') > 0.10"},
+                {"name": "class_sf", "condition": "col('Detected SF') == col('GT SF')", "kind": "categorical"},
+                {"name": "class_bw", "condition": "col('Detected BW (Hz)') == col('GT BW (Hz)')", "kind": "continuous"},
+                {"name": "measured_bw", "condition": "col('Measured BW (Hz)') == col('GT BW (Hz)')", "kind": "continuous"},
             ],
             "score_mode": "absolute_error",
         }
