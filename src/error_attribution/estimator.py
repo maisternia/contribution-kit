@@ -233,12 +233,16 @@ class Estimator:
         return self._sample_shapley(row, features, names, n_samples=n_samples, seed=seed)
 
     def _exact_shapley(self, row: Mapping[str, Any], features: Sequence[_Feature], names: list[str]) -> dict[str, float]:
+        # Closed-form Shapley value computation @cite: Shapley, 1953
+        # For each feature, sum weighted marginal contributions over all
+        # coalitions — exact for small feature sets @cite: Lundberg & Lee, 2017
         n = len(names)
         factorial_n = math.factorial(n)
         values = {name: 0.0 for name in names}
         for name in names:
             others = [other for other in names if other != name]
             for subset_size in range(len(others) + 1):
+                # Shapley weight: |S|! * (n - |S| - 1)! / n! @cite: Shapley, 1953
                 weight = math.factorial(subset_size) * math.factorial(n - subset_size - 1) / factorial_n
                 for subset in itertools.combinations(others, subset_size):
                     coalition = frozenset(subset)
@@ -246,6 +250,9 @@ class Estimator:
         return values
 
     def _sample_shapley(self, row: Mapping[str, Any], features: Sequence[_Feature], names: list[str], *, n_samples: int, seed: int) -> dict[str, float]:
+        # Monte-Carlo permutation sampling approximation of Shapley values
+        # @cite: Lundberg & Lee, 2017 — used when the feature count exceeds
+        # max_exact_features.
         rng = random.Random(seed)
         values = {name: 0.0 for name in names}
         for _ in range(max(1, n_samples)):

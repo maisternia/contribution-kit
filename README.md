@@ -17,8 +17,8 @@ Callers never construct regimes or binary tests directly — they only declare c
 
 - **Safe expression DSL** — define hypotheses and formulas over CSV columns without executing arbitrary code. Supports `col('Column Name')`, arithmetic, comparisons, `and`/`or`/`not`, ternary `a if cond else b`, and the functions `abs`, `bool`, `ceil`, `floor`, `float`, `int`, `log2`, `max`, `min`, `round`, `str`.
 - **Unified hypothesis model** — one flat list of `condition` strings drives error-regime shares, binary mismatch risk, and (for equality conditions) feature Shapley attribution.
-- **Exact Shapley** — closed-form decomposition for ≤12 features; deterministic sampling fallback for larger sets.
-- **Binary effect sizes** — Katz risk-ratio CIs and Haldane-Anscombe odds-ratio CIs for sparse 2x2 mismatch tables.
+- **Exact Shapley** — closed-form decomposition for ≤12 features; deterministic sampling fallback for larger sets \[[Shapley 1953](#ref-shapley53), [Lundberg & Lee 2017](#ref-lundberg17)\].
+- **Binary effect sizes** — Katz log-transform risk-ratio CIs \[[Katz et al. 1978](#ref-katz78)\] and Haldane-Anscombe continuity-corrected odds-ratio CIs \[[Haldane 1956](#ref-haldane56), [Anscombe 1956](#ref-anscombe56), [Agresti 2013](#ref-agresti13)\] for sparse 2×2 mismatch tables.
 - **Contributor ranking** — reusable lift/share/score scoring for categorical error buckets.
 - **CLI + Python API** — use from scripts, notebooks, or shell pipelines.
 
@@ -90,7 +90,7 @@ result.save("outputs/run_001")  # writes contribution.csv, run.json, report.md
 
 `save()` writes three files: `contribution.csv` (the feature-attribution table), `run.json` (the full machine-readable result), and `report.md`. The tables below are the real output of the Quick start spec on the bundled [examples/continuous_lora](examples/continuous_lora) dataset (13,277 rows of continuous-LoRa Sobel measurements).
 
-**Feature attributions** — Shapley decomposition of the prediction-formula error, one row per equality hypothesis, ranked by net error share:
+**Feature attributions** — Shapley decomposition of the prediction-formula error \[[Shapley 1953](#ref-shapley53), [Lundberg & Lee 2017](#ref-lundberg17)\], one row per equality hypothesis, ranked by net error share:
 
 | name | label | mean_abs_shapley | mean_signed_shapley | total_signed_shapley | net_error_share_pct |
 |---|---:|---:|---:|---:|---:|
@@ -107,7 +107,7 @@ result.save("outputs/run_001")  # writes contribution.csv, run.json, report.md
 | class_bw within tol & sf wrong | 23 | 1.2174 | 28.00 | 7.33 |
 | class_bw & sf ok, measured_bw off | 497 | 0.4487 | 223.00 | 58.38 |
 
-**Mismatch risk** — each regime's matching rows (group A) versus the rest (group B), using `mismatch_expr`, with risk and odds ratios:
+**Mismatch risk** — each regime's matching rows (group A) versus the rest (group B), using `mismatch_expr`, with Katz risk ratios \[[Katz et al. 1978](#ref-katz78)\] and Haldane-Anscombe odds ratios \[[Haldane 1956](#ref-haldane56), [Anscombe 1956](#ref-anscombe56)\]:
 
 | hypothesis | match mismatch rate | rest mismatch rate | risk ratio | odds ratio |
 |---|---:|---:|---:|---:|
@@ -166,6 +166,26 @@ tests/                  — pytest suite (Shapley invariants, DSL, estimator, co
 examples/               — example configs and data
   continuous_lora/      — config.json + measurements.csv (13,277-row real sample used in Results)
 ```
+
+## References
+
+<a id="ref-katz78"></a>
+[Katz 1978] Katz, D., Baptista, J., Azen, S. P., & Pike, M. C. (1978). Obtaining confidence intervals for the risk ratio in cohort studies. *Biometrics*, 34(3), 469–474.
+
+<a id="ref-haldane56"></a>
+[Haldane 1956] Haldane, J. B. S. (1956). The estimation and significance of the logarithm of a ratio of frequencies. *Annals of Human Genetics*, 20(4), 309–311.
+
+<a id="ref-anscombe56"></a>
+[Anscombe 1956] Anscombe, F. J. (1956). On estimating binomial response relations. *Biometrika*, 43(3–4), 461–464.
+
+<a id="ref-agresti13"></a>
+[Agresti 2013] Agresti, A. (2013). *Categorical Data Analysis* (3rd ed.). Wiley.
+
+<a id="ref-shapley53"></a>
+[Shapley 1953] Shapley, L. S. (1953). A value for n-person games. In *Contributions to the Theory of Games II* (pp. 307–317). Princeton University Press.
+
+<a id="ref-lundberg17"></a>
+[Lundberg & Lee 2017] Lundberg, S. M., & Lee, S.-I. (2017). A unified approach to interpreting model predictions. *Advances in Neural Information Processing Systems (NeurIPS)*, 30, 4765–4774.
 
 ## License
 

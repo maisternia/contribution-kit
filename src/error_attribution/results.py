@@ -112,6 +112,19 @@ class AssessmentResult:
         lines.append("")
         lines.append(f"Rows: {self.n_rows}")
         lines.append(f"Mean observed error: {self.mean_observed_error:.6f}")
+        lines.append("")
+        lines.append("---")
+        lines.append("**References**")
+        lines.append(
+            "Shapley values: Shapley (1953) *A value for n-person games*, Princeton UP; "
+            "Lundberg & Lee (2017) *A unified approach to interpreting model predictions*, NeurIPS 30."
+        )
+        lines.append(
+            "Risk ratio CI: Katz et al. (1978) *Biometrics* 34(3):469-474. "
+            "Odds ratio CI: Haldane (1956) *Ann. Hum. Genet.* 20(4):309-311; "
+            "Anscombe (1956) *Biometrika* 43(3-4):461-464; "
+            "Agresti (2013) *Categorical Data Analysis* (3rd ed.), Wiley."
+        )
         return "\n".join(lines)
 
     def to_json(self, path: str | Path) -> None:
