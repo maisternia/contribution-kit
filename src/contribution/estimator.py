@@ -1,4 +1,4 @@
-"""Estimator API for contribution analysis."""
+"""Estimator API for factor-contribution analysis."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Contribution analysis toolkit public API."""
+"""Factor-contribution analysis toolkit public API."""
 
 from .contributor import ContributorRow, combine_contributors, rank_contributors
 from .estimator import Estimator

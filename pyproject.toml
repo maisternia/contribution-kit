@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "contribution-kit"
 version = "0.2.0"
-description = "Reusable contribution-analysis toolkit for ML research"
+description = "Reusable toolkit for attributing a modeled quantity to its contributing factors"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}

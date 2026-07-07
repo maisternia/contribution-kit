@@ -1,4 +1,4 @@
-"""Command line interface for contribution analysis."""
+"""Command line interface for factor-contribution analysis."""
 
 from __future__ import annotations
 
@@ -143,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "report":
         payload = json.loads(Path(args.run).read_text(encoding="utf-8"))
-        lines = ["# Contribution Analysis Report", "", f"Rows: {payload['n_rows']}", f"Mean observed contribution: {payload['mean_observed_contribution']:.6f}", "", "| name | label | mean_abs_shapley | mean_signed_shapley | total_signed_shapley | net_contribution_share_pct |", "|---|---:|---:|---:|---:|---:|"]
+        lines = ["# Factor-Contribution Analysis Report", "", f"Rows: {payload['n_rows']}", f"Mean observed contribution: {payload['mean_observed_contribution']:.6f}", "", "| name | label | mean_abs_shapley | mean_signed_shapley | total_signed_shapley | net_contribution_share_pct |", "|---|---:|---:|---:|---:|---:|"]
         for row in payload["feature_attributions"]:
             lines.append(f"| {row['name']} | {row['label']} | {row['mean_abs_shapley']:.6f} | {row['mean_signed_shapley']:.6f} | {row['total_signed_shapley']:.6f} | {row['net_contribution_share_pct']:.2f} |")
         Path(args.out).write_text("\n".join(lines) + "\n", encoding="utf-8")
