@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from error_attribution import BinaryHypothesisTest, evaluate_binary_hypotheses, evaluate_binary_hypothesis
+from contribution import BinaryHypothesisTest, evaluate_binary_hypotheses, evaluate_binary_hypothesis
 
 
 def test_evaluate_binary_hypothesis_basic_rates() -> None:

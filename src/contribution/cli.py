@@ -1,4 +1,4 @@
-"""Command line interface for error attribution."""
+"""Command line interface for contribution attribution."""
 
 from __future__ import annotations
 
@@ -37,12 +37,12 @@ def _load_spec(path: str | Path) -> AttributionSpec:
         hypotheses=hypotheses,
         mismatch_expr=payload.get("mismatch_expr"),
         scope=payload.get("scope", "global"),
-        score_mode=payload.get("score_mode", "absolute_error"),
+        score_mode=payload.get("score_mode", "absolute"),
     )
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="error-attrib")
+    parser = argparse.ArgumentParser(prog="contrib")
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subcommands.add_parser("init-config", help="Write a starter configuration file")
@@ -124,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
                 {"name": "class_bw", "condition": "col('Detected BW (Hz)') == col('GT BW (Hz)')"},
                 {"name": "measured_bw", "condition": "col('Measured BW (Hz)') == col('GT BW (Hz)')"},
             ],
-            "score_mode": "absolute_error",
+            "score_mode": "absolute",
         }
         Path(args.out).write_text(json.dumps(sample, indent=2), encoding="utf-8")
         return 0
@@ -143,9 +143,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "report":
         payload = json.loads(Path(args.run).read_text(encoding="utf-8"))
-        lines = ["# Error Attribution Report", "", f"Rows: {payload['n_rows']}", f"Mean observed error: {payload['mean_observed_error']:.6f}", "", "| name | label | mean_abs_shapley | mean_signed_shapley | total_signed_shapley | net_error_share_pct |", "|---|---:|---:|---:|---:|---:|"]
+        lines = ["# Contribution Attribution Report", "", f"Rows: {payload['n_rows']}", f"Mean observed contribution: {payload['mean_observed_contribution']:.6f}", "", "| name | label | mean_abs_shapley | mean_signed_shapley | total_signed_shapley | net_contribution_share_pct |", "|---|---:|---:|---:|---:|---:|"]
         for row in payload["feature_attributions"]:
-            lines.append(f"| {row['name']} | {row['label']} | {row['mean_abs_shapley']:.6f} | {row['mean_signed_shapley']:.6f} | {row['total_signed_shapley']:.6f} | {row['net_error_share_pct']:.2f} |")
+            lines.append(f"| {row['name']} | {row['label']} | {row['mean_abs_shapley']:.6f} | {row['mean_signed_shapley']:.6f} | {row['total_signed_shapley']:.6f} | {row['net_contribution_share_pct']:.2f} |")
         Path(args.out).write_text("\n".join(lines) + "\n", encoding="utf-8")
         return 0
 

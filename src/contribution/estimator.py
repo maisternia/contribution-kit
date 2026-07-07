@@ -1,4 +1,4 @@
-"""Estimator API for error attribution."""
+"""Estimator API for contribution attribution."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from typing import Any, Mapping, Sequence
 
 from .expr import CompiledExpression, build_row_context, compile_expression, evaluate_expression, split_equality
 from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis
-from .results import AssessmentResult, ErrorRegimeSummary, FeatureAttribution, HypothesisAssessment
+from .results import AssessmentResult, RegimeSummary, FeatureAttribution, HypothesisAssessment
 from .spec import AttributionSpec, Hypothesis
 
 
@@ -34,7 +34,7 @@ def _parse_scalar(value: str) -> Any:
 
 
 def _score(prediction: float, target: float, score_mode: str) -> float:
-    return prediction - target if score_mode == "signed_error" else abs(prediction - target)
+    return prediction - target if score_mode == "signed" else abs(prediction - target)
 
 
 @dataclass(slots=True)
@@ -80,17 +80,17 @@ class Estimator:
 
         totals = {name: 0.0 for name in feature_names}
         abs_totals = {name: 0.0 for name in feature_names}
-        observed_errors: list[float] = []
-        observed_error_total = 0.0
+        observed_contributions: list[float] = []
+        observed_contribution_total = 0.0
         for row in self.rows:
             if feature_names:
                 row_result = self._assess_row(row, features, exact=exact, max_exact_features=max_exact_features, n_samples=n_samples, seed=seed)
                 for name, value in row_result.items():
                     totals[name] += value
                     abs_totals[name] += abs(value)
-            observed_error = self._observed_error(row, features)
-            observed_errors.append(observed_error)
-            observed_error_total += observed_error
+            observed_contribution = self._observed_contribution(row, features)
+            observed_contributions.append(observed_contribution)
+            observed_contribution_total += observed_contribution
 
         n_rows = len(self.rows)
         feature_attr: dict[str, FeatureAttribution] = {}
@@ -102,7 +102,7 @@ class Estimator:
                 mean_abs_shapley=abs_totals[feature.name] / n_rows if n_rows else 0.0,
                 mean_signed_shapley=signed_total / n_rows if n_rows else 0.0,
                 total_signed_shapley=signed_total,
-                net_error_share_pct=(signed_total / observed_error_total * 100.0) if observed_error_total else 0.0,
+                net_contribution_share_pct=(signed_total / observed_contribution_total * 100.0) if observed_contribution_total else 0.0,
             )
 
         mismatch_fn = self._mismatch_fn()
@@ -123,7 +123,7 @@ class Estimator:
                         name=hypothesis.name,
                         label=hypothesis.label or hypothesis.name,
                         analysis="regime",
-                        regime=self._regime_summary(hypothesis, observed_errors, observed_error_total),
+                        regime=self._regime_summary(hypothesis, observed_contributions, observed_contribution_total),
                         risk=self._regime_risk(hypothesis, mismatch_fn),
                     )
                 )
@@ -131,7 +131,7 @@ class Estimator:
         return AssessmentResult(
             hypotheses=assessments,
             n_rows=n_rows,
-            mean_observed_error=observed_error_total / n_rows if n_rows else 0.0,
+            mean_observed_contribution=observed_contribution_total / n_rows if n_rows else 0.0,
             metadata={"exact": exact, "n_samples": n_samples, "seed": seed},
         )
 
@@ -146,20 +146,20 @@ class Estimator:
             features.append(_Feature(name=hypothesis.name, label=hypothesis.label or hypothesis.name, actual=actual, baseline=baseline))
         return features
 
-    def _regime_summary(self, hypothesis: Hypothesis, observed_errors: Sequence[float], observed_error_total: float) -> ErrorRegimeSummary:
+    def _regime_summary(self, hypothesis: Hypothesis, observed_contributions: Sequence[float], observed_contribution_total: float) -> RegimeSummary:
         predicate = compile_expression(hypothesis.condition)
-        group_total_error = 0.0
+        group_total_contribution = 0.0
         count = 0
-        for row, observed_error in zip(self.rows, observed_errors):
+        for row, observed_contribution in zip(self.rows, observed_contributions):
             if bool(predicate.evaluate(build_row_context(row))):
-                group_total_error += observed_error
+                group_total_contribution += observed_contribution
                 count += 1
-        return ErrorRegimeSummary(
+        return RegimeSummary(
             name=hypothesis.name,
             count=count,
-            mean_error=(group_total_error / count) if count else 0.0,
-            total_error=group_total_error,
-            error_share_pct=(group_total_error / observed_error_total * 100.0) if observed_error_total else 0.0,
+            mean_contribution=(group_total_contribution / count) if count else 0.0,
+            total_contribution=group_total_contribution,
+            contribution_share_pct=(group_total_contribution / observed_contribution_total * 100.0) if observed_contribution_total else 0.0,
         )
 
     def _regime_risk(self, hypothesis: Hypothesis, mismatch_fn) -> BinaryHypothesisResult | None:
@@ -193,7 +193,7 @@ class Estimator:
 
         return predicate
 
-    def _observed_error(self, row: Mapping[str, Any], features: Sequence[_Feature]) -> float:
+    def _observed_contribution(self, row: Mapping[str, Any], features: Sequence[_Feature]) -> float:
         assert self.spec is not None
         prediction = float(self._evaluate_prediction(row, self._feature_values(row, features, actual=True)))
         target = float(self._evaluate_target(row))

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from error_attribution import (
+from contribution import (
     AttributionSpec,
     Estimator,
     Hypothesis,

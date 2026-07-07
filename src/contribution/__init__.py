@@ -1,4 +1,4 @@
-"""Error attribution toolkit public API."""
+"""Contribution attribution toolkit public API."""
 
 from .contributor import ContributorRow, combine_contributors, rank_contributors
 from .estimator import Estimator
@@ -8,7 +8,7 @@ from .hypothesis import (
     evaluate_binary_hypotheses,
     evaluate_binary_hypothesis,
 )
-from .results import AssessmentResult, ErrorRegimeSummary, FeatureAttribution, HypothesisAssessment
+from .results import AssessmentResult, RegimeSummary, FeatureAttribution, HypothesisAssessment
 from .spec import (
     AttributionSpec,
     Hypothesis,
@@ -21,7 +21,7 @@ __all__ = [
     "BinaryHypothesisResult",
     "BinaryHypothesisTest",
     "ContributorRow",
-    "ErrorRegimeSummary",
+    "RegimeSummary",
     "Estimator",
     "FeatureAttribution",
     "Hypothesis",

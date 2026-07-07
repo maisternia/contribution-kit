@@ -46,5 +46,5 @@
       "condition": "col('Window Open') == 1 and col('GT Temp (C)') <= 21"
     }
   ],
-  "score_mode": "absolute_error"
+  "score_mode": "absolute"
 }

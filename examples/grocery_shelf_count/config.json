@@ -56,5 +56,5 @@
       "condition": "col('GT Item Count') >= 8 and col('Detected Item Count') < col('GT Item Count')"
     }
   ],
-  "score_mode": "absolute_error"
+  "score_mode": "absolute"
 }

@@ -18,16 +18,16 @@ class FeatureAttribution:
     mean_abs_shapley: float
     mean_signed_shapley: float
     total_signed_shapley: float
-    net_error_share_pct: float
+    net_contribution_share_pct: float
 
 
 @dataclass(slots=True)
-class ErrorRegimeSummary:
+class RegimeSummary:
     name: str
     count: int
-    mean_error: float
-    total_error: float
-    error_share_pct: float
+    mean_contribution: float
+    total_contribution: float
+    contribution_share_pct: float
 
 
 @dataclass(slots=True)
@@ -35,8 +35,8 @@ class HypothesisAssessment:
     """Unified per-hypothesis assessment.
 
     Each input hypothesis produces exactly one assessment. ``analysis`` is either
-    ``"feature"`` (a Shapley contribution to the prediction-formula error) or
-    ``"regime"`` (an error-share plus mismatch-risk view of the rows matching the
+    ``"feature"`` (a Shapley contribution to the prediction-formula outcome) or
+    ``"regime"`` (a contribution-share plus mismatch-risk view of the rows matching the
     condition). Only the sub-results that apply are populated.
     """
 
@@ -44,7 +44,7 @@ class HypothesisAssessment:
     label: str
     analysis: str
     feature: FeatureAttribution | None = None
-    regime: ErrorRegimeSummary | None = None
+    regime: RegimeSummary | None = None
     risk: BinaryHypothesisResult | None = None
 
 
@@ -52,16 +52,16 @@ class HypothesisAssessment:
 class AssessmentResult:
     hypotheses: list[HypothesisAssessment]
     n_rows: int
-    mean_observed_error: float
+    mean_observed_contribution: float
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def feature_attributions(self) -> list[FeatureAttribution]:
         features = [item.feature for item in self.hypotheses if item.feature is not None]
-        return sorted(features, key=lambda row: row.net_error_share_pct, reverse=True)
+        return sorted(features, key=lambda row: row.net_contribution_share_pct, reverse=True)
 
     @property
-    def regime_summaries(self) -> list[ErrorRegimeSummary]:
+    def regime_summaries(self) -> list[RegimeSummary]:
         return [item.regime for item in self.hypotheses if item.regime is not None]
 
     @property
@@ -73,28 +73,28 @@ class AssessmentResult:
         target.parent.mkdir(parents=True, exist_ok=True)
         records = [asdict(row) for row in self.feature_attributions]
         with target.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=list(records[0].keys()) if records else ["name", "label", "mean_abs_shapley", "mean_signed_shapley", "total_signed_shapley", "net_error_share_pct"])
+            writer = csv.DictWriter(handle, fieldnames=list(records[0].keys()) if records else ["name", "label", "mean_abs_shapley", "mean_signed_shapley", "total_signed_shapley", "net_contribution_share_pct"])
             writer.writeheader()
             writer.writerows(records)
 
     def to_markdown(self) -> str:
         lines = [
-            "| name | label | mean_abs_shapley | mean_signed_shapley | total_signed_shapley | net_error_share_pct |",
+            "| name | label | mean_abs_shapley | mean_signed_shapley | total_signed_shapley | net_contribution_share_pct |",
             "|---|---:|---:|---:|---:|---:|",
         ]
         for row in self.feature_attributions:
             lines.append(
-                f"| {row.name} | {row.label} | {row.mean_abs_shapley:.6f} | {row.mean_signed_shapley:.6f} | {row.total_signed_shapley:.6f} | {row.net_error_share_pct:.2f} |"
+                f"| {row.name} | {row.label} | {row.mean_abs_shapley:.6f} | {row.mean_signed_shapley:.6f} | {row.total_signed_shapley:.6f} | {row.net_contribution_share_pct:.2f} |"
             )
 
         regimes = self.regime_summaries
         if regimes:
             lines.append("")
-            lines.append("| regime | count | mean_error | total_error | error_share_pct |")
+            lines.append("| regime | count | mean_contribution | total_contribution | contribution_share_pct |")
             lines.append("|---|---:|---:|---:|---:|")
             for regime in regimes:
                 lines.append(
-                    f"| {regime.name} | {regime.count} | {regime.mean_error:.4f} | {regime.total_error:.2f} | {regime.error_share_pct:.2f} |"
+                    f"| {regime.name} | {regime.count} | {regime.mean_contribution:.4f} | {regime.total_contribution:.2f} | {regime.contribution_share_pct:.2f} |"
                 )
 
         risks = self.binary_results
@@ -111,7 +111,7 @@ class AssessmentResult:
 
         lines.append("")
         lines.append(f"Rows: {self.n_rows}")
-        lines.append(f"Mean observed error: {self.mean_observed_error:.6f}")
+        lines.append(f"Mean observed contribution: {self.mean_observed_contribution:.6f}")
         lines.append("")
         lines.append("---")
         lines.append("**References**")
@@ -138,7 +138,7 @@ class AssessmentResult:
                     "regime_summaries": [asdict(row) for row in self.regime_summaries],
                     "binary_results": [asdict(row) for row in self.binary_results],
                     "n_rows": self.n_rows,
-                    "mean_observed_error": self.mean_observed_error,
+                    "mean_observed_contribution": self.mean_observed_contribution,
                     "metadata": self.metadata,
                 },
                 handle,

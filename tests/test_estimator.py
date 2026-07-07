@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from error_attribution import AttributionSpec, Estimator, Hypothesis
+from contribution import AttributionSpec, Estimator, Hypothesis
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -42,9 +42,9 @@ def test_n_rows_and_features() -> None:
 
 
 def test_additivity_invariant() -> None:
-    """Sum of per-feature net_error_share_pct must equal 100.0 (within float tolerance)."""
+    """Sum of per-feature net_contribution_share_pct must equal 100.0 (within float tolerance)."""
     result = Estimator.from_csv(FIXTURES / "synthetic_measurements.csv", _ungated_sf_spec()).assess()
-    total_share = sum(row.net_error_share_pct for row in result.feature_attributions)
+    total_share = sum(row.net_contribution_share_pct for row in result.feature_attributions)
     assert abs(total_share - 100.0) < 1e-6, f"shares do not sum to 100: {total_share}"
 
 
@@ -53,8 +53,8 @@ def test_dominated_by_class_sf() -> None:
     class_sf must therefore hold all of the net error share."""
     result = Estimator.from_csv(FIXTURES / "synthetic_measurements.csv", _ungated_sf_spec()).assess()
     by_name = {row.name: row for row in result.feature_attributions}
-    assert abs(by_name["class_sf"].net_error_share_pct - 100.0) < 1e-6, (
-        f"class_sf should own 100% of error, got {by_name['class_sf'].net_error_share_pct}"
+    assert abs(by_name["class_sf"].net_contribution_share_pct - 100.0) < 1e-6, (
+        f"class_sf should own 100% of error, got {by_name['class_sf'].net_contribution_share_pct}"
     )
 
 
@@ -80,7 +80,7 @@ def test_from_dataframe_equivalent() -> None:
     assert result_csv.n_rows == result_df.n_rows
     for a, b in zip(result_csv.feature_attributions, result_df.feature_attributions):
         assert a.name == b.name
-        assert abs(a.net_error_share_pct - b.net_error_share_pct) < 1e-9
+        assert abs(a.net_contribution_share_pct - b.net_contribution_share_pct) < 1e-9
 
 
 def _try_numeric(value: str) -> int | float | str:

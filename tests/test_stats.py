@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from error_attribution import haldane_anscombe_odds_ratio, katz_risk_ratio
+from contribution import haldane_anscombe_odds_ratio, katz_risk_ratio
 
 
 def test_katz_risk_ratio_known_values() -> None:

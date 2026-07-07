@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from error_attribution import combine_contributors, rank_contributors
+from contribution import combine_contributors, rank_contributors
 
 
 def test_rank_contributors_orders_by_score() -> None:

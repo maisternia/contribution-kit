@@ -1,13 +1,14 @@
-"""Typed configuration objects for error attribution."""
+"""Typed configuration objects for contribution attribution."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Literal
 
 
 @dataclass(slots=True)
 class Hypothesis:
-    """A single declarative hypothesis about what may contribute to formula error.
+    """A single declarative hypothesis about what may contribute to a formula outcome.
 
     ``Hypothesis`` is the one type callers need to construct. Each hypothesis is a
     ``name`` plus one boolean ``condition`` DSL string. The estimator privately
@@ -18,10 +19,10 @@ class Hypothesis:
       ``AttributionSpec.prediction_expr`` becomes a *Shapley feature*. The left
       operand is the model-produced value, the right operand is the ground-truth
       baseline, and the feature joins the Shapley attribution of the
-      prediction-formula error.
-    * Every other hypothesis is an *error regime*: the rows where the condition
-      holds form a subset whose observed-error share and mismatch risk (versus
-      the remaining rows) are reported.
+      prediction-formula contribution.
+    * Every other hypothesis is a *regime*: the rows where the condition
+      holds form a subset whose observed-contribution share and mismatch risk
+      (versus the remaining rows) are reported.
 
     Routing depends only on the ``condition`` shape and ``prediction_expr``
     membership. Callers never declare regimes or binary tests directly; they only
@@ -40,7 +41,7 @@ class AttributionSpec:
     Callers declare the prediction formula (``prediction_expr`` versus
     ``target_expr``), an optional mismatch indicator (``mismatch_expr``), and one
     flat list of ``hypotheses``. The estimator privately derives feature Shapley
-    attribution, error-regime shares, and binary mismatch risk from that list.
+    attribution, contribution-regime shares, and binary mismatch risk from that list.
     """
 
     target_expr: str
@@ -48,4 +49,4 @@ class AttributionSpec:
     hypotheses: list[Hypothesis] = field(default_factory=list)
     mismatch_expr: str | None = None
     scope: str = "global"
-    score_mode: Literal["absolute_error", "signed_error"] = "absolute_error"
+    score_mode: Literal["absolute", "signed"] = "absolute"

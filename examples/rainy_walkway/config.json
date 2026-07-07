@@ -41,5 +41,5 @@
       "condition": "col('Wind Speed (m/s)') >= 6 and col('Measured Wetness (%)') - col('GT Wetness (%)') >= 15"
     }
   ],
-  "score_mode": "absolute_error"
+  "score_mode": "absolute"
 }

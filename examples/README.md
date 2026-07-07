@@ -7,7 +7,7 @@ This directory contains small, self-contained example scenarios for the kit.
 - [rainy_walkway](rainy_walkway) - wet-surface estimation under rain, glare, and wind.
 - [grocery_shelf_count](grocery_shelf_count) - shelf-item counting under blur, occlusion, and low light.
 
-Each example folder contains a `config.json` and a matching `measurements.csv` that can be used with `error-attrib validate` and `error-attrib run`.
+Each example folder contains a `config.json` and a matching `measurements.csv` that can be used with `contrib validate` and `contrib run`.
 
 Short notes on the AI-generated examples:
 

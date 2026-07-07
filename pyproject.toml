@@ -3,16 +3,16 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "error-attribution-kit"
+name = "contribution-kit"
 version = "0.2.0"
-description = "Reusable error attribution toolkit for ML research"
+description = "Reusable contribution attribution toolkit for ML research"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 dependencies = []
 
 [project.scripts]
-error-attrib = "error_attribution.cli:main"
+contrib = "contribution.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

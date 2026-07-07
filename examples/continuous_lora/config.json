@@ -46,5 +46,5 @@
       "condition": "col('Measured BW (Hz)') == col('GT BW (Hz)')"
     }
   ],
-  "score_mode": "absolute_error"
+  "score_mode": "absolute"
 }

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from error_attribution.expr import compile_expression, evaluate_expression
+from contribution.expr import compile_expression, evaluate_expression
 
 
 def test_arithmetic() -> None:
