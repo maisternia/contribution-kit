@@ -1,4 +1,4 @@
-"""Typed configuration objects for contribution attribution."""
+"""Typed configuration objects for contribution analysis."""
 
 from __future__ import annotations
 
