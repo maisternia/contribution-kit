@@ -47,12 +47,12 @@ from contribution import (
 
 spec = AttributionSpec(
     target_expr="col('GT SF')",
-    prediction_expr="class_sf + round(2 * log2(measured_bw / class_bw))",
+    prediction_expr="class_sf + round(2 * log2(measured_bw / class_bw))", # is the formula you want to decompose — it defines what gets attributed to each Shapley feature.
     mismatch_expr="col('Measured SF (ungated)') != col('GT SF')",
-    scope="sobel",
-    score_mode="absolute",  # or "signed"
+    scope="sobel", # optional metadata for organizational purposes
+    score_mode="absolute",  # or "signed", it just tells the attribution engine whether to interpret the resulting values as absolute amounts or as signed (directional) amounts when computing Shapley features and regime shares.
     hypotheses=[
-        # Primary use case: directional / conditional error regimes.
+        # Directional / conditional error regimes for risks and odds ratios (Koopman, Baptista-Pike)
         Hypothesis(
             name="class_bw < gt_bw (beyond tol)",
             condition="col('Detected BW (Hz)') < col('GT BW (Hz)') * (1 - 0.10)",
@@ -84,8 +84,8 @@ spec = AttributionSpec(
                 "and abs(col('Measured BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10"
             ),
         ),
-        # Extra capability: top-level equalities whose name is in prediction_expr
-        # become Shapley features. No special type is required.
+        
+        # Top-level equalities whose name is in prediction_expr become Shapley features. No special type is required.
         Hypothesis(
             name="class_sf",
             condition="col('Detected SF') == col('GT SF')",
@@ -164,6 +164,10 @@ Config files are JSON or YAML with `target_expr`, `prediction_expr`, an optional
 pip install -e .
 ```
 
+Runtime dependency:
+
+- `pyyaml>=6.0` (used by `contrib` for YAML config files; JSON configs work as well).
+
 ## Testing
 
 Install test dependencies and run the unit-coverage gate:
@@ -171,6 +175,17 @@ Install test dependencies and run the unit-coverage gate:
 ```bash
 pip install -e '.[test]'
 pytest tests/unit --cov=contribution --cov-branch --cov-fail-under=100
+```
+
+Test layout:
+
+- `tests/unit/` contains exhaustive unit tests and is the required coverage gate.
+- `tests/smoke/` contains lightweight API smoke checks (fast integration-style sanity tests).
+
+Optional smoke run:
+
+```bash
+pytest tests/smoke
 ```
 
 ## Using as a submodule
@@ -194,7 +209,9 @@ src/contribution/  — reusable library
   hypothesis.py         — binary mismatch hypothesis test helpers
   results.py            — AssessmentResult (feature/regime/risk) → contribution.csv + report.md + run.json
   cli.py                — contrib CLI (init-config, validate, run, report, contributor, hypothesis)
-tests/                  — pytest suite (Shapley invariants, DSL, estimator, contributor, hypothesis, stats)
+tests/                  — pytest suite
+    unit/                 — exhaustive unit tests and coverage gate
+    smoke/                — lightweight API smoke checks
 examples/               — example configs and data
   continuous_lora/      — config.json + measurements.csv (13,277-row real sample used in Results)
 ```
