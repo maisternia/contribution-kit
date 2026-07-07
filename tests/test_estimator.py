@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from contribution import AttributionSpec, Estimator, Hypothesis
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -30,6 +28,21 @@ def _ungated_sf_spec() -> AttributionSpec:
                 name="measured_bw",
                 label="Measured BW",
                 condition="col('Measured BW (Hz)') == col('GT BW (Hz)')",
+            ),
+        ],
+    )
+
+
+def _binary_risk_spec() -> AttributionSpec:
+    return AttributionSpec(
+        target_expr="0",
+        prediction_expr="0",
+        mismatch_expr="mismatch",
+        hypotheses=[
+            Hypothesis(
+                name="group_a",
+                label="Group A",
+                condition="group != 'B'",
             ),
         ],
     )
@@ -81,6 +94,37 @@ def test_from_dataframe_equivalent() -> None:
     for a, b in zip(result_csv.feature_attributions, result_df.feature_attributions):
         assert a.name == b.name
         assert abs(a.net_contribution_share_pct - b.net_contribution_share_pct) < 1e-9
+
+
+def test_assess_uses_default_score_exact_and_legacy_wald() -> None:
+    rows = []
+    rows.extend({"group": "A", "mismatch": i == 0} for i in range(14))
+    rows.extend({"group": "B", "mismatch": i < 9} for i in range(10))
+
+    estimator = Estimator.from_dataframe(list(rows), _binary_risk_spec())
+    score_exact = estimator.assess()
+    wald = estimator.assess(ci_method="wald")
+
+    assert score_exact.metadata["ci_method"] == "score-exact"
+    assert wald.metadata["ci_method"] == "wald"
+    assert score_exact.binary_results[0].risk_ratio == wald.binary_results[0].risk_ratio
+    assert score_exact.binary_results[0].odds_ratio == wald.binary_results[0].odds_ratio
+    assert score_exact.binary_results[0].rr_ci_low != wald.binary_results[0].rr_ci_low
+
+
+def test_markdown_uses_koopman_and_baptista_references() -> None:
+    rows = []
+    rows.extend({"group": "A", "mismatch": i == 0} for i in range(14))
+    rows.extend({"group": "B", "mismatch": i < 9} for i in range(10))
+
+    result = Estimator.from_dataframe(list(rows), _binary_risk_spec()).assess()
+    markdown = result.to_markdown()
+
+    assert "Koopman (1984)" in markdown
+    assert "Baptista & Pike (1977)" in markdown
+    assert "Fagerland, Lydersen & Laake" in markdown
+    assert "Katz et al. (1978)" not in markdown
+    assert "Haldane" not in markdown
 
 
 def _try_numeric(value: str) -> int | float | str:

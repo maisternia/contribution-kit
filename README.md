@@ -20,7 +20,6 @@ The two analyses are:
 Callers never construct regimes or binary tests directly — they only declare conditions, and the relevant sub-results are populated automatically.
 
 Mini-example (one regime):
-See Dudarek & Martyniuk (2026) preprint for more information about the experiment.
 
 - Condition: `col('Detected BW (Hz)') < col('GT BW (Hz)') * (1 - 0.10)`
 - This condition only selects rows into group A (true) and group B (false/rest).
@@ -33,7 +32,7 @@ See Dudarek & Martyniuk (2026) preprint for more information about the experimen
 - **Safe expression DSL** — define hypotheses and formulas over CSV columns without executing arbitrary code. Supports `col('Column Name')`, arithmetic, comparisons, `and`/`or`/`not`, ternary `a if cond else b`, and the functions `abs`, `bool`, `ceil`, `floor`, `float`, `int`, `log2`, `max`, `min`, `round`, `str`.
 - **Unified hypothesis model** — one flat list of `condition` strings drives regime shares, binary mismatch risk, and (for equality conditions) feature Shapley attribution.
 - **Exact Shapley** — closed-form decomposition for ≤12 features; deterministic sampling fallback for larger sets \[[Shapley 1953](#ref-shapley53), [Lundberg & Lee 2017](#ref-lundberg17)\].
-- **Binary effect sizes** — Katz log-transform risk-ratio CIs \[[Katz et al. 1978](#ref-katz78)\] and Haldane-Anscombe continuity-corrected odds-ratio CIs \[[Haldane 1956](#ref-haldane56), [Anscombe 1956](#ref-anscombe56), [Agresti 2013](#ref-agresti13)\] for sparse 2×2 mismatch tables.
+- **Binary effect sizes** — Koopman asymptotic-score risk-ratio CIs \[[Koopman 1984](#ref-koopman84), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\] and Baptista-Pike exact odds-ratio CIs \[[Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2017](#ref-fagerland17)\] for sparse 2×2 mismatch tables. If you need the legacy Katz / Haldane-Anscombe pair, pass `ci_method="wald"` to `assess()` or `--ci-method wald` to `contrib hypothesis`.
 - **Contributor ranking** — reusable lift/share/score scoring for categorical contribution buckets.
 - **CLI + Python API** — use from scripts, notebooks, or shell pipelines.
 
@@ -130,7 +129,7 @@ result.save("outputs/run_001")  # writes contribution.csv, run.json, report.md
 | class_bw & sf ok, measured_bw off | 497 | 0.4487 | 223.00 | 58.38 |
 | class_bw & sf ok & measured ok (baseline) | 11972 | 0.0000 | 0.00 | 0.00% |
 
-**Mismatch risk** — each regime's matching rows (group A) versus the rest (group B), using `mismatch_expr` as the mismatch indicator (for example, `col('Measured SF (ungated)') != col('GT SF')`), with Katz risk ratios \[[Katz et al. 1978](#ref-katz78)\] and Haldane-Anscombe odds ratios \[[Haldane 1956](#ref-haldane56), [Anscombe 1956](#ref-anscombe56)\]:
+**Mismatch risk** — each regime's matching rows (group A) versus the rest (group B), using `mismatch_expr` as the mismatch indicator (for example, `col('Measured SF (ungated)') != col('GT SF')`), with Koopman risk ratios \[[Koopman 1984](#ref-koopman84), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\] and Baptista-Pike odds ratios \[[Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2017](#ref-fagerland17)\]:
 
 | hypothesis | match mismatch rate | rest mismatch rate | risk ratio (95% CI) | odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
@@ -181,7 +180,7 @@ src/contribution/  — reusable library
     spec.py               — AttributionSpec, Hypothesis
   estimator.py          — Estimator (from_csv, from_dataframe, assess); private feature/regime routing
   expr.py               — safe AST expression evaluator and equality splitting
-  stats.py              — Katz risk ratio and Haldane-Anscombe odds ratio
+    stats.py              — Koopman risk ratio and Baptista-Pike odds ratio
   contributor.py        — contributor lift/share/score ranking
   hypothesis.py         — binary mismatch hypothesis test helpers
   results.py            — AssessmentResult (feature/regime/risk) → contribution.csv + report.md + run.json
@@ -202,6 +201,18 @@ The repository also includes a few smaller, more familiar life-domain examples u
 Each folder ships a `config.json` and a matching `measurements.csv` that can be used directly with `contrib validate` and `contrib run`.
 
 ## References
+
+<a id="ref-koopman84"></a>
+[Koopman 1984] Koopman, P. A. R. (1984). Confidence intervals for the ratio of two binomial proportions. *Biometrics*, 40(2), 513–517.
+
+<a id="ref-baptista77"></a>
+[Baptista & Pike 1977] Baptista, J., & Pike, M. C. (1977). Algorithm AS 64: Exact two-sided confidence limits for the odds ratio in a 2×2 table. *Journal of the Royal Statistical Society, Series C (Applied Statistics)*, 26(2), 214–220.
+
+<a id="ref-fagerland15"></a>
+[Fagerland et al. 2015] Fagerland, M. W., Lydersen, S., & Laake, P. (2015). Recommended confidence intervals for two independent binomial proportions. *Statistical Methods in Medical Research*, 24(2), 224–254.
+
+<a id="ref-fagerland17"></a>
+[Fagerland et al. 2017] Fagerland, M. W., Lydersen, S., & Laake, P. (2017). *Statistical Analysis of Contingency Tables*. CRC Press.
 
 <a id="ref-katz78"></a>
 [Katz 1978] Katz, D., Baptista, J., Azen, S. P., & Pike, M. C. (1978). Obtaining confidence intervals for the risk ratio in cohort studies. *Biometrics*, 34(3), 469–474.

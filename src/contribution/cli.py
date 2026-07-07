@@ -78,6 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
     hypothesis_parser.add_argument("--group-a-label", required=True)
     hypothesis_parser.add_argument("--group-b-label", required=True)
     hypothesis_parser.add_argument("--scope", default="global")
+    hypothesis_parser.add_argument("--ci-method", default="score-exact", choices=["score-exact", "wald"])
     hypothesis_parser.add_argument("--out", required=True)
 
     return parser
@@ -202,6 +203,7 @@ def main(argv: list[str] | None = None) -> int:
             group_a_rows=group_a_rows,
             group_b_rows=group_b_rows,
             mismatch_fn=mismatch_fn_hypothesis,
+            ci_method=args.ci_method,
         )
         Path(args.out).write_text(json.dumps(asdict(result), indent=2), encoding="utf-8")
         return 0

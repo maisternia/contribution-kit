@@ -69,7 +69,7 @@ class Estimator:
             raise TypeError("Unsupported dataframe-like object")
         return cls(rows=rows, spec=spec)
 
-    def assess(self, *, spec: AttributionSpec | None = None, exact: bool = True, max_exact_features: int = 12, n_samples: int = 512, seed: int = 0) -> AssessmentResult:
+    def assess(self, *, spec: AttributionSpec | None = None, exact: bool = True, max_exact_features: int = 12, n_samples: int = 512, seed: int = 0, ci_method: str = "score-exact") -> AssessmentResult:
         if spec is not None:
             self.spec = spec
         self._validate_spec()
@@ -124,7 +124,7 @@ class Estimator:
                         label=hypothesis.label or hypothesis.name,
                         analysis="regime",
                         regime=self._regime_summary(hypothesis, observed_contributions, observed_contribution_total),
-                        risk=self._regime_risk(hypothesis, mismatch_fn),
+                        risk=self._regime_risk(hypothesis, mismatch_fn, ci_method=ci_method),
                     )
                 )
 
@@ -132,7 +132,7 @@ class Estimator:
             hypotheses=assessments,
             n_rows=n_rows,
             mean_observed_contribution=observed_contribution_total / n_rows if n_rows else 0.0,
-            metadata={"exact": exact, "n_samples": n_samples, "seed": seed},
+            metadata={"exact": exact, "n_samples": n_samples, "seed": seed, "ci_method": ci_method},
         )
 
     def _formula_features(self) -> list[_Feature]:
@@ -162,7 +162,7 @@ class Estimator:
             contribution_share_pct=(group_total_contribution / observed_contribution_total * 100.0) if observed_contribution_total else 0.0,
         )
 
-    def _regime_risk(self, hypothesis: Hypothesis, mismatch_fn) -> BinaryHypothesisResult | None:
+    def _regime_risk(self, hypothesis: Hypothesis, mismatch_fn, *, ci_method: str) -> BinaryHypothesisResult | None:
         assert self.spec is not None
         if mismatch_fn is None:
             return None
@@ -180,6 +180,7 @@ class Estimator:
             group_a_rows=group_a_rows,
             group_b_rows=group_b_rows,
             mismatch_fn=mismatch_fn,
+            ci_method=ci_method,
         )
 
     def _mismatch_fn(self):
