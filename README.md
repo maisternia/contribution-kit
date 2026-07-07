@@ -132,12 +132,12 @@ result.save("outputs/run_001")  # writes contribution.csv, run.json, report.md
 
 **Mismatch risk** — each regime's matching rows (group A) versus the rest (group B), using `mismatch_expr` as the mismatch indicator (for example, `col('Measured SF (ungated)') != col('GT SF')`), with Katz risk ratios \[[Katz et al. 1978](#ref-katz78)\] and Haldane-Anscombe odds ratios \[[Haldane 1956](#ref-haldane56), [Anscombe 1956](#ref-anscombe56)\]:
 
-| hypothesis | match mismatch rate | rest mismatch rate | risk ratio | odds ratio |
+| hypothesis | match mismatch rate | rest mismatch rate | risk ratio (95% CI) | odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
-| class_bw < gt_bw (beyond tol) | 19.12% (91/476) | 1.73% (222/12801) | 11.02 | 13.42 |
-| class_bw > gt_bw (beyond tol) | 10.36% (32/309) | 2.17% (281/12968) | 4.78 | 5.28 |
-| class_bw within tol & sf wrong | 95.65% (22/23) | 2.20% (291/13254) | 43.57 | 667.08 |
-| class_bw & sf ok, measured_bw off | 33.80% (168/497) | 1.13% (145/12780) | 29.79 | 44.41 |
+| class_bw < gt_bw (beyond tol) | 19.12% (91/476) | 1.73% (222/12801) | 11.02 (8.79 to 13.82) | 13.42 (10.31 to 17.47) |
+| class_bw > gt_bw (beyond tol) | 10.36% (32/309) | 2.17% (281/12968) | 4.78 (3.38 to 6.77) | 5.28 (3.60 to 7.73) |
+| class_bw within tol & sf wrong | 95.65% (22/23) | 2.20% (291/13254) | 43.57 (37.75 to 50.27) | 667.08 (127.23 to 3497.46) |
+| class_bw & sf ok, measured_bw off | 33.80% (168/497) | 1.13% (145/12780) | 29.79 (24.31 to 36.51) | 44.41 (34.68 to 56.87) |
 
 ```
 Rows: 13277

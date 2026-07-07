@@ -11,6 +11,20 @@ from typing import Any
 from .hypothesis import BinaryHypothesisResult
 
 
+def _format_effect_ci(value: float, ci_low: float | None, ci_high: float | None) -> str:
+    """Format an effect size with its confidence interval as ``value (low to high)``.
+
+    Matches the Prism-style reporting of a point estimate alongside its range. When
+    the value is infinite or a CI bound is unavailable the range is reported as n/a.
+    """
+
+    point = "inf" if value == float("inf") else f"{value:.2f}"
+    if ci_low is None or ci_high is None or value == float("inf"):
+        return f"{point} (n/a)"
+    return f"{point} ({ci_low:.2f} to {ci_high:.2f})"
+
+
+
 @dataclass(slots=True)
 class FeatureAttribution:
     name: str
@@ -100,13 +114,14 @@ class AssessmentResult:
         risks = self.binary_results
         if risks:
             lines.append("")
-            lines.append("| hypothesis | match mismatch rate | rest mismatch rate | risk ratio | odds ratio |")
+            lines.append("| hypothesis | match mismatch rate | rest mismatch rate | risk ratio (95% CI) | odds ratio (95% CI) |")
             lines.append("|---|---:|---:|---:|---:|")
             for risk in risks:
-                rr = "inf" if risk.risk_ratio == float("inf") else f"{risk.risk_ratio:.2f}"
+                rr = _format_effect_ci(risk.risk_ratio, risk.rr_ci_low, risk.rr_ci_high)
+                or_ = _format_effect_ci(risk.odds_ratio, risk.or_ci_low, risk.or_ci_high)
                 lines.append(
                     f"| {risk.test_name} | {risk.mismatch_rate_a_pct:.2f}% ({risk.mismatch_count_a}/{risk.total_count_a}) | "
-                    f"{risk.mismatch_rate_b_pct:.2f}% ({risk.mismatch_count_b}/{risk.total_count_b}) | {rr} | {risk.odds_ratio:.2f} |"
+                    f"{risk.mismatch_rate_b_pct:.2f}% ({risk.mismatch_count_b}/{risk.total_count_b}) | {rr} | {or_} |"
                 )
 
         lines.append("")
