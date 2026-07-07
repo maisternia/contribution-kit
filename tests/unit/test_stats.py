@@ -108,3 +108,86 @@ def test_internal_helpers_and_branches() -> None:
         upper_limit=1000.0,
     )
     assert 0.9 <= dec <= 1.1
+
+
+def test_bisect_root_endpoint_and_max_iter_paths() -> None:
+    assert stats._bisect_root(lambda x: x, 0.0, 2.0) == 0.0
+    assert stats._bisect_root(lambda x: x - 2.0, 0.0, 2.0) == 2.0
+    approx = stats._bisect_root(lambda x: x - 1.0, 0.0, 2.0, max_iter=0)
+    assert 0.9 <= approx <= 1.1
+
+
+def test_tail_probability_degenerate_and_invalid_paths(monkeypatch) -> None:
+    assert stats._tail_probability(0, 2, 2, 1, 0.0, tail="lower") == 1.0
+    assert stats._tail_probability(1, 1, 1, 1, 0.0, tail="upper") == 1.0
+    assert stats._tail_probability(1, 1, 1, 1, float("inf"), tail="lower") == 1.0
+    assert stats._tail_probability(0, 1, 1, 1, float("inf"), tail="upper") == 1.0
+    with pytest.raises(ValueError, match="tail"):
+        stats._tail_probability(1, 1, 1, 1, 0.0, tail="bad")
+    with pytest.raises(ValueError, match="tail"):
+        stats._tail_probability(1, 1, 1, 1, float("inf"), tail="bad")
+
+    monkeypatch.setattr(stats.math, "exp", lambda _x: 0.0)
+    assert stats._tail_probability(1, 2, 2, 2, 1.0, tail="lower") == 0.0
+
+
+def test_invert_monotone_tail_limit_branches() -> None:
+    # start <= 0 path and immediate equality return.
+    assert stats._invert_monotone_tail(lambda x: 1e-12, 1e-12, start=0.0, increasing=True) == 1e-12
+
+    # increasing branch with hard upper-limit return.
+    assert stats._invert_monotone_tail(lambda x: x, 10.0, start=0.5, increasing=True, upper_limit=1.0) == 1.0
+
+    # increasing branch with lower-limit return.
+    assert stats._invert_monotone_tail(lambda x: x, 0.1, start=0.5, increasing=True, lower_limit=0.2) == 0.2
+
+    # decreasing branch with upper-limit return.
+    assert stats._invert_monotone_tail(
+        lambda x: 1.0 / (1.0 + x),
+        0.1,
+        start=0.5,
+        increasing=False,
+        upper_limit=0.8,
+    ) == 0.8
+
+    # decreasing branch alternate path ending at lower limit.
+    assert stats._invert_monotone_tail(lambda x: x, 0.9, start=0.5, increasing=False, lower_limit=0.2) == 0.2
+
+    # increasing branch that exhausts iterations and returns upper_limit.
+    assert math.isinf(stats._invert_monotone_tail(lambda _x: 0.0, 1.0, start=0.5, increasing=True))
+
+    # increasing branch that exhausts iterations and returns lower_limit.
+    assert stats._invert_monotone_tail(
+        lambda _x: 2.0,
+        1.0,
+        start=0.5,
+        increasing=True,
+        lower_limit=-1.0,
+    ) == -1.0
+
+    # decreasing branch that hits the explicit bisection return.
+    assert stats._invert_monotone_tail(
+        lambda x: 1.0 / x,
+        0.6,
+        start=2.0,
+        increasing=False,
+    ) > 0
+
+    # decreasing branch that exhausts iterations and returns lower_limit.
+    assert stats._invert_monotone_tail(
+        lambda _x: 0.0,
+        1.0,
+        start=1.0,
+        increasing=False,
+        lower_limit=-1.0,
+    ) == -1.0
+
+
+def test_baptista_collapsed_support_path() -> None:
+    collapsed = baptista_pike_odds_ratio(0, 1, 0, 1)
+    assert collapsed.ci_low == 0.0
+    assert math.isinf(collapsed.ci_high)
+
+
+def test_private_odds_ratio_zero_numerator_zero_denominator() -> None:
+    assert math.isinf(stats._odds_ratio_value(0, 0, 1, 1))

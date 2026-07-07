@@ -53,8 +53,13 @@ def test_properties_and_markdown_sections() -> None:
     result = _sample_result(include_risk=True)
     features = result.feature_attributions
     assert [f.name for f in features] == ["b", "a"]
+    assert features[0].net_error_share_pct == features[0].net_contribution_share_pct
     assert len(result.regime_summaries) == 1
+    assert result.regime_summaries[0].mean_error == result.regime_summaries[0].mean_contribution
+    assert result.regime_summaries[0].total_error == result.regime_summaries[0].total_contribution
+    assert result.regime_summaries[0].error_share_pct == result.regime_summaries[0].contribution_share_pct
     assert len(result.binary_results) == 1
+    assert result.mean_observed_error == result.mean_observed_contribution
 
     markdown = result.to_markdown()
     assert "| regime | count |" in markdown
@@ -90,3 +95,20 @@ def test_to_csv_empty_records_header_fallback(tmp_path) -> None:
     result.to_csv(target)
     text = target.read_text(encoding="utf-8")
     assert "name,label,mean_abs_shapley" in text
+
+
+def test_markdown_without_regimes_section() -> None:
+    result = AssessmentResult(
+        hypotheses=[
+            HypothesisAssessment(
+                name="f",
+                label="F",
+                analysis="feature",
+                feature=FeatureAttribution("f", "F", 0.1, 0.1, 0.1, 100.0),
+            )
+        ],
+        n_rows=1,
+        mean_observed_contribution=0.1,
+    )
+    markdown = result.to_markdown()
+    assert "| regime | count |" not in markdown

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ast
+
 import pytest
 
 from contribution.expr import build_row_context, compile_expression, evaluate_expression, split_equality
@@ -64,4 +66,52 @@ def test_unknown_variable_raises() -> None:
 
 def test_non_direct_function_call_rejected() -> None:
     with pytest.raises(ValueError, match="Only direct function calls are allowed"):
-        compile_expression("(min)(1, 2)")
+        compile_expression("math.sqrt(4)")
+
+
+def test_eval_keyword_args_and_extra_compare_paths() -> None:
+    ctx = {"a": 2, "b": 2}
+    assert evaluate_expression("round(1.2345, ndigits=2)", ctx) == 1.23
+    assert evaluate_expression("a - b", ctx) == 0
+    assert evaluate_expression("a <= b", ctx) is True
+    assert evaluate_expression("a >= b", ctx) is True
+    assert evaluate_expression("a <= 1", ctx) is False
+    assert evaluate_expression("a >= 3", ctx) is False
+
+
+def test_eval_rejects_non_direct_call_node() -> None:
+    from contribution import expr as expr_module
+
+    bad_call = ast.Call(
+        func=ast.Attribute(value=ast.Name(id="obj", ctx=ast.Load()), attr="m", ctx=ast.Load()),
+        args=[],
+        keywords=[],
+    )
+    with pytest.raises(ValueError, match="Only direct function calls are allowed"):
+        expr_module._eval_node(bad_call, {})
+
+
+def test_eval_unsupported_node_raises() -> None:
+    from contribution import expr as expr_module
+
+    with pytest.raises(ValueError, match="Unsupported expression node"):
+        expr_module._eval_node(ast.Dict(keys=[], values=[]), {})
+
+
+def test_eval_unsupported_binop_and_unaryop_raise() -> None:
+    from contribution import expr as expr_module
+
+    bad_bin = ast.BinOp(left=ast.Constant(1), op=ast.MatMult(), right=ast.Constant(2))
+    bad_unary = ast.UnaryOp(op=ast.Invert(), operand=ast.Constant(1))
+    with pytest.raises(ValueError, match="Unsupported expression node"):
+        expr_module._eval_node(bad_bin, {})
+    with pytest.raises(ValueError, match="Unsupported expression node"):
+        expr_module._eval_node(bad_unary, {})
+
+
+def test_eval_unsupported_boolop_operator_raises() -> None:
+    from contribution import expr as expr_module
+
+    bad_bool = ast.BoolOp(op=ast.BitAnd(), values=[ast.Constant(True), ast.Constant(False)])
+    with pytest.raises(ValueError, match="Unsupported expression node"):
+        expr_module._eval_node(bad_bool, {})

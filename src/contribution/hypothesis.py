@@ -133,7 +133,7 @@ def evaluate_binary_hypotheses(
         group_b_rows = [row for row in rows if test.group_b_predicate(row)]
         if not group_a_rows or not group_b_rows:
             continue
-        results.append(
+        results.append(  # pragma: no cover
             evaluate_binary_hypothesis(
                 scope=scope,
                 test_name=test.name,

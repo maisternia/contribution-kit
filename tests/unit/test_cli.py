@@ -87,6 +87,12 @@ def test_load_rows_scalar_parsing(tmp_path: Path) -> None:
     assert isinstance(rows[0]["mismatch"], bool)
 
 
+def test_parse_scalar_empty_and_non_numeric_text() -> None:
+    assert cli._parse_scalar("   ") is None
+    assert cli._parse_scalar("1.5") == 1.5
+    assert cli._parse_scalar("abc") == "abc"
+
+
 def test_main_validate_run_report(tmp_path: Path) -> None:
     data = tmp_path / "in.csv"
     _write_csv(data, _rows())
@@ -173,3 +179,15 @@ def test_main_contributor_feature_format_error(tmp_path: Path) -> None:
                 str(tmp_path / "x.json"),
             ]
         )
+
+
+def test_main_returns_one_for_unrecognized_command(monkeypatch) -> None:
+    class _Args:
+        command = "unknown"
+
+    class _Parser:
+        def parse_args(self, argv):
+            return _Args()
+
+    monkeypatch.setattr(cli, "build_parser", lambda: _Parser())
+    assert cli.main([]) == 1

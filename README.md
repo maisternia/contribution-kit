@@ -164,6 +164,15 @@ Config files are JSON or YAML with `target_expr`, `prediction_expr`, an optional
 pip install -e .
 ```
 
+## Testing
+
+Install test dependencies and run the unit-coverage gate:
+
+```bash
+pip install -e '.[test]'
+pytest tests/unit --cov=contribution --cov-branch --cov-fail-under=100
+```
+
 ## Using as a submodule
 
 You can add this repository as a git submodule in your own project:

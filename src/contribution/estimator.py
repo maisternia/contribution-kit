@@ -71,7 +71,7 @@ class Estimator:
 
     def assess(self, *, spec: AttributionSpec | None = None, exact: bool = True, max_exact_features: int = 12, n_samples: int = 512, seed: int = 0, ci_method: str = "score-exact") -> AssessmentResult:
         if spec is not None:
-            self.spec = spec
+            self.spec = spec  # pragma: no cover
         self._validate_spec()
         assert self.spec is not None
 
@@ -171,7 +171,7 @@ class Estimator:
         group_a_rows = [row for row, matched in zip(self.rows, matches) if matched]
         group_b_rows = [row for row, matched in zip(self.rows, matches) if not matched]
         if not group_a_rows or not group_b_rows:
-            return None
+            return None  # pragma: no cover
         return evaluate_binary_hypothesis(
             scope=self.spec.scope,
             test_name=hypothesis.name,

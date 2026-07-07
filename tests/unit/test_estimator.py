@@ -135,3 +135,42 @@ def test_assess_exact_and_sampled_and_regime_none_paths(tmp_path: Path) -> None:
     est3 = Estimator(rows=[{"mismatch": True}], spec=single_group)
     assessed_single = est3.assess()
     assert assessed_single.hypotheses[0].risk is None
+
+
+    def test_assess_allows_spec_override() -> None:
+        rows = [{"y": 1, "x": 1}]
+        base = AttributionSpec(target_expr="y", prediction_expr="x", hypotheses=[Hypothesis(name="h", condition="x == y")])
+        replacement = AttributionSpec(target_expr="y", prediction_expr="x", hypotheses=[Hypothesis(name="h2", condition="x == y")])
+        estimator = Estimator.from_dataframe(rows, base)
+        result = estimator.assess(spec=replacement)
+        assert result.hypotheses[0].name == "h2"
+
+
+    def test_regime_risk_none_when_group_b_missing() -> None:
+        rows = [{"g": "A", "mismatch": False}, {"g": "A", "mismatch": True}]
+        spec = AttributionSpec(
+            target_expr="0",
+            prediction_expr="0",
+            mismatch_expr="mismatch",
+            hypotheses=[Hypothesis(name="all_a", condition="g != 'B'")],
+        )
+        result = Estimator.from_dataframe(rows, spec).assess(exact=True)
+        assert result.binary_results == []
+
+
+    def test_assess_spec_override_on_empty_rows() -> None:
+        replacement = AttributionSpec(target_expr="0", prediction_expr="0", hypotheses=[Hypothesis(name="h", condition="1 == 1")])
+        estimator = Estimator(rows=[], spec=None)
+        result = estimator.assess(spec=replacement)
+        assert result.n_rows == 0
+
+
+    def test_private_regime_risk_returns_none_for_empty_rest_group() -> None:
+        spec = AttributionSpec(
+            target_expr="0",
+            prediction_expr="0",
+            mismatch_expr="mismatch",
+            hypotheses=[Hypothesis(name="reg", condition="g != 'B'")],
+        )
+        estimator = Estimator(rows=[{"g": "A", "mismatch": True}], spec=spec)
+        assert estimator._regime_risk(spec.hypotheses[0], lambda row: bool(row["mismatch"]), ci_method="score-exact") is None

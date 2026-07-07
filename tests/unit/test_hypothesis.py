@@ -64,6 +64,11 @@ def test_evaluate_binary_hypothesis_ci_methods_and_error() -> None:
         )
 
 
+def test_raw_odds_ratio_negative_numerator_path() -> None:
+    # Private helper branch coverage: denominator == 0 and numerator < 0.
+    assert _raw_odds_ratio(-1, 1, 0, 1) == 0.0
+
+
 def test_evaluate_binary_hypotheses_skips_empty_group() -> None:
     rows = [{"group": "A", "mismatch": True}, {"group": "A", "mismatch": False}]
     tests = [
@@ -81,3 +86,44 @@ def test_evaluate_binary_hypotheses_skips_empty_group() -> None:
         tests=tests,
         mismatch_fn=lambda row: bool(row["mismatch"]),
     ) == []
+
+
+    def test_evaluate_binary_hypotheses_appends_non_empty() -> None:
+        rows = [{"g": "A", "m": True}, {"g": "B", "m": False}]
+        tests = [
+            BinaryHypothesisTest(
+                name="non-empty",
+                group_a_label="A",
+                group_b_label="B",
+                group_a_predicate=lambda row: row["g"] == "A",
+                group_b_predicate=lambda row: row["g"] == "B",
+            )
+        ]
+        out = evaluate_binary_hypotheses(
+            scope="s",
+            rows=rows,
+            tests=tests,
+            mismatch_fn=lambda row: bool(row["m"]),
+        )
+        assert len(out) == 1
+
+
+    def test_evaluate_binary_hypotheses_with_multiple_tests() -> None:
+        rows = [{"g": "A", "m": True}, {"g": "B", "m": False}, {"g": "A", "m": False}]
+        tests = [
+            BinaryHypothesisTest(
+                name="a-vs-b",
+                group_a_label="A",
+                group_b_label="B",
+                group_a_predicate=lambda row: row["g"] == "A",
+                group_b_predicate=lambda row: row["g"] == "B",
+            )
+        ]
+        results = evaluate_binary_hypotheses(
+            scope="global",
+            rows=rows,
+            tests=tests,
+            mismatch_fn=lambda row: bool(row["m"]),
+            ci_method="wald",
+        )
+        assert [item.test_name for item in results] == ["a-vs-b"]
