@@ -2,9 +2,9 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-maisternia%2Fcontribution--kit-blue)](https://github.com/maisternia/contribution-kit)
 
-Reusable Python toolkit for attributing a modeled quantity to user-defined hypotheses. The quantity is whatever you define through `target_expr`, `prediction_expr`, and `score_mode` — it can be a prediction *error*, but equally a reward, yield, deviation, or any signed contribution; the framing is entirely yours through the hypothesis conditions and how you name-interpret the results. You declare each hypothesis as a single boolean `condition` over CSV columns. The primary use case is directional or conditional **regimes** (e.g. "detected BW falls below GT BW"), whose observed-contribution share and condition-vs-rest mismatch risk are reported; top-level equality conditions are also supported as an extra **Shapley feature** of the prediction formula.
+Reusable Python toolkit for attributing a modeled quantity to user-defined hypotheses. The quantity is whatever you define through `target_expr`, `prediction_expr`, and `score_mode` — it can be a prediction *error*, but equally a reward, yield, deviation, or any signed contribution; the framing is entirely yours through the hypothesis conditions and how you name-interpret the results. You declare each hypothesis as a single boolean `condition` over CSV columns. The primary use case is directional or conditional **regimes** (e.g. "detected Height falls below GT Height"), whose observed-contribution share and condition-vs-rest mismatch risk are reported; top-level equality conditions are also supported as an extra **Shapley feature** of the prediction formula.
 
-> Running example: throughout this README the modeled quantity is a prediction *error* (`|prediction - target|`), because that is the bundled dataset's use case. Swap the expressions and `score_mode` and the same math attributes any positive or negative contribution.
+> Running example: throughout this README the modeled quantity is a prediction *error* (`|prediction - target|`), because that is the bundled dataset's use case. Swap the expressions and `score_mode` and the same math attributes any positive or negative contribution. See Dudarek & Martyniuk (2026) preprint for more information about the experiment used as the main example here \[[Dudarek & Martyniuk 2026](#ref-dudarek26)\].
 
 ## How it works
 
@@ -20,6 +20,7 @@ The two analyses are:
 Callers never construct regimes or binary tests directly — they only declare conditions, and the relevant sub-results are populated automatically.
 
 Mini-example (one regime):
+See Dudarek & Martyniuk (2026) preprint for more information about the experiment.
 
 - Condition: `col('Detected BW (Hz)') < col('GT BW (Hz)') * (1 - 0.10)`
 - This condition only selects rows into group A (true) and group B (false/rest).
@@ -219,6 +220,9 @@ Each folder ships a `config.json` and a matching `measurements.csv` that can be 
 
 <a id="ref-lundberg17"></a>
 [Lundberg & Lee 2017] Lundberg, S. M., & Lee, S.-I. (2017). A unified approach to interpreting model predictions. *Advances in Neural Information Processing Systems (NeurIPS)*, 30, 4765–4774.
+
+<a id="ref-dudarek26"></a>
+[Dudarek & Martyniuk 2026] Dudarek, G., & Martyniuk, A. (2026). From Discrete to Continuous LoRa Parameter Estimation Using Vision-Based Deep Learning. *Preprint*. SSRN. http://ssrn.com/abstract=6891362
 
 ## License
 
