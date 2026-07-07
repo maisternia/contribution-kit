@@ -11,6 +11,14 @@ requires-python = ">=3.11"
 license = {text = "MIT"}
 dependencies = []
 
+[project.optional-dependencies]
+test = [
+	"coverage>=7.6",
+	"pytest>=8.3",
+	"pytest-cov>=5.0",
+	"pyyaml>=6.0",
+]
+
 [project.scripts]
 contrib = "contribution.cli:main"
 
@@ -19,3 +27,15 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests/unit"]
+
+[tool.coverage.run]
+branch = true
+source = ["contribution"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true

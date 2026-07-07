@@ -34,6 +34,11 @@ class FeatureAttribution:
     total_signed_shapley: float
     net_contribution_share_pct: float
 
+    @property
+    def net_error_share_pct(self) -> float:
+        """Backward-compatible alias for pre-v0.2 naming."""
+        return self.net_contribution_share_pct
+
 
 @dataclass(slots=True)
 class RegimeSummary:
@@ -42,6 +47,21 @@ class RegimeSummary:
     mean_contribution: float
     total_contribution: float
     contribution_share_pct: float
+
+    @property
+    def mean_error(self) -> float:
+        """Backward-compatible alias for pre-v0.2 naming."""
+        return self.mean_contribution
+
+    @property
+    def total_error(self) -> float:
+        """Backward-compatible alias for pre-v0.2 naming."""
+        return self.total_contribution
+
+    @property
+    def error_share_pct(self) -> float:
+        """Backward-compatible alias for pre-v0.2 naming."""
+        return self.contribution_share_pct
 
 
 @dataclass(slots=True)
@@ -68,6 +88,11 @@ class AssessmentResult:
     n_rows: int
     mean_observed_contribution: float
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def mean_observed_error(self) -> float:
+        """Backward-compatible alias for pre-v0.2 naming."""
+        return self.mean_observed_contribution
 
     @property
     def feature_attributions(self) -> list[FeatureAttribution]:
@@ -135,10 +160,9 @@ class AssessmentResult:
             "Lundberg & Lee (2017) *A unified approach to interpreting model predictions*, NeurIPS 30."
         )
         lines.append(
-            "Risk ratio CI: Katz et al. (1978) *Biometrics* 34(3):469-474. "
-            "Odds ratio CI: Haldane (1956) *Ann. Hum. Genet.* 20(4):309-311; "
-            "Anscombe (1956) *Biometrika* 43(3-4):461-464; "
-            "Agresti (2013) *Categorical Data Analysis* (3rd ed.), Wiley."
+            "Risk ratio CI: Koopman (1984) *Biometrics* 40(2):513-517. "
+            "Odds ratio CI: Baptista & Pike (1977) *J. Roy. Statist. Soc. C* 26(2):214-220. "
+            "Small-sample recommendation: Fagerland, Lydersen & Laake (2015, 2017)."
         )
         return "\n".join(lines)
 

@@ -35,6 +35,16 @@ class Hypothesis:
 
 
 @dataclass(slots=True)
+class CategoricalHypothesis(Hypothesis):
+    """Backward-compatible alias for category-focused hypothesis declarations."""
+
+
+@dataclass(slots=True)
+class ContinuousHypothesis(Hypothesis):
+    """Backward-compatible alias for continuous-value hypothesis declarations."""
+
+
+@dataclass(slots=True)
 class AttributionSpec:
     """Single declarative entry point for an attribution analysis.
 
