@@ -57,11 +57,11 @@ def _config(path: Path) -> Path:
     return path
 
 
-def test_build_parser_and_init_config(tmp_path: Path) -> None:
+def test_build_parser_and_starter_config(tmp_path: Path) -> None:
     parser = cli.build_parser()
-    parsed = parser.parse_args(["init-config", "--out", str(tmp_path / "cfg.json")])
-    assert parsed.command == "init-config"
-    assert cli.main(["init-config", "--out", str(tmp_path / "cfg.json")]) == 0
+    parsed = parser.parse_args(["starter-config", "--out", str(tmp_path / "cfg.json")])
+    assert parsed.command == "starter-config"
+    assert cli.main(["starter-config", "--out", str(tmp_path / "cfg.json")]) == 0
     assert (tmp_path / "cfg.json").exists()
 
 
@@ -91,6 +91,17 @@ def test_parse_scalar_empty_and_non_numeric_text() -> None:
     assert cli._parse_scalar("   ") is None
     assert cli._parse_scalar("1.5") == 1.5
     assert cli._parse_scalar("abc") == "abc"
+
+
+def test_main_help(capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.main(["help"]) == 0
+    out = capsys.readouterr().out
+    assert "Available commands" in out
+    assert "starter-config" in out
+    assert "run" in out
+    assert "Minimal path" in out
+    assert "Recommended path" in out
+    assert "Other commands" in out
 
 
 def test_main_validate_run_report(tmp_path: Path) -> None:

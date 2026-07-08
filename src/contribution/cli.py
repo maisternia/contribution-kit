@@ -7,6 +7,7 @@ import csv
 import json
 from dataclasses import asdict
 from pathlib import Path
+from textwrap import dedent
 from typing import Any
 
 from .contributor import combine_contributors, rank_contributors
@@ -41,13 +42,44 @@ def _load_spec(path: str | Path) -> AttributionSpec:
     )
 
 
+def _help_text() -> str:
+        return dedent(
+                """
+                contrib CLI
+
+                Available commands:
+                    starter-config  Write a starter configuration file
+                    validate        Validate config and input
+                    run             Run attribution and save outputs
+                    report          Regenerate markdown report from run.json
+                    contributor     Run contributor bucket ranking
+                    hypothesis      Run a binary hypothesis test
+                    help            Show this help text
+
+                Quick guide
+
+                Minimal path (get results in one command):
+                    contrib run --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
+
+                Recommended path (safer):
+                    contrib validate --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv
+                    contrib run      --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
+
+                Other commands (optional / independent):
+                    contrib starter-config --out config.json
+                    contrib report --run outputs/run_001/run.json --out outputs/run_001/report.md
+                    contrib contributor --input <csv> --mismatch-expr <expr> --feature <name:expr> --out <json>
+                    contrib hypothesis --input <csv> --mismatch-expr <expr> --name <name> --group-a <expr> --group-b <expr> --group-a-label <label> --group-b-label <label> --out <json>
+                """
+        ).strip()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="contrib")
     subcommands = parser.add_subparsers(dest="command", required=True)
 
-    init_parser = subcommands.add_parser("init-config", help="Write a starter configuration file")
+    init_parser = subcommands.add_parser("starter-config", help="Write a starter configuration file")
     init_parser.add_argument("--out", required=True)
-    init_parser.add_argument("--template", default="ungated_sf")
 
     validate_parser = subcommands.add_parser("validate", help="Validate config and input")
     validate_parser.add_argument("--config", required=True)
@@ -81,6 +113,8 @@ def build_parser() -> argparse.ArgumentParser:
     hypothesis_parser.add_argument("--ci-method", default="score-exact", choices=["score-exact", "wald"])
     hypothesis_parser.add_argument("--out", required=True)
 
+    subcommands.add_parser("help", help="Show command workflow and examples")
+
     return parser
 
 
@@ -110,7 +144,11 @@ def _load_rows(path: str | Path) -> list[dict[str, Any]]:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
-    if args.command == "init-config":
+    if args.command == "help":
+        print(_help_text())
+        return 0
+
+    if args.command == "starter-config":
         sample = {
             "target_expr": "col('GT SF')",
             "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",

@@ -10,9 +10,16 @@ Reusable Python toolkit for attributing a modeled quantity to user-defined hypot
 
 You declare every hypothesis with the single `Hypothesis` type — a `name` plus one boolean `condition` written in the safe DSL. The condition is used only to select rows (inside regime vs outside regime). After that selection, the estimator computes observed-contribution statistics on the selected rows and, if `mismatch_expr` is provided, compares mismatch rates between selected rows and the rest.
 
+At a glance, the reported analyses are:
+
+- **Shapley feature attribution** (feature-level decomposition of formula contribution)
+- **Koopman risk-ratio intervals** (regime mismatch risk vs rest)
+- **Baptista-Pike odds-ratio intervals** (sparse-table robust mismatch odds)
+
+
 **Classification rule:** a hypothesis whose `condition` is a top-level equality (`==`) and whose `name` appears in `prediction_expr` becomes a Shapley feature; every other hypothesis is a regime. You never pick a type or set a flag — routing is derived entirely from the condition.
 
-The two analyses are:
+The two hypothesis-routing outputs are:
 
 - **Regime (share + risk) — primary.** Any non-equality boolean condition declares a regime. The rows where it holds form a subset. For that subset, the toolkit reports observed-contribution share (`mean_contribution`, `total_contribution`, `contribution_share_pct`) and, when `mismatch_expr` is set, mismatch risk versus the remaining rows. Directional and conditional regimes are the main thing you declare.
 - **Formula feature (Shapley) — extra.** A top-level equality `actual == baseline` declares a feature. The left operand is the model-produced value, the right operand is the ground-truth baseline, and the feature joins the exact Shapley attribution of the prediction-formula contribution. The feature `name` must appear in `prediction_expr`.
@@ -48,7 +55,7 @@ from contribution import (
 spec = AttributionSpec(
     target_expr="col('GT SF')",
     prediction_expr="class_sf + round(2 * log2(measured_bw / class_bw))", # is the formula you want to decompose — it defines what gets attributed to each Shapley feature.
-    mismatch_expr="col('Measured SF (ungated)') != col('GT SF')",
+    mismatch_expr="col('Measured SF (ungated)') != col('GT SF')", # may align with prediction-vs-target disagreement in some setups, but can also be independent (for example, tolerance exceedance or directional error event). 
     scope="sobel", # optional metadata for organizational purposes
     score_mode="absolute",  # or "signed", it just tells the attribution engine whether to interpret the resulting values as absolute amounts or as signed (directional) amounts when computing Shapley features and regime shares.
     hypotheses=[
@@ -84,7 +91,6 @@ spec = AttributionSpec(
                 "and abs(col('Measured BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10"
             ),
         ),
-        
         # Top-level equalities whose name is in prediction_expr become Shapley features. No special type is required.
         Hypothesis(
             name="class_sf",
@@ -109,7 +115,7 @@ result.save("outputs/run_001")  # writes contribution.csv, run.json, report.md
 
 ## Results
 
-`save()` writes three files: `contribution.csv` (the feature-attribution table), `run.json` (the full machine-readable result), and `report.md`. The tables below are the real output of the Quick start spec on the bundled [examples/continuous_lora](examples/continuous_lora) dataset (13,277 rows of continuous-LoRa Sobel measurements). The prediction formula corresponds to formula (2.7), and the experimental data are referenced from Dudarek, Gennadii and Martyniuk, Serhii, *From Discrete to Continuous LoRa Parameter Estimation Using Vision-Based Deep Learning* (SSRN: [6891362](https://ssrn.com/abstract=6891362), DOI: [10.2139/ssrn.6891362](https://dx.doi.org/10.2139/ssrn.6891362)).
+`save()` writes three files: `contribution.csv` (the feature-attribution table), `run.json` (the full machine-readable result), and `report.md`. The tables below are the real output of the Quick start spec on the bundled [examples/continuous_lora](examples/continuous_lora) dataset (13,277 rows of continuous-LoRa Sobel measurements). The prediction formula corresponds to formula (2.7), and the experimental data are referenced from \[[Dudarek & Martyniuk 2026](#ref-dudarek26)\].
 
 **Feature attributions** — Shapley decomposition of the prediction-formula contribution \[[Shapley 1953](#ref-shapley53), [Lundberg & Lee 2017](#ref-lundberg17)\], one row per equality hypothesis, ranked by net contribution share:
 
@@ -147,11 +153,33 @@ If a regime has no matching rows (or no contrasting rest), it still appears in t
 
 ## CLI
 
+Commands are subcommands of `contrib` and can be run independently. For the main attribution output, you do not need to run everything.
+
+**Minimal path (get results in one command):**
+
 ```bash
-contrib init-config --out config.json --template ungated_sf
+contrib run --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
+```
+
+**Recommended path (safer):**
+
+```bash
+contrib validate --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv
+contrib run      --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
+```
+
+**Other commands (optional / independent):**
+
+- `starter-config` writes a starter config file.
+- `contributor` runs contributor-bucket ranking directly from input rows.
+- `hypothesis` runs one explicit binary hypothesis test (group A vs group B).
+- `help` prints a short workflow guide with the minimal and recommended command paths.
+
+```bash
+contrib help
+contrib starter-config --out config.json
 contrib validate  --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv
 contrib run       --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
-contrib report    --run outputs/run_001/run.json --out outputs/run_001/report.md
 contrib contributor --input examples/continuous_lora/measurements.csv --mismatch-expr "col('Measured SF (ungated)') != col('GT SF')" --feature "detected_sf:col('Detected SF')" --out outputs/contributors.json
 contrib hypothesis --input examples/continuous_lora/measurements.csv --mismatch-expr "col('Measured SF (ungated)') != col('GT SF')" --name "Detected BW Underestimation" --group-a "col('Detected BW (Hz)') < col('GT BW (Hz)')" --group-b "col('Detected BW (Hz)') >= col('GT BW (Hz)')" --group-a-label "detected_bw < gt_bw" --group-b-label "detected_bw >= gt_bw" --out outputs/hypothesis.json
 ```
@@ -208,7 +236,7 @@ src/contribution/  — reusable library
   contributor.py        — contributor lift/share/score ranking
   hypothesis.py         — binary mismatch hypothesis test helpers
   results.py            — AssessmentResult (feature/regime/risk) → contribution.csv + report.md + run.json
-  cli.py                — contrib CLI (init-config, validate, run, report, contributor, hypothesis)
+    cli.py                — contrib CLI (starter-config, help, validate, run, report, contributor, hypothesis)
 tests/                  — pytest suite
     unit/                 — exhaustive unit tests and coverage gate
     smoke/                — lightweight API smoke checks
