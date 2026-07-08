@@ -79,11 +79,13 @@ def build_parser() -> argparse.ArgumentParser:
     validate_parser = subcommands.add_parser("validate", help="Validate config and input")
     validate_parser.add_argument("--config", required=True)
     validate_parser.add_argument("--input", required=True)
+    validate_parser.add_argument("--ci-method", default="score-exact", choices=["score-exact", "wald"])
 
     run_parser = subcommands.add_parser("run", help="Run attribution")
     run_parser.add_argument("--config", required=True)
     run_parser.add_argument("--input", required=True)
     run_parser.add_argument("--out", required=True)
+    run_parser.add_argument("--ci-method", default="score-exact", choices=["score-exact", "wald"])
 
     report_parser = subcommands.add_parser("report", help="Write a markdown report")
     report_parser.add_argument("--run", required=True)
@@ -145,13 +147,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "validate":
         spec = _load_spec(args.config)
-        Estimator.from_csv(args.input, spec=spec).assess(exact=True)
+        Estimator.from_csv(args.input, spec=spec).assess(exact=True, ci_method=args.ci_method)
         print("configuration and input validated")
         return 0
 
     if args.command == "run":
         spec = _load_spec(args.config)
-        result = Estimator.from_csv(args.input, spec=spec).assess(exact=True)
+        result = Estimator.from_csv(args.input, spec=spec).assess(exact=True, ci_method=args.ci_method)
         result.save(args.out)
         return 0
 

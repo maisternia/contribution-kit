@@ -69,6 +69,18 @@ def test_baptista_pike_paths() -> None:
     assert math.isinf(inf_point.ci_high)
 
 
+def test_sparse_reference_case_matches_r_packages() -> None:
+    koopman = koopman_risk_ratio(22, 1, 291, 12963)
+    assert math.isclose(koopman.value, 43.56611385029135, rel_tol=0.0, abs_tol=1e-12)
+    assert math.isclose(koopman.ci_low, 35.32102569886903, rel_tol=0.0, abs_tol=1e-12)
+    assert math.isclose(koopman.ci_high, 49.49482167596187, rel_tol=0.0, abs_tol=1e-12)
+
+    baptista = baptista_pike_odds_ratio(22, 1, 291, 12963)
+    assert math.isclose(baptista.value, 980.020618556701, rel_tol=0.0, abs_tol=1e-12)
+    assert math.isclose(baptista.ci_low, 162.5056, rel_tol=0.0, abs_tol=1e-12)
+    assert math.isclose(baptista.ci_high, 19952.2398, rel_tol=0.0, abs_tol=1e-12)
+
+
 def test_internal_helpers_and_branches() -> None:
     assert stats._normal_two_sided_pvalue(0.0) == 1.0
     assert stats._log_comb(5, 2) > 0

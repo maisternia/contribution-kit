@@ -24,6 +24,20 @@ def _format_effect_ci(value: float, ci_low: float | None, ci_high: float | None)
     return f"{point} ({ci_low:.2f} to {ci_high:.2f})"
 
 
+def _ci_reference_text(ci_method: str) -> str:
+    if ci_method == "wald":
+        return (
+            "Risk ratio CI: Katz, Baptista, Azen & Pike (1978) *Biometrics* 34(3):469-474. "
+            "Odds ratio CI: Haldane (1956) *Annals of Human Genetics* 20(4):309-311; "
+            "Anscombe (1956) *Biometrika* 43(3-4):461-464."
+        )
+    return (
+        "Risk ratio CI: Koopman (1984) *Biometrics* 40(2):513-517. "
+        "Odds ratio CI: Baptista & Pike (1977) *J. Roy. Statist. Soc. C* 26(2):214-220. "
+        "Small-sample recommendation: Fagerland, Lydersen & Laake (2015, 2017)."
+    )
+
+
 
 @dataclass(slots=True)
 class FeatureAttribution:
@@ -117,6 +131,7 @@ class AssessmentResult:
             writer.writerows(records)
 
     def to_markdown(self) -> str:
+        ci_method = str(self.metadata.get("ci_method", "score-exact"))
         lines = [
             "| name | label | mean_abs_shapley | mean_signed_shapley | total_signed_shapley | net_contribution_share_pct |",
             "|---|---:|---:|---:|---:|---:|",
@@ -159,11 +174,7 @@ class AssessmentResult:
             "Shapley values: Shapley (1953) *A value for n-person games*, Princeton UP; "
             "Lundberg & Lee (2017) *A unified approach to interpreting model predictions*, NeurIPS 30."
         )
-        lines.append(
-            "Risk ratio CI: Koopman (1984) *Biometrics* 40(2):513-517. "
-            "Odds ratio CI: Baptista & Pike (1977) *J. Roy. Statist. Soc. C* 26(2):214-220. "
-            "Small-sample recommendation: Fagerland, Lydersen & Laake (2015, 2017)."
-        )
+        lines.append(_ci_reference_text(ci_method))
         return "\n".join(lines)
 
     def to_json(self, path: str | Path) -> None:

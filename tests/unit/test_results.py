@@ -112,3 +112,18 @@ def test_markdown_without_regimes_section() -> None:
     )
     markdown = result.to_markdown()
     assert "| regime | count |" not in markdown
+
+
+def test_markdown_references_default_to_score_exact() -> None:
+    markdown = _sample_result(include_risk=True).to_markdown()
+    assert "Risk ratio CI: Koopman (1984)" in markdown
+    assert "Odds ratio CI: Baptista & Pike (1977)" in markdown
+
+
+def test_markdown_references_switch_for_wald() -> None:
+    result = _sample_result(include_risk=True)
+    result.metadata = {"ci_method": "wald"}
+    markdown = result.to_markdown()
+    assert "Risk ratio CI: Katz, Baptista, Azen & Pike (1978)" in markdown
+    assert "Odds ratio CI: Haldane (1956)" in markdown
+    assert "Koopman (1984)" not in markdown
