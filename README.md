@@ -227,17 +227,17 @@ git submodule update --init path/to/contribution-kit
 
 ```
 src/contribution/  — reusable library
-    spec.py               — AttributionSpec, Hypothesis
+  spec.py               — AttributionSpec, Hypothesis
   estimator.py          — Estimator (from_csv, from_dataframe, assess); private feature/regime routing
   expr.py               — safe AST expression evaluator and equality splitting
-    stats.py              — Koopman risk ratio and Baptista-Pike odds ratio
+  stats.py              — Koopman risk ratio and Baptista-Pike odds ratio
   contributor.py        — contributor lift/share/score ranking
   hypothesis.py         — binary mismatch hypothesis test helpers
   results.py            — AssessmentResult (feature/regime/risk) → contribution.csv + report.md + run.json
-    cli.py                — contrib CLI (help, validate, run, report, contributor, hypothesis)
+  cli.py                — contrib CLI (help, validate, run, report, contributor, hypothesis)
 tests/                  — pytest suite
-    unit/                 — exhaustive unit tests and coverage gate
-    smoke/                — lightweight API smoke checks
+  unit/                 — exhaustive unit tests and coverage gate
+  smoke/                — lightweight API smoke checks
 examples/               — example configs and data
   continuous_lora/      — config.json + measurements.csv (13,277-row real sample used in Results)
 ```
