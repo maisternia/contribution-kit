@@ -170,14 +170,12 @@ contrib run      --config examples/continuous_lora/config.json --input examples/
 
 **Other commands (optional / independent):**
 
-- `starter-config` writes a starter config file.
 - `contributor` runs contributor-bucket ranking directly from input rows.
 - `hypothesis` runs one explicit binary hypothesis test (group A vs group B).
 - `help` prints a short workflow guide with the minimal and recommended command paths.
 
 ```bash
 contrib help
-contrib starter-config --out config.json
 contrib validate  --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv
 contrib run       --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
 contrib contributor --input examples/continuous_lora/measurements.csv --mismatch-expr "col('Measured SF (ungated)') != col('GT SF')" --feature "detected_sf:col('Detected SF')" --out outputs/contributors.json
@@ -236,7 +234,7 @@ src/contribution/  — reusable library
   contributor.py        — contributor lift/share/score ranking
   hypothesis.py         — binary mismatch hypothesis test helpers
   results.py            — AssessmentResult (feature/regime/risk) → contribution.csv + report.md + run.json
-    cli.py                — contrib CLI (starter-config, help, validate, run, report, contributor, hypothesis)
+    cli.py                — contrib CLI (help, validate, run, report, contributor, hypothesis)
 tests/                  — pytest suite
     unit/                 — exhaustive unit tests and coverage gate
     smoke/                — lightweight API smoke checks

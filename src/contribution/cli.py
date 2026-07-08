@@ -48,7 +48,6 @@ def _help_text() -> str:
                 contrib CLI
 
                 Available commands:
-                    starter-config  Write a starter configuration file
                     validate        Validate config and input
                     run             Run attribution and save outputs
                     report          Regenerate markdown report from run.json
@@ -66,7 +65,6 @@ def _help_text() -> str:
                     contrib run      --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
 
                 Other commands (optional / independent):
-                    contrib starter-config --out config.json
                     contrib report --run outputs/run_001/run.json --out outputs/run_001/report.md
                     contrib contributor --input <csv> --mismatch-expr <expr> --feature <name:expr> --out <json>
                     contrib hypothesis --input <csv> --mismatch-expr <expr> --name <name> --group-a <expr> --group-b <expr> --group-a-label <label> --group-b-label <label> --out <json>
@@ -77,9 +75,6 @@ def _help_text() -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="contrib")
     subcommands = parser.add_subparsers(dest="command", required=True)
-
-    init_parser = subcommands.add_parser("starter-config", help="Write a starter configuration file")
-    init_parser.add_argument("--out", required=True)
 
     validate_parser = subcommands.add_parser("validate", help="Validate config and input")
     validate_parser.add_argument("--config", required=True)
@@ -146,26 +141,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "help":
         print(_help_text())
-        return 0
-
-    if args.command == "starter-config":
-        sample = {
-            "target_expr": "col('GT SF')",
-            "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
-            "mismatch_expr": "col('Measured SF (ungated)') != col('GT SF')",
-            "scope": "sobel",
-            "hypotheses": [
-                {"name": "class_bw < gt_bw (beyond tol)", "condition": "col('Detected BW (Hz)') < col('GT BW (Hz)') * (1 - 0.10)"},
-                {"name": "class_bw > gt_bw (beyond tol)", "condition": "col('Detected BW (Hz)') > col('GT BW (Hz)') * (1 + 0.10)"},
-                {"name": "class_bw within tol & sf wrong", "condition": "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 and col('Detected SF') != col('GT SF')"},
-                {"name": "class_bw & sf ok, measured_bw off", "condition": "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 and col('Detected SF') == col('GT SF') and abs(col('Measured BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') > 0.10"},
-                {"name": "class_sf", "condition": "col('Detected SF') == col('GT SF')"},
-                {"name": "class_bw", "condition": "col('Detected BW (Hz)') == col('GT BW (Hz)')"},
-                {"name": "measured_bw", "condition": "col('Measured BW (Hz)') == col('GT BW (Hz)')"},
-            ],
-            "score_mode": "absolute",
-        }
-        Path(args.out).write_text(json.dumps(sample, indent=2), encoding="utf-8")
         return 0
 
     if args.command == "validate":

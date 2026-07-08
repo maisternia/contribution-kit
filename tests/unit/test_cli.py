@@ -57,12 +57,10 @@ def _config(path: Path) -> Path:
     return path
 
 
-def test_build_parser_and_starter_config(tmp_path: Path) -> None:
+def test_build_parser_help_command() -> None:
     parser = cli.build_parser()
-    parsed = parser.parse_args(["starter-config", "--out", str(tmp_path / "cfg.json")])
-    assert parsed.command == "starter-config"
-    assert cli.main(["starter-config", "--out", str(tmp_path / "cfg.json")]) == 0
-    assert (tmp_path / "cfg.json").exists()
+    parsed = parser.parse_args(["help"])
+    assert parsed.command == "help"
 
 
 def test_load_spec_json_and_yaml(tmp_path: Path) -> None:
@@ -97,7 +95,6 @@ def test_main_help(capsys: pytest.CaptureFixture[str]) -> None:
     assert cli.main(["help"]) == 0
     out = capsys.readouterr().out
     assert "Available commands" in out
-    assert "starter-config" in out
     assert "run" in out
     assert "Minimal path" in out
     assert "Recommended path" in out
