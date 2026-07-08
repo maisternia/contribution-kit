@@ -4,6 +4,8 @@
 
 Reusable Python toolkit for attributing a modeled quantity to user-defined hypotheses. The quantity is whatever you define through `target_expr`, `prediction_expr`, and `score_mode` — it can be a prediction *error*, but equally a reward, yield, deviation, or any signed contribution; the framing is entirely yours through the hypothesis conditions and how you name-interpret the results. You declare each hypothesis as a single boolean `condition` over CSV columns. The primary use case is directional or conditional **regimes** (e.g. "detected Height falls below GT Height"), whose observed-contribution share and condition-vs-rest mismatch risk are reported; top-level equality conditions are also supported as an extra **Shapley feature** of the prediction formula.
 
+This `r_sourced` branch is distributed under the GNU General Public License, version 3 or later, to reflect the source-informed alignment work against GPL-licensed R reference implementations used for the confidence-interval path.
+
 > Running example: throughout this README the modeled quantity is a prediction *error* (`|prediction - target|`), because that is the bundled dataset's use case. Swap the expressions and `score_mode` and the same math attributes any positive or negative contribution. See Dudarek & Martyniuk (2026) preprint for more information about the experiment used as the main example here \[[Dudarek & Martyniuk 2026](#ref-dudarek26)\].
 
 ## How it works
@@ -42,6 +44,10 @@ Mini-example (one regime):
 - **Binary effect sizes** — Koopman asymptotic-score risk-ratio CIs \[[Koopman 1984](#ref-koopman84), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\] and Baptista-Pike exact odds-ratio CIs \[[Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2017](#ref-fagerland17)\] for sparse 2×2 mismatch tables. If you need the legacy Katz / Haldane-Anscombe pair, pass `ci_method="wald"` to `assess()` or `--ci-method wald` to `contrib hypothesis`.
 - **Contributor ranking** — reusable lift/share/score scoring for categorical contribution buckets.
 - **CLI + Python API** — use from scripts, notebooks, or shell pipelines.
+
+## License
+
+This `r_sourced` branch is licensed under `GPL-3.0-or-later`. See `LICENSE`.
 
 ## Quick start
 
