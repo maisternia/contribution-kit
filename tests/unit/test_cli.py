@@ -99,6 +99,9 @@ def test_main_help(capsys: pytest.CaptureFixture[str]) -> None:
     assert "Minimal path" in out
     assert "Recommended path" in out
     assert "Other commands" in out
+    assert "CI method options" in out
+    assert "score-exact" in out
+    assert "wald" in out
 
 
 def test_main_validate_run_report(tmp_path: Path) -> None:

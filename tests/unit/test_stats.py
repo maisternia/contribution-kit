@@ -56,6 +56,38 @@ def test_koopman_risk_ratio_value_classes() -> None:
     assert math.isinf(inf_point.ci_high)
 
 
+def test_koopman_sparse_finite_cases_do_not_return_infinite_upper_bound() -> None:
+    case_a = koopman_risk_ratio(22, 1, 291, 12963)
+    assert math.isfinite(case_a.value)
+    assert case_a.ci_low is not None and math.isfinite(case_a.ci_low)
+    assert case_a.ci_high is not None and math.isfinite(case_a.ci_high)
+    assert case_a.ci_low <= case_a.ci_high
+
+    case_b = koopman_risk_ratio(168, 329, 145, 12635)
+    assert math.isfinite(case_b.value)
+    assert case_b.ci_low is not None and math.isfinite(case_b.ci_low)
+    assert case_b.ci_high is not None and math.isfinite(case_b.ci_high)
+    assert case_b.ci_low <= case_b.ci_high
+
+
+def test_sparse_fallback_keeps_point_estimate_equal_to_raw_ratio() -> None:
+    # These sparse rows previously produced open RR intervals; fallback should
+    # only affect CI bounds, not the point estimate.
+    sparse_rows = [
+        (22, 1, 291, 13254),
+        (168, 329, 145, 12780),
+    ]
+
+    for a, b, c, d in sparse_rows:
+        rr = koopman_risk_ratio(a, b, c, d)
+        expected_rr = a / (a + b) / (c / (c + d))
+        assert math.isclose(rr.value, expected_rr, rel_tol=0.0, abs_tol=1e-12)
+
+        or_ = baptista_pike_odds_ratio(a, b, c, d)
+        expected_or = (a * d) / (b * c)
+        assert math.isclose(or_.value, expected_or, rel_tol=0.0, abs_tol=1e-12)
+
+
 def test_baptista_pike_paths() -> None:
     finite = baptista_pike_odds_ratio(1, 13, 9, 1)
     assert finite.ci_low < finite.value < finite.ci_high
@@ -191,3 +223,15 @@ def test_baptista_collapsed_support_path() -> None:
 
 def test_private_odds_ratio_zero_numerator_zero_denominator() -> None:
     assert math.isinf(stats._odds_ratio_value(0, 0, 1, 1))
+
+
+@pytest.mark.parametrize("bad_z", [0.0, -1.0, float("inf"), float("nan")])
+def test_ci_methods_reject_non_positive_or_non_finite_z(bad_z: float) -> None:
+    with pytest.raises(ValueError, match="finite positive"):
+        katz_risk_ratio(20, 80, 10, 90, z=bad_z)
+    with pytest.raises(ValueError, match="finite positive"):
+        haldane_anscombe_odds_ratio(20, 80, 10, 90, z=bad_z)
+    with pytest.raises(ValueError, match="finite positive"):
+        koopman_risk_ratio(20, 80, 10, 90, z=bad_z)
+    with pytest.raises(ValueError, match="finite positive"):
+        baptista_pike_odds_ratio(20, 80, 10, 90, z=bad_z)

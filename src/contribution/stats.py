@@ -29,6 +29,19 @@ def _validate_2x2_counts(a: int, b: int, c: int, d: int) -> None:
         raise ValueError("Baseline group cannot be empty")
 
 
+def _validate_z_score(z: float) -> None:
+    if not math.isfinite(z) or z <= 0.0:
+        raise ValueError("z must be a finite positive value")
+
+
+def _finite_ordered_interval(ci_low: float | None, ci_high: float | None) -> bool:
+    if ci_low is None or ci_high is None:
+        return False
+    if not math.isfinite(ci_low) or not math.isfinite(ci_high):
+        return False
+    return ci_low <= ci_high
+
+
 def katz_risk_ratio(a: int, b: int, c: int, d: int, z: float = 1.96) -> RiskRatioResult:
     """Compute risk ratio and Katz log-transform confidence interval.
 
@@ -41,6 +54,7 @@ def katz_risk_ratio(a: int, b: int, c: int, d: int, z: float = 1.96) -> RiskRati
     """
 
     _validate_2x2_counts(a, b, c, d)
+    _validate_z_score(z)
 
     p_exposed = a / (a + b)
     p_baseline = c / (c + d)
@@ -73,6 +87,7 @@ def haldane_anscombe_odds_ratio(a: int, b: int, c: int, d: int, z: float = 1.96)
     """
 
     _validate_2x2_counts(a, b, c, d)
+    _validate_z_score(z)
 
     # Add 0.5 to each cell — Haldane-Anscombe continuity correction
     # @cite: Haldane, 1956; Anscombe, 1956; Agresti, 2013
@@ -307,6 +322,7 @@ def koopman_risk_ratio(a: int, b: int, c: int, d: int, z: float = 1.96) -> RiskR
     """Compute the risk ratio and Koopman asymptotic-score confidence interval."""
 
     _validate_2x2_counts(a, b, c, d)
+    _validate_z_score(z)
 
     point_estimate = _rr_point_estimate(a, b, c, d)
     alpha = math.erfc(z / math.sqrt(2.0))
@@ -342,6 +358,14 @@ def koopman_risk_ratio(a: int, b: int, c: int, d: int, z: float = 1.96) -> RiskR
         start=point_estimate,
         increasing=False,
     )
+    if not _finite_ordered_interval(lower, upper):
+        # Paper-grounded guardrail: when score inversion is numerically unstable or
+        # yields an open interval for a finite estimate, fall back to Katz CI.
+        fallback = katz_risk_ratio(a, b, c, d, z=z)
+        if _finite_ordered_interval(fallback.ci_low, fallback.ci_high):
+            lower = fallback.ci_low
+            upper = fallback.ci_high
+
     return RiskRatioResult(value=point_estimate, ci_low=lower, ci_high=upper)
 
 
@@ -349,6 +373,7 @@ def baptista_pike_odds_ratio(a: int, b: int, c: int, d: int, z: float = 1.96) ->
     """Compute the odds ratio and Baptista-Pike exact confidence interval."""
 
     _validate_2x2_counts(a, b, c, d)
+    _validate_z_score(z)
 
     point_estimate = _odds_ratio_value(a, b, c, d)
     n1 = a + b
@@ -392,4 +417,12 @@ def baptista_pike_odds_ratio(a: int, b: int, c: int, d: int, z: float = 1.96) ->
         start=point_estimate,
         increasing=False,
     )
+    if not _finite_ordered_interval(lower, upper):
+        # Paper-grounded guardrail: continuity-corrected Wald CI is used only when
+        # exact inversion cannot provide a finite ordered interval.
+        fallback = haldane_anscombe_odds_ratio(a, b, c, d, z=z)
+        if _finite_ordered_interval(fallback.ci_low, fallback.ci_high):
+            lower = fallback.ci_low
+            upper = fallback.ci_high
+
     return OddsRatioResult(value=point_estimate, ci_low=lower, ci_high=upper)

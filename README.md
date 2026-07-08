@@ -13,8 +13,8 @@ You declare every hypothesis with the single `Hypothesis` type — a `name` plus
 At a glance, the reported analyses are:
 
 - **Shapley feature attribution** (feature-level decomposition of formula contribution)
-- **Koopman risk-ratio intervals** (regime mismatch risk vs rest)
-- **Baptista-Pike odds-ratio intervals** (sparse-table robust mismatch odds)
+- **Koopman risk-ratio intervals** (regime mismatch risk vs rest; with automatic Katz guardrail fallback only when Koopman inversion is non-finite/unordered for a finite point estimate)
+- **Baptista-Pike odds-ratio intervals** (sparse-table robust mismatch odds; with automatic Haldane-Anscombe guardrail fallback only when exact inversion is non-finite/unordered for a finite point estimate)
 
 
 **Classification rule:** a hypothesis whose `condition` is a top-level equality (`==`) and whose `name` appears in `prediction_expr` becomes a Shapley feature; every other hypothesis is a regime. You never pick a type or set a flag — routing is derived entirely from the condition.
@@ -39,7 +39,7 @@ Mini-example (one regime):
 - **Safe expression DSL** — define hypotheses and formulas over CSV columns without executing arbitrary code. Supports `col('Column Name')`, arithmetic, comparisons, `and`/`or`/`not`, ternary `a if cond else b`, and the functions `abs`, `bool`, `ceil`, `floor`, `float`, `int`, `log2`, `max`, `min`, `round`, `str`.
 - **Unified hypothesis model** — one flat list of `condition` strings drives regime shares, binary mismatch risk, and (for equality conditions) feature Shapley attribution.
 - **Exact Shapley** — closed-form decomposition for ≤12 features; deterministic sampling fallback for larger sets \[[Shapley 1953](#ref-shapley53), [Lundberg & Lee 2017](#ref-lundberg17)\].
-- **Binary effect sizes** — Koopman asymptotic-score risk-ratio CIs \[[Koopman 1984](#ref-koopman84), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\] and Baptista-Pike exact odds-ratio CIs \[[Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2017](#ref-fagerland17)\] for sparse 2×2 mismatch tables. If you need the legacy Katz / Haldane-Anscombe pair, pass `ci_method="wald"` to `assess()` or `--ci-method wald` to `contrib hypothesis`.
+- **Binary effect sizes** — Koopman asymptotic-score risk-ratio CIs \[[Koopman 1984](#ref-koopman84), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\] and Baptista-Pike exact odds-ratio CIs \[[Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2017](#ref-fagerland17)\] for sparse 2×2 mismatch tables. For finite point estimates, if default interval inversion is non-finite or unordered, the toolkit applies an automatic guardrail fallback (Katz for risk ratio, Haldane-Anscombe for odds ratio) for that result only. If you need to force the legacy Katz / Haldane-Anscombe pair, pass `ci_method="wald"` to `assess()` or `--ci-method wald` to `contrib hypothesis`.
 - **Contributor ranking** — reusable lift/share/score scoring for categorical contribution buckets.
 - **CLI + Python API** — use from scripts, notebooks, or shell pipelines.
 

@@ -68,6 +68,10 @@ def _help_text() -> str:
                     contrib report --run outputs/run_001/run.json --out outputs/run_001/report.md
                     contrib contributor --input <csv> --mismatch-expr <expr> --feature <name:expr> --out <json>
                     contrib hypothesis --input <csv> --mismatch-expr <expr> --name <name> --group-a <expr> --group-b <expr> --group-a-label <label> --group-b-label <label> --out <json>
+
+                CI method options (for hypothesis):
+                    --ci-method score-exact   Default. Uses Koopman asymptotic-score RR CI + Baptista-Pike exact OR CI.
+                    --ci-method wald          Legacy mode. Uses Wald-type confidence intervals: Katz RR CI + Haldane-Anscombe corrected OR CI.
                 """
         ).strip()
 
@@ -105,7 +109,15 @@ def build_parser() -> argparse.ArgumentParser:
     hypothesis_parser.add_argument("--group-a-label", required=True)
     hypothesis_parser.add_argument("--group-b-label", required=True)
     hypothesis_parser.add_argument("--scope", default="global")
-    hypothesis_parser.add_argument("--ci-method", default="score-exact", choices=["score-exact", "wald"])
+    hypothesis_parser.add_argument(
+        "--ci-method",
+        default="score-exact",
+        choices=["score-exact", "wald"],
+        help=(
+            "CI construction mode: score-exact (default; Koopman RR + Baptista-Pike OR) "
+            "or wald (legacy; Katz RR + Haldane-Anscombe OR)."
+        ),
+    )
     hypothesis_parser.add_argument("--out", required=True)
 
     subcommands.add_parser("help", help="Show command workflow and examples")
