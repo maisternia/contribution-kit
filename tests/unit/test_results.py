@@ -151,8 +151,8 @@ def test_markdown_accessible_presentation() -> None:
     # Per-table conclusions and preserved CI labels/footnotes.
     assert markdown.count("**In short:**") == 3
     assert "`b` (B) carries the largest net contribution share at 75.00%." in markdown
-    assert "risk ratio (95% CI)" in markdown
-    assert "odds ratio (95% CI)" in markdown
+    assert "Risk ratio (95% CI)" in markdown
+    assert "Odds ratio (95% CI)" in markdown
     assert "| Hypothesis | Regime mismatch rate | Rest mismatch rate |" in markdown
     assert "Koopman (1984)" in markdown
 

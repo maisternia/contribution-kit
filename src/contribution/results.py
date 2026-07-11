@@ -268,7 +268,7 @@ class AssessmentResult:
                     lines.append(f"- Observed prediction (`prediction`): `{prediction}`")
                 lines.append("- Mismatch definition: `prediction != target`")
             lines.append("")
-            lines.append("| Hypothesis | Regime mismatch rate | Rest mismatch rate | risk ratio (95% CI) | odds ratio (95% CI) |")
+            lines.append("| Hypothesis | Regime mismatch rate | Rest mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |")
             lines.append("|---|---:|---:|---:|---:|")
             for risk in risks:
                 rr = _format_effect_ci(risk.risk_ratio, risk.rr_ci_low, risk.rr_ci_high)
