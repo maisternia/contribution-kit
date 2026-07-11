@@ -62,11 +62,11 @@ def test_properties_and_markdown_sections() -> None:
     assert result.mean_observed_error == result.mean_observed_contribution
 
     markdown = result.to_markdown()
-    assert "| regime | count |" in markdown
-    assert "| hypothesis | match mismatch rate |" in markdown
+    assert "| Regime | Count |" in markdown
+    assert "| Hypothesis | Match mismatch rate |" in markdown
 
     no_risk_markdown = _sample_result(include_risk=False).to_markdown()
-    assert "| hypothesis | match mismatch rate |" not in no_risk_markdown
+    assert "| Hypothesis | Match mismatch rate |" not in no_risk_markdown
 
 
 def test_csv_json_and_save(tmp_path) -> None:
@@ -111,4 +111,75 @@ def test_markdown_without_regimes_section() -> None:
         mean_observed_contribution=0.1,
     )
     markdown = result.to_markdown()
-    assert "| regime | count |" not in markdown
+    assert "| Regime | Count |" not in markdown
+
+
+def test_markdown_accessible_presentation() -> None:
+    result = _sample_result(include_risk=True)
+    result.metadata.update(
+        {
+            "target": "col('GT SF')",
+            "prediction": "col('Measured SF')",
+            "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
+            "score_mode": "absolute",
+        }
+    )
+    markdown = result.to_markdown()
+
+    # Section titles name each analysis.
+    assert "## Shapley Value Contributions" in markdown
+    assert "## Error Regimes" in markdown
+    assert "## Mismatch Risk" in markdown
+
+    # Inputs live in an Inputs subsection inside each relevant analysis section.
+    assert "\n## Inputs\n" not in markdown
+    assert "### Inputs" in markdown
+    assert "- Shapley formula (`prediction_expr`):" in markdown
+    assert "- Target (`target`):" in markdown
+    assert "- Observed prediction (`prediction`):" in markdown
+    assert "- Scoring mode (`score_mode`):" in markdown
+    assert "- Mismatch definition: `prediction != target`" in markdown
+    assert "- Formula apportioned across features:" in markdown
+
+    # Human-readable Shapley column names instead of raw field identifiers.
+    assert "| Feature | Description | Mean absolute | Mean signed | Total signed | Net share (%) |" in markdown
+    assert "mean_abs_shapley" not in markdown
+    assert "net_contribution_share_pct" not in markdown
+
+    # Per-table conclusions and preserved CI labels/footnotes.
+    assert markdown.count("**In short:**") == 3
+    assert "`b` (B) carries the largest net contribution share at 75.00%." in markdown
+    assert "risk ratio (95% CI)" in markdown
+    assert "odds ratio (95% CI)" in markdown
+    assert "Koopman (1984)" in markdown
+
+
+def test_markdown_omits_missing_input_line() -> None:
+    result = _sample_result(include_risk=False)
+    result.metadata.update(
+        {
+            "target": "gt",
+            "prediction": "pred",
+            "prediction_expr": "a + b",
+            "score_mode": "absolute",
+        }
+    )
+    markdown = result.to_markdown()
+    assert "- Shapley formula (`prediction_expr`):" in markdown
+    assert "- Mismatch definition: `prediction != target`" not in markdown
+
+
+def test_csv_json_keep_raw_field_names(tmp_path) -> None:
+    result = _sample_result(include_risk=True)
+    csv_path = tmp_path / "out.csv"
+    json_path = tmp_path / "out.json"
+    result.to_csv(csv_path)
+    result.to_json(json_path)
+
+    csv_header = csv_path.read_text(encoding="utf-8").splitlines()[0]
+    assert csv_header == "name,label,mean_abs_shapley,mean_signed_shapley,total_signed_shapley,net_contribution_share_pct"
+
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+    assert "mean_abs_shapley" in payload["feature_attributions"][0]
+    assert "net_contribution_share_pct" in payload["feature_attributions"][0]
+    assert "contribution_share_pct" in payload["regime_summaries"][0]

@@ -1,8 +1,8 @@
 {
   "description": "AI-generated shelf-counting example: the formula fuses object counts, brightness, blur, and occlusion to model common grocery-store vision errors under low light.",
-  "target_expr": "col('GT Item Count')",
+  "target": "col('GT Item Count')",
+  "prediction": "col('Detected Item Count')",
   "prediction_expr": "detected_count + round((measured_count - detected_count) * 0.6) + round((estimated_brightness - 70) / 25) - round(estimated_blur) - round(occlusion / 18) - round(low_light * 1.0)",
-  "mismatch_expr": "abs(col('Detected Item Count') - col('GT Item Count')) >= 2",
   "scope": "vision",
   "hypotheses": [
     {

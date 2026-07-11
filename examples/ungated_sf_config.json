@@ -1,7 +1,7 @@
 {
-  "target_expr": "col('GT SF')",
+  "target": "col('GT SF')",
+  "prediction": "col('Measured SF (ungated)')",
   "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
-  "mismatch_expr": "col('Measured SF (ungated)') != col('GT SF')",
   "scope": "sobel",
   "hypotheses": [
     {

@@ -1,8 +1,8 @@
 {
   "description": "AI-generated rainy-walkway example: the formula combines detector wetness, moisture probe output, rain-rate estimate, and camera exposure to study slip-risk style wet-surface errors.",
-  "target_expr": "col('GT Wetness (%)')",
+  "target": "col('GT Wetness (%)')",
+  "prediction": "col('Detected Wetness (%)')",
   "prediction_expr": "detected_wetness + round((measured_wetness - detected_wetness) * 0.5) + round((estimated_rain_rate - 3) * 3) - round(camera_exposure / 20)",
-  "mismatch_expr": "abs(col('Detected Wetness (%)') - col('GT Wetness (%)')) >= 12",
   "scope": "vision",
   "hypotheses": [
     {

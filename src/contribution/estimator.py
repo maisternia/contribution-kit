@@ -132,7 +132,16 @@ class Estimator:
             hypotheses=assessments,
             n_rows=n_rows,
             mean_observed_contribution=observed_contribution_total / n_rows if n_rows else 0.0,
-            metadata={"exact": exact, "n_samples": n_samples, "seed": seed, "ci_method": ci_method},
+            metadata={
+                "exact": exact,
+                "n_samples": n_samples,
+                "seed": seed,
+                "ci_method": ci_method,
+                "target": self.spec.target,
+                "prediction": self.spec.prediction,
+                "prediction_expr": self.spec.prediction_expr,
+                "score_mode": self.spec.score_mode,
+            },
         )
 
     def _formula_features(self) -> list[_Feature]:
@@ -185,18 +194,16 @@ class Estimator:
 
     def _mismatch_fn(self):
         assert self.spec is not None
-        if self.spec.mismatch_expr is None:
-            return None
-        mismatch = compile_expression(self.spec.mismatch_expr)
-
         def predicate(row: Mapping[str, Any]) -> bool:
-            return bool(mismatch.evaluate(build_row_context(row)))
+            prediction = self._evaluate_prediction_observed(row)
+            target = self._evaluate_target(row)
+            return prediction != target
 
         return predicate
 
-    def _observed_contribution(self, row: Mapping[str, Any], features: Sequence[_Feature]) -> float:
+    def _observed_contribution(self, row: Mapping[str, Any], _features: Sequence[_Feature]) -> float:
         assert self.spec is not None
-        prediction = float(self._evaluate_prediction(row, self._feature_values(row, features, actual=True)))
+        prediction = float(self._evaluate_prediction_observed(row))
         target = float(self._evaluate_target(row))
         return _score(prediction, target, self.spec.score_mode)
 
@@ -210,20 +217,23 @@ class Estimator:
             raise ValueError("Hypothesis names must be unique")
 
     def _evaluate_target(self, row: Mapping[str, Any]) -> Any:
-        return evaluate_expression(self.spec.target_expr, build_row_context(row))
+        return evaluate_expression(self.spec.target, build_row_context(row))
+
+    def _evaluate_prediction_observed(self, row: Mapping[str, Any]) -> Any:
+        return evaluate_expression(self.spec.prediction, build_row_context(row))
 
     def _feature_values(self, row: Mapping[str, Any], features: Sequence[_Feature], *, actual: bool) -> dict[str, Any]:
         context = build_row_context(row)
         return {feature.name: (feature.actual if actual else feature.baseline).evaluate(context) for feature in features}
 
-    def _evaluate_prediction(self, row: Mapping[str, Any], values: Mapping[str, Any]) -> float:
+    def _evaluate_prediction_formula(self, row: Mapping[str, Any], values: Mapping[str, Any]) -> float:
         return float(evaluate_expression(self.spec.prediction_expr, build_row_context(row, values)))
 
     def _coalition_score(self, row: Mapping[str, Any], features: Sequence[_Feature], subset: frozenset[str]) -> float:
         actual = self._feature_values(row, features, actual=True)
         baseline = self._feature_values(row, features, actual=False)
         mixed = {name: actual[name] if name in subset else baseline[name] for name in actual}
-        prediction = self._evaluate_prediction(row, mixed)
+        prediction = self._evaluate_prediction_formula(row, mixed)
         target = float(self._evaluate_target(row))
         return _score(prediction, target, self.spec.score_mode)
 

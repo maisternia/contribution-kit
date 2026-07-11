@@ -2,13 +2,13 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-maisternia%2Fcontribution--kit-blue)](https://github.com/maisternia/contribution-kit)
 
-Reusable Python toolkit for attributing a modeled quantity to user-defined hypotheses. The quantity is whatever you define through `target_expr`, `prediction_expr`, and `score_mode` — it can be a prediction *error*, but equally a reward, yield, deviation, or any signed contribution; the framing is entirely yours through the hypothesis conditions and how you name-interpret the results. You declare each hypothesis as a single boolean `condition` over CSV columns. The primary use case is directional or conditional **regimes** (e.g. "detected Height falls below GT Height"), whose observed-contribution share and condition-vs-rest mismatch risk are reported; top-level equality conditions are also supported as an extra **Shapley feature** of the prediction formula.
+Reusable Python toolkit for attributing a modeled quantity to user-defined hypotheses. The quantity is whatever you define through `target`, `prediction`, and `score_mode` for observed outcomes, plus `prediction_expr` for Shapley decomposition. It can be a prediction *error*, but equally a reward, yield, deviation, or any signed contribution; the framing is entirely yours through the hypothesis conditions and how you name-interpret the results. You declare each hypothesis as a single boolean `condition` over CSV columns. The primary use case is directional or conditional **regimes** (e.g. "detected Height falls below GT Height"), whose observed-contribution share and condition-vs-rest mismatch risk are reported; top-level equality conditions are also supported as an extra **Shapley feature** of the decomposition formula.
 
 > Running example: throughout this README the modeled quantity is a prediction *error* (`|prediction - target|`), because that is the bundled dataset's use case. Swap the expressions and `score_mode` and the same math attributes any positive or negative contribution. See Dudarek & Martyniuk (2026) preprint for more information about the experiment used as the main example here \[[Dudarek & Martyniuk 2026](#ref-dudarek26)\].
 
 ## How it works
 
-You declare every hypothesis with the single `Hypothesis` type — a `name` plus one boolean `condition` written in the safe DSL. The condition is used only to select rows (inside regime vs outside regime). After that selection, the estimator computes observed-contribution statistics on the selected rows and, if `mismatch_expr` is provided, compares mismatch rates between selected rows and the rest.
+You declare every hypothesis with the single `Hypothesis` type — a `name` plus one boolean `condition` written in the safe DSL. The condition is used only to select rows (inside regime vs outside regime). After that selection, the estimator computes observed-contribution statistics on the selected rows and compares mismatch rates between selected rows and the rest using `prediction != target`.
 
 At a glance, the reported analyses are:
 
@@ -21,7 +21,7 @@ At a glance, the reported analyses are:
 
 The two hypothesis-routing outputs are:
 
-- **Regime (share + risk) — primary.** Any non-equality boolean condition declares a regime. The rows where it holds form a subset. For that subset, the toolkit reports observed-contribution share (`mean_contribution`, `total_contribution`, `contribution_share_pct`) and, when `mismatch_expr` is set, mismatch risk versus the remaining rows. Directional and conditional regimes are the main thing you declare.
+- **Regime (share + risk) — primary.** Any non-equality boolean condition declares a regime. The rows where it holds form a subset. For that subset, the toolkit reports observed-contribution share (`mean_contribution`, `total_contribution`, `contribution_share_pct`) and mismatch risk versus the remaining rows. Directional and conditional regimes are the main thing you declare.
 - **Formula feature (Shapley) — extra.** A top-level equality `actual == baseline` declares a feature. The left operand is the model-produced value, the right operand is the ground-truth baseline, and the feature joins the exact Shapley attribution of the prediction-formula contribution. The feature `name` must appear in `prediction_expr`.
 
 Callers never construct regimes or binary tests directly — they only declare conditions, and the relevant sub-results are populated automatically.
@@ -31,7 +31,7 @@ Mini-example (one regime):
 - Condition: `col('Detected BW (Hz)') < col('GT BW (Hz)') * (1 - 0.10)`
 - This condition only selects rows into group A (true) and group B (false/rest).
 - Regime metrics (`mean_contribution`, `total_contribution`, `contribution_share_pct`) are computed from prediction-vs-target observed contribution over group A.
-- Mismatch-risk metrics are computed from `mismatch_expr` rates in group A versus group B (for example, `col('Measured SF (ungated)') != col('GT SF')`).
+- Mismatch-risk metrics are computed from `prediction != target` rates in group A versus group B.
 - Therefore, "how far below" GT BW is not a direct weight by itself unless you encode severity explicitly (for example, separate bands such as 10-20%, 20-40%, >40%).
 
 ## Features
@@ -53,9 +53,9 @@ from contribution import (
 )
 
 spec = AttributionSpec(
-    target_expr="col('GT SF')",
-    prediction_expr="class_sf + round(2 * log2(measured_bw / class_bw))", # is the formula you want to decompose — it defines what gets attributed to each Shapley feature.
-    mismatch_expr="col('Measured SF (ungated)') != col('GT SF')", # may align with prediction-vs-target disagreement in some setups, but can also be independent (for example, tolerance exceedance or directional error event). 
+    target="col('GT SF')",
+    prediction="col('Measured SF (ungated)')",
+    prediction_expr="class_sf + round(2 * log2(measured_bw / class_bw))", # formula to decompose into Shapley contributions.
     scope="sobel", # optional metadata for organizational purposes
     score_mode="absolute",  # or "signed", it just tells the attribution engine whether to interpret the resulting values as absolute amounts or as signed (directional) amounts when computing Shapley features and regime shares.
     hypotheses=[
@@ -125,7 +125,7 @@ result.save("outputs/run_001")  # writes contribution.csv, run.json, report.md
 | class_bw | Nominal class BW (detected vs GT BW) | 0.006804 | 0.004544 | 60.333333 | 15.79 |
 | class_sf | Nominal class SF (detected vs GT SF) | 0.004620 | 0.004318 | 57.333333 | 15.01 |
 
-**Regimes** — observed-contribution share of the rows matching each non-equality condition. These values come from prediction-vs-target observed contribution, not directly from `mismatch_expr`:
+**Regimes** — observed-contribution share of the rows matching each non-equality condition. These values come from prediction-vs-target observed contribution.
 
 | regime | count | mean_contribution | total_contribution | contribution_share_pct |
 |---|---:|---:|---:|---:|
@@ -135,7 +135,7 @@ result.save("outputs/run_001")  # writes contribution.csv, run.json, report.md
 | class_bw & sf ok, measured_bw off | 497 | 0.4487 | 223.00 | 58.38 |
 | class_bw & sf ok & measured ok (baseline) | 11972 | 0.0000 | 0.00 | 0.00% |
 
-**Mismatch risk** — each regime's matching rows (group A) versus the rest (group B), using `mismatch_expr` as the mismatch indicator (for example, `col('Measured SF (ungated)') != col('GT SF')`), with Koopman risk ratios \[[Koopman 1984](#ref-koopman84), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\] and Baptista-Pike odds ratios \[[Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2017](#ref-fagerland17)\]:
+**Mismatch risk** — each regime's matching rows (group A) versus the rest (group B), using `prediction != target` as the mismatch indicator, with Koopman risk ratios \[[Koopman 1984](#ref-koopman84), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\] and Baptista-Pike odds ratios \[[Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2017](#ref-fagerland17)\]:
 
 | hypothesis | match mismatch rate | rest mismatch rate | risk ratio (95% CI) | odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
@@ -182,7 +182,7 @@ contrib contributor --input examples/continuous_lora/measurements.csv --mismatch
 contrib hypothesis --input examples/continuous_lora/measurements.csv --mismatch-expr "col('Measured SF (ungated)') != col('GT SF')" --name "Detected BW Underestimation" --group-a "col('Detected BW (Hz)') < col('GT BW (Hz)')" --group-b "col('Detected BW (Hz)') >= col('GT BW (Hz)')" --group-a-label "detected_bw < gt_bw" --group-b-label "detected_bw >= gt_bw" --out outputs/hypothesis.json
 ```
 
-Config files are JSON or YAML with `target_expr`, `prediction_expr`, an optional `mismatch_expr`, optional `scope` and `score_mode`, and a `hypotheses` list. Each hypothesis entry is `{ "name", "condition", "label"? }`. Classification is derived only from the `condition`. See [examples/continuous_lora/config.json](examples/continuous_lora/config.json) and its [measurements.csv](examples/continuous_lora/measurements.csv).
+Config files are JSON or YAML with `target`, `prediction`, `prediction_expr`, optional `scope` and `score_mode`, and a `hypotheses` list. Each hypothesis entry is `{ "name", "condition", "label"? }`. Classification is derived only from the `condition`. See [examples/continuous_lora/config.json](examples/continuous_lora/config.json) and its [measurements.csv](examples/continuous_lora/measurements.csv).
 
 ## Install
 

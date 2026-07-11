@@ -1,4 +1,4 @@
-GT BW (Hz),Detected BW (Hz),Measured BW (Hz),GT SF,Detected SF,Measured SF (upscaled),Measured SF (downscaled),Measured SF (ungated),Height,Confidence,IoU
+GT BW,Class BW,Measured BW,GT SF,Class SF,Measured SF (upscaled),Measured SF (downscaled),Measured SF,Height,Confidence,IoU
 101562.00,125000.00,109838.49,9,10,10,10,10,0.013730,0.7145,0.9162
 101562.00,125000.00,102096.56,9,10,10,9,9,0.012762,0.8792,0.9682
 101562.00,125000.00,114643.10,9,10,10,10,10,0.014330,0.8037,0.8836

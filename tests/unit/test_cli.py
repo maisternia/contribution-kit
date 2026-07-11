@@ -43,9 +43,9 @@ def _rows() -> list[dict[str, str]]:
 
 def _config(path: Path) -> Path:
     payload = {
-        "target_expr": "col('GT SF')",
+        "target": "col('GT SF')",
+        "prediction": "col('Measured SF (ungated)')",
         "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
-        "mismatch_expr": "col('Measured SF (ungated)') != col('GT SF')",
         "hypotheses": [
             {"name": "class_sf", "condition": "col('Detected SF') == col('GT SF')"},
             {"name": "class_bw", "condition": "col('Detected BW (Hz)') == col('GT BW (Hz)')"},
@@ -66,11 +66,11 @@ def test_build_parser_help_command() -> None:
 def test_load_spec_json_and_yaml(tmp_path: Path) -> None:
     json_cfg = _config(tmp_path / "cfg.json")
     loaded = cli._load_spec(json_cfg)
-    assert loaded.target_expr.startswith("col")
+    assert loaded.target.startswith("col")
 
     yaml_cfg = tmp_path / "cfg.yaml"
     yaml_cfg.write_text(
-        "target_expr: \"1\"\nprediction_expr: \"1\"\nhypotheses:\n  - name: h\n    condition: \"1 == 1\"\n",
+        "target: \"1\"\nprediction: \"1\"\nprediction_expr: \"1\"\nhypotheses:\n  - name: h\n    condition: \"1 == 1\"\n",
         encoding="utf-8",
     )
     loaded_yaml = cli._load_spec(yaml_cfg)
@@ -117,7 +117,11 @@ def test_main_validate_run_report(tmp_path: Path) -> None:
 
     report_path = tmp_path / "report.md"
     assert cli.main(["report", "--run", str(out_dir / "run.json"), "--out", str(report_path)]) == 0
-    assert "Factor-Contribution Analysis Report" in report_path.read_text(encoding="utf-8")
+    regenerated = report_path.read_text(encoding="utf-8")
+    assert "Factor-Contribution Analysis Report" in regenerated
+    assert "## Shapley Value Contributions" in regenerated
+    # Regenerated report matches the accessible layout saved by `run`.
+    assert regenerated.rstrip("\n") == (out_dir / "report.md").read_text(encoding="utf-8").rstrip("\n")
 
 
 def test_main_contributor_and_hypothesis(tmp_path: Path) -> None:

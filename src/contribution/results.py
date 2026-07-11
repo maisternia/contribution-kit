@@ -116,30 +116,157 @@ class AssessmentResult:
             writer.writeheader()
             writer.writerows(records)
 
+    def _input_lines(self) -> list[str]:
+        """Echo the analysis inputs, skipping any that are absent from metadata."""
+        meta = self.metadata
+        lines: list[str] = []
+        target = meta.get("target")
+        prediction = meta.get("prediction")
+        prediction_expr = meta.get("prediction_expr")
+        score_mode = meta.get("score_mode")
+        if target:
+            lines.append(f"- **Target (`target`):** `{target}`")
+        if prediction:
+            lines.append(f"- **Prediction (`prediction`):** `{prediction}`")
+        if prediction_expr:
+            lines.append(f"- **Shapley formula (`prediction_expr`):** `{prediction_expr}`")
+        if score_mode:
+            lines.append(f"- **Scoring mode:** {score_mode}")
+        return lines
+
+    def _shapley_formula(self) -> str | None:
+        """Render the outcome formula that the Shapley values apportion."""
+        meta = self.metadata
+        target = meta.get("target")
+        prediction_expr = meta.get("prediction_expr")
+        if not prediction_expr or not target:
+            return None
+        if meta.get("score_mode") == "signed":
+            return f"outcome = ({prediction_expr}) - ({target})"
+        return f"outcome = |({prediction_expr}) - ({target})|"
+
     def to_markdown(self) -> str:
-        lines = [
-            "| name | label | mean_abs_shapley | mean_signed_shapley | total_signed_shapley | net_contribution_share_pct |",
-            "|---|---:|---:|---:|---:|---:|",
-        ]
-        for row in self.feature_attributions:
+        lines: list[str] = ["# Factor-Contribution Analysis Report", ""]
+
+        features = self.feature_attributions
+        lines.append("## Shapley Value Contributions")
+        lines.append("")
+        lines.append(
+            "How much each feature contributes to the gap between the formula output "
+            "(`prediction_expr`) and the target (`target`). Bigger values mean that feature has "
+            "a stronger influence on the final result."
+        )
+        meta = self.metadata
+        target = meta.get("target")
+        prediction = meta.get("prediction")
+        prediction_expr = meta.get("prediction_expr")
+        score_mode = meta.get("score_mode")
+        formula = self._shapley_formula()
+        shapley_inputs: list[str] = []
+        if target:
+            shapley_inputs.append(
+                f"- Target (`target`): `{target}`"
+            )
+        if prediction:
+            shapley_inputs.append(
+                f"- Observed prediction (`prediction`): `{prediction}`"
+            )
+        if prediction_expr:
+            shapley_inputs.append(
+                f"- Shapley formula (`prediction_expr`): `{prediction_expr}`"
+            )
+        if score_mode:
+            shapley_inputs.append(f"- Scoring mode (`score_mode`): `{score_mode}`")
+        if formula is not None:
+            shapley_inputs.append(
+                f"- Formula apportioned across features: `{formula}`"
+            )
+        if shapley_inputs:
+            lines.append("")
+            lines.append("### Inputs")
+            lines.append("")
+            lines.extend(shapley_inputs)
+        lines.append("")
+        lines.append("| Feature | Description | Mean absolute | Mean signed | Total signed | Net share (%) |")
+        lines.append("|---|---|---:|---:|---:|---:|")
+        for row in features:
             lines.append(
                 f"| {row.name} | {row.label} | {row.mean_abs_shapley:.6f} | {row.mean_signed_shapley:.6f} | {row.total_signed_shapley:.6f} | {row.net_contribution_share_pct:.2f} |"
+            )
+        if features:
+            top = features[0]
+            lines.append("")
+            lines.append(
+                f"**In short:** `{top.name}` ({top.label}) carries the largest net contribution "
+                f"share at {top.net_contribution_share_pct:.2f}%."
             )
 
         regimes = self.regime_summaries
         if regimes:
             lines.append("")
-            lines.append("| regime | count | mean_contribution | total_contribution | contribution_share_pct |")
+            lines.append("## Error Regimes")
+            lines.append("")
+            lines.append(
+                "How much each condition (regime) contributes to the total observed prediction error. "
+                "Here, prediction is the value from `prediction`, and target is the reference "
+                "value from `target`. Share (%) shows what fraction of the total error comes "
+                "from rows in that condition."
+            )
+            regime_inputs: list[str] = []
+            if target:
+                regime_inputs.append(
+                    f"- Target (`target`): `{target}`"
+                )
+            if prediction:
+                regime_inputs.append(
+                    f"- Observed prediction (`prediction`): `{prediction}`"
+                )
+            if prediction_expr:
+                regime_inputs.append(
+                    f"- Shapley formula (`prediction_expr`): `{prediction_expr}`"
+                )
+            if score_mode:
+                regime_inputs.append(f"- Scoring mode (`score_mode`): `{score_mode}`")
+            if regime_inputs:
+                lines.append("")
+                lines.append("### Inputs")
+                lines.append("")
+                lines.extend(regime_inputs)
+            lines.append("")
+            lines.append("| Regime | Count | Mean contribution | Total contribution | Share (%) |")
             lines.append("|---|---:|---:|---:|---:|")
             for regime in regimes:
                 lines.append(
                     f"| {regime.name} | {regime.count} | {regime.mean_contribution:.4f} | {regime.total_contribution:.2f} | {regime.contribution_share_pct:.2f} |"
                 )
+            top_regime = max(regimes, key=lambda r: r.contribution_share_pct)
+            lines.append("")
+            lines.append(
+                f"**In short:** the `{top_regime.name}` regime accounts for the largest share "
+                f"at {top_regime.contribution_share_pct:.2f}%."
+            )
 
         risks = self.binary_results
         if risks:
             lines.append("")
-            lines.append("| hypothesis | match mismatch rate | rest mismatch rate | risk ratio (95% CI) | odds ratio (95% CI) |")
+            lines.append("## Mismatch Risk")
+            lines.append("")
+            lines.append(
+                "How much more often rows matching each condition have prediction different from "
+                "target (`prediction != target`) compared with all other rows. A risk ratio above "
+                "1 means the condition is linked to more mismatches."
+            )
+            if target or prediction:
+                lines.append("")
+                lines.append("### Inputs")
+                lines.append("")
+                if target:
+                    lines.append(f"- Target (`target`): `{target}`")
+                if prediction:
+                    lines.append(f"- Observed prediction (`prediction`): `{prediction}`")
+                lines.append("- Mismatch definition: `prediction != target`")
+            lines.append("")
+            lines.append("| Hypothesis | Match mismatch rate | Rest mismatch rate | risk ratio (95% CI) | odds ratio (95% CI) |")
             lines.append("|---|---:|---:|---:|---:|")
             for risk in risks:
                 rr = _format_effect_ci(risk.risk_ratio, risk.rr_ci_low, risk.rr_ci_high)
@@ -147,6 +274,14 @@ class AssessmentResult:
                 lines.append(
                     f"| {risk.test_name} | {risk.mismatch_rate_a_pct:.2f}% ({risk.mismatch_count_a}/{risk.total_count_a}) | "
                     f"{risk.mismatch_rate_b_pct:.2f}% ({risk.mismatch_count_b}/{risk.total_count_b}) | {rr} | {or_} |"
+                )
+            finite_risks = [risk for risk in risks if risk.risk_ratio != float("inf")]
+            if finite_risks:
+                top_risk = max(finite_risks, key=lambda r: r.risk_ratio)
+                lines.append("")
+                lines.append(
+                    f"**In short:** `{top_risk.test_name}` carries the highest mismatch risk "
+                    f"(risk ratio {top_risk.risk_ratio:.2f})."
                 )
 
         lines.append("")

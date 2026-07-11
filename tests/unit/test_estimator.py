@@ -21,9 +21,9 @@ def _write_csv(tmp_path: Path, rows: list[dict[str, str]]) -> Path:
 
 def _spec() -> AttributionSpec:
     return AttributionSpec(
-        target_expr="col('GT SF')",
+        target="col('GT SF')",
+        prediction="col('Measured SF (ungated)')",
         prediction_expr="class_sf + round(2 * log2(measured_bw / class_bw))",
-        mismatch_expr="col('Measured SF (ungated)') != col('GT SF')",
         scope="sobel",
         hypotheses=[
             Hypothesis(name="class_sf", condition="col('Detected SF') == col('GT SF')"),
@@ -89,12 +89,13 @@ def test_validate_spec_errors() -> None:
     with pytest.raises(ValueError, match="Attribution spec is required"):
         est.assess()
 
-    est.spec = AttributionSpec(target_expr="1", prediction_expr="1", hypotheses=[])
+    est.spec = AttributionSpec(target="1", prediction="1", prediction_expr="1", hypotheses=[])
     with pytest.raises(ValueError, match="At least one hypothesis"):
         est.assess()
 
     est.spec = AttributionSpec(
-        target_expr="1",
+        target="1",
+        prediction="1",
         prediction_expr="1",
         hypotheses=[Hypothesis(name="dup", condition="1==1"), Hypothesis(name="dup", condition="1==1")],
     )
@@ -115,32 +116,22 @@ def test_assess_exact_and_sampled_and_regime_none_paths(tmp_path: Path) -> None:
     assert any(item.analysis == "feature" for item in exact.hypotheses)
     assert any(item.analysis == "regime" for item in exact.hypotheses)
 
-    # no mismatch expression path => risk is None for regime assessments
-    no_mismatch = AttributionSpec(
-        target_expr="1",
-        prediction_expr="1",
-        hypotheses=[Hypothesis(name="reg", condition="col('v') > 0")],
-    )
-    est2 = Estimator(rows=[{"v": 1}, {"v": 0}], spec=no_mismatch)
-    assessed = est2.assess()
-    assert assessed.hypotheses[0].risk is None
-
     # single-group path => risk is None
     single_group = AttributionSpec(
-        target_expr="0",
+        target="0",
+        prediction="0",
         prediction_expr="0",
-        mismatch_expr="mismatch",
         hypotheses=[Hypothesis(name="all", condition="1 == 1")],
     )
-    est3 = Estimator(rows=[{"mismatch": True}], spec=single_group)
+    est3 = Estimator(rows=[{}], spec=single_group)
     assessed_single = est3.assess()
     assert assessed_single.hypotheses[0].risk is None
 
 
 def test_assess_allows_spec_override() -> None:
     rows = [{"y": 1, "x": 1}]
-    base = AttributionSpec(target_expr="y", prediction_expr="x", hypotheses=[Hypothesis(name="h", condition="x == y")])
-    replacement = AttributionSpec(target_expr="y", prediction_expr="x", hypotheses=[Hypothesis(name="h2", condition="x == y")])
+    base = AttributionSpec(target="y", prediction="x", prediction_expr="x", hypotheses=[Hypothesis(name="h", condition="x == y")])
+    replacement = AttributionSpec(target="y", prediction="x", prediction_expr="x", hypotheses=[Hypothesis(name="h2", condition="x == y")])
     estimator = Estimator.from_dataframe(rows, base)
     result = estimator.assess(spec=replacement)
     assert result.hypotheses[0].name == "h2"
@@ -149,9 +140,9 @@ def test_assess_allows_spec_override() -> None:
 def test_regime_risk_none_when_group_b_missing() -> None:
     rows = [{"g": "A", "mismatch": False}, {"g": "A", "mismatch": True}]
     spec = AttributionSpec(
-        target_expr="0",
+        target="0",
+        prediction="mismatch",
         prediction_expr="0",
-        mismatch_expr="mismatch",
         hypotheses=[Hypothesis(name="all_a", condition="g != 'B'")],
     )
     result = Estimator.from_dataframe(rows, spec).assess(exact=True)
@@ -159,7 +150,7 @@ def test_regime_risk_none_when_group_b_missing() -> None:
 
 
 def test_assess_spec_override_on_empty_rows() -> None:
-    replacement = AttributionSpec(target_expr="0", prediction_expr="0", hypotheses=[Hypothesis(name="h", condition="1 == 1")])
+    replacement = AttributionSpec(target="0", prediction="0", prediction_expr="0", hypotheses=[Hypothesis(name="h", condition="1 == 1")])
     estimator = Estimator(rows=[], spec=None)
     result = estimator.assess(spec=replacement)
     assert result.n_rows == 0

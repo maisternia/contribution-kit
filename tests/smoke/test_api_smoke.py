@@ -15,7 +15,8 @@ def _spec(
     prediction_expr: str = "class_sf + round(2 * log2(measured_bw / class_bw))",
 ) -> AttributionSpec:
     return AttributionSpec(
-        target_expr="col('GT SF')",
+        target="col('GT SF')",
+        prediction="col('Detected SF')",
         prediction_expr=prediction_expr,
         hypotheses=hypotheses,
     )

@@ -7,9 +7,8 @@ def test_hypothesis_defaults() -> None:
 
 
 def test_attribution_spec_defaults() -> None:
-    spec = AttributionSpec(target_expr="1", prediction_expr="1")
+    spec = AttributionSpec(target="1", prediction="2", prediction_expr="3")
     assert spec.hypotheses == []
-    assert spec.mismatch_expr is None
     assert spec.scope == "global"
     assert spec.score_mode == "absolute"
 

@@ -13,11 +13,46 @@ from typing import Any
 from .contributor import combine_contributors, rank_contributors
 from .estimator import Estimator
 from .expr import build_row_context, evaluate_expression
-from .hypothesis import evaluate_binary_hypothesis
+from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis
+from .results import (
+    AssessmentResult,
+    FeatureAttribution,
+    HypothesisAssessment,
+    RegimeSummary,
+)
 from .spec import (
     AttributionSpec,
     Hypothesis,
 )
+
+
+def _result_from_run(payload: dict[str, Any]) -> AssessmentResult:
+    """Rebuild an ``AssessmentResult`` from a saved ``run.json`` payload.
+
+    Lets ``contrib report`` regenerate the same accessible markdown layout that
+    ``AssessmentResult.to_markdown()`` produces during ``run``.
+    """
+    hypotheses: list[HypothesisAssessment] = []
+    for item in payload.get("hypotheses", []):
+        feature = FeatureAttribution(**item["feature"]) if item.get("feature") else None
+        regime = RegimeSummary(**item["regime"]) if item.get("regime") else None
+        risk = BinaryHypothesisResult(**item["risk"]) if item.get("risk") else None
+        hypotheses.append(
+            HypothesisAssessment(
+                name=item["name"],
+                label=item["label"],
+                analysis=item["analysis"],
+                feature=feature,
+                regime=regime,
+                risk=risk,
+            )
+        )
+    return AssessmentResult(
+        hypotheses=hypotheses,
+        n_rows=payload["n_rows"],
+        mean_observed_contribution=payload["mean_observed_contribution"],
+        metadata=payload.get("metadata", {}),
+    )
 
 
 def _load_spec(path: str | Path) -> AttributionSpec:
@@ -33,47 +68,47 @@ def _load_spec(path: str | Path) -> AttributionSpec:
     for item in payload.get("hypotheses", []):
         hypotheses.append(Hypothesis(**item))
     return AttributionSpec(
-        target_expr=payload["target_expr"],
+        target=payload["target"],
+        prediction=payload["prediction"],
         prediction_expr=payload["prediction_expr"],
         hypotheses=hypotheses,
-        mismatch_expr=payload.get("mismatch_expr"),
         scope=payload.get("scope", "global"),
         score_mode=payload.get("score_mode", "absolute"),
     )
 
 
 def _help_text() -> str:
-        return dedent(
-                """
-                contrib CLI
+    return dedent(
+    """
+    contrib CLI
 
-                Available commands:
-                    validate        Validate config and input
-                    run             Run attribution and save outputs
-                    report          Regenerate markdown report from run.json
-                    contributor     Run contributor bucket ranking
-                    hypothesis      Run a binary hypothesis test
-                    help            Show this help text
+        Available commands:
+            validate        Validate config and input
+            run             Run attribution and save outputs
+            report          Regenerate markdown report from run.json
+            contributor     Run contributor bucket ranking
+            hypothesis      Run a binary hypothesis test
+            help            Show this help text
 
-                Quick guide
+            Quick guide
 
-                Minimal path (get results in one command):
-                    contrib run --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
+        Minimal path (get results in one command):
+            contrib run --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
 
-                Recommended path (safer):
-                    contrib validate --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv
-                    contrib run      --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
+        Recommended path (safer):
+            contrib validate --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv
+            contrib run      --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
 
-                Other commands (optional / independent):
-                    contrib report --run outputs/run_001/run.json --out outputs/run_001/report.md
-                    contrib contributor --input <csv> --mismatch-expr <expr> --feature <name:expr> --out <json>
-                    contrib hypothesis --input <csv> --mismatch-expr <expr> --name <name> --group-a <expr> --group-b <expr> --group-a-label <label> --group-b-label <label> --out <json>
+        Other commands (optional / independent):
+            contrib report --run outputs/run_001/run.json --out outputs/run_001/report.md
+            contrib contributor --input <csv> --mismatch-expr <expr> --feature <name:expr> --out <json>
+            contrib hypothesis --input <csv> --mismatch-expr <expr> --name <name> --group-a <expr> --group-b <expr> --group-a-label <label> --group-b-label <label> --out <json>
 
-                CI method options (for hypothesis):
-                    --ci-method score-exact   Default. Uses Koopman asymptotic-score RR CI + Baptista-Pike exact OR CI.
-                    --ci-method wald          Legacy mode. Uses Wald-type confidence intervals: Katz RR CI + Haldane-Anscombe corrected OR CI.
-                """
-        ).strip()
+        CI method options (for hypothesis):
+            --ci-method score-exact   Default. Uses Koopman asymptotic-score RR CI + Baptista-Pike exact OR CI.
+            --ci-method wald          Legacy mode. Uses Wald-type confidence intervals: Katz RR CI + Haldane-Anscombe corrected OR CI.
+        """
+    ).strip()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -169,10 +204,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "report":
         payload = json.loads(Path(args.run).read_text(encoding="utf-8"))
-        lines = ["# Factor-Contribution Analysis Report", "", f"Rows: {payload['n_rows']}", f"Mean observed contribution: {payload['mean_observed_contribution']:.6f}", "", "| name | label | mean_abs_shapley | mean_signed_shapley | total_signed_shapley | net_contribution_share_pct |", "|---|---:|---:|---:|---:|---:|"]
-        for row in payload["feature_attributions"]:
-            lines.append(f"| {row['name']} | {row['label']} | {row['mean_abs_shapley']:.6f} | {row['mean_signed_shapley']:.6f} | {row['total_signed_shapley']:.6f} | {row['net_contribution_share_pct']:.2f} |")
-        Path(args.out).write_text("\n".join(lines) + "\n", encoding="utf-8")
+        result = _result_from_run(payload)
+        Path(args.out).write_text(result.to_markdown() + "\n", encoding="utf-8")
         return 0
 
     if args.command == "contributor":

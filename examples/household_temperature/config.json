@@ -1,8 +1,8 @@
 {
   "description": "AI-generated smart-home thermostat example: the formula blends thermostat, wall sensor, humidity, window state, and occupancy to estimate room temperature error in a normal household setting.",
-  "target_expr": "col('GT Temp (C)')",
+  "target": "col('GT Temp (C)')",
+  "prediction": "col('Measured Temp (C)')",
   "prediction_expr": "thermostat_temp + round((room_sensor_temp - thermostat_temp) * 0.5) + round((measured_humidity - 50) / 20) - round(window_open * 0.8) + round(occupancy * 0.3)",
-  "mismatch_expr": "abs(col('Measured Temp (C)') - col('GT Temp (C)')) > 1.5",
   "scope": "home",
   "hypotheses": [
     {

@@ -48,15 +48,15 @@ class ContinuousHypothesis(Hypothesis):
 class AttributionSpec:
     """Single declarative entry point for an attribution analysis.
 
-    Callers declare the prediction formula (``prediction_expr`` versus
-    ``target_expr``), an optional mismatch indicator (``mismatch_expr``), and one
-    flat list of ``hypotheses``. The estimator privately derives feature Shapley
-    attribution, contribution-regime shares, and binary mismatch risk from that list.
+    Callers declare the observed target expression (``target``), observed
+    prediction expression (``prediction``), and a formula expression
+    (``prediction_expr``) used only for Shapley decomposition. A flat list of
+    ``hypotheses`` drives both feature and regime analyses.
     """
 
-    target_expr: str
+    target: str
+    prediction: str
     prediction_expr: str
     hypotheses: list[Hypothesis] = field(default_factory=list)
-    mismatch_expr: str | None = None
     scope: str = "global"
     score_mode: Literal["absolute", "signed"] = "absolute"
