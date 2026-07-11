@@ -63,10 +63,10 @@ def test_properties_and_markdown_sections() -> None:
 
     markdown = result.to_markdown()
     assert "| Regime | Count |" in markdown
-    assert "| Hypothesis | Match mismatch rate |" in markdown
+    assert "| Hypothesis | Regime mismatch rate |" in markdown
 
     no_risk_markdown = _sample_result(include_risk=False).to_markdown()
-    assert "| Hypothesis | Match mismatch rate |" not in no_risk_markdown
+    assert "| Hypothesis | Regime mismatch rate |" not in no_risk_markdown
 
 
 def test_csv_json_and_save(tmp_path) -> None:
@@ -153,6 +153,7 @@ def test_markdown_accessible_presentation() -> None:
     assert "`b` (B) carries the largest net contribution share at 75.00%." in markdown
     assert "risk ratio (95% CI)" in markdown
     assert "odds ratio (95% CI)" in markdown
+    assert "| Hypothesis | Regime mismatch rate | Rest mismatch rate |" in markdown
     assert "Koopman (1984)" in markdown
 
 
@@ -241,6 +242,16 @@ def test_markdown_omits_zero_mismatch_risk_row() -> None:
     assert "visible-risk" in risk_section
     assert "baseline-hidden" not in risk_section
     assert markdown.count("baseline-hidden") == 1
+
+
+def test_markdown_risk_counts_show_mismatch_and_match_split() -> None:
+    result = _sample_result(include_risk=True)
+    markdown = result.to_markdown()
+
+    # For group A: mismatch_count_a=1, total_count_a=10 => 1:9
+    # For group B: mismatch_count_b=1, total_count_b=20 => 1:19
+    assert "10.00% (1:9)" in markdown
+    assert "5.00% (1:19)" in markdown
 
 
 def test_csv_json_keep_raw_field_names(tmp_path) -> None:

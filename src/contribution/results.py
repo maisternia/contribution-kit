@@ -24,6 +24,13 @@ def _format_effect_ci(value: float, ci_low: float | None, ci_high: float | None)
     return f"{point} ({ci_low:.2f} to {ci_high:.2f})"
 
 
+def _format_mismatch_split(mismatch_count: int, total_count: int) -> str:
+    """Render mismatch and non-mismatch counts as ``mismatch:non_mismatch``."""
+
+    matched_count = max(total_count - mismatch_count, 0)
+    return f"{mismatch_count}:{matched_count}"
+
+
 
 @dataclass(slots=True)
 class FeatureAttribution:
@@ -261,14 +268,14 @@ class AssessmentResult:
                     lines.append(f"- Observed prediction (`prediction`): `{prediction}`")
                 lines.append("- Mismatch definition: `prediction != target`")
             lines.append("")
-            lines.append("| Hypothesis | Match mismatch rate | Rest mismatch rate | risk ratio (95% CI) | odds ratio (95% CI) |")
+            lines.append("| Hypothesis | Regime mismatch rate | Rest mismatch rate | risk ratio (95% CI) | odds ratio (95% CI) |")
             lines.append("|---|---:|---:|---:|---:|")
             for risk in risks:
                 rr = _format_effect_ci(risk.risk_ratio, risk.rr_ci_low, risk.rr_ci_high)
                 or_ = _format_effect_ci(risk.odds_ratio, risk.or_ci_low, risk.or_ci_high)
                 lines.append(
-                    f"| {risk.test_name} | {risk.mismatch_rate_a_pct:.2f}% ({risk.mismatch_count_a}/{risk.total_count_a}) | "
-                    f"{risk.mismatch_rate_b_pct:.2f}% ({risk.mismatch_count_b}/{risk.total_count_b}) | {rr} | {or_} |"
+                    f"| {risk.test_name} | {risk.mismatch_rate_a_pct:.2f}% ({_format_mismatch_split(risk.mismatch_count_a, risk.total_count_a)}) | "
+                    f"{risk.mismatch_rate_b_pct:.2f}% ({_format_mismatch_split(risk.mismatch_count_b, risk.total_count_b)}) | {rr} | {or_} |"
                 )
             finite_risks = [risk for risk in risks if risk.risk_ratio != float("inf")]
             if finite_risks:
