@@ -1,6 +1,9 @@
 {
   "description": "Continuous-LoRa Sobel example using formula (2.7) and experimental data from Dudarek and Martyniuk's pre-print on discrete-to-continuous LoRa parameter estimation.",
-git s  "hypotheses": [
+  "target": "col('GT SF')",
+  "prediction": "col('Measured SF')",
+  "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
+  "hypotheses": [
     {
       "name": "class_bw < gt_bw (upscale)",
       "label": "Class BW upscaled to GT BW (beyond 10%)",
