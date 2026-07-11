@@ -5,6 +5,21 @@
   "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
   "hypotheses": [
     {
+      "name": "class_sf",
+      "label": "Nominal class SF (detected vs GT SF)",
+      "condition": "col('Class SF') == col('GT SF')"
+    },
+    {
+      "name": "class_bw",
+      "label": "Nominal class BW (detected vs GT BW)",
+      "condition": "col('Class BW') == col('GT BW')"
+    },
+    {
+      "name": "measured_bw",
+      "label": "Measured BW (box estimate vs GT BW)",
+      "condition": "col('Measured BW') == col('GT BW')"
+    },
+    {
       "name": "class_bw < gt_bw (upscale)",
       "label": "Class BW upscaled to GT BW (beyond 10%)",
       "condition": "col('Class BW') < col('GT BW') * (1 - 0.10)"
@@ -28,21 +43,6 @@
       "name": "class_bw & sf ok & measured ok (baseline)",
       "label": "All inputs correct: class BW, SF, and measured BW within tolerance (sanity check)",
       "condition": "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10 and col('Class SF') == col('GT SF') and abs(col('Measured BW') - col('GT BW')) / col('GT BW') <= 0.10"
-    },
-    {
-      "name": "class_sf",
-      "label": "Nominal class SF (detected vs GT SF)",
-      "condition": "col('Class SF') == col('GT SF')"
-    },
-    {
-      "name": "class_bw",
-      "label": "Nominal class BW (detected vs GT BW)",
-      "condition": "col('Class BW') == col('GT BW')"
-    },
-    {
-      "name": "measured_bw",
-      "label": "Measured BW (box estimate vs GT BW)",
-      "condition": "col('Measured BW') == col('GT BW')"
     }
   ],
   "score_mode": "absolute"

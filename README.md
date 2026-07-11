@@ -34,7 +34,7 @@ Callers never construct regimes or binary tests directly — they only declare c
 
 Mini-example (one regime):
 
-- Condition: `col('Detected BW (Hz)') < col('GT BW (Hz)') * (1 - 0.10)`
+- Condition: `col('Class BW') < col('GT BW') * (1 - 0.10)`
 - This condition only selects rows into group A (true) and group B (false/rest).
 - Regime metrics (`mean_contribution`, `total_contribution`, `contribution_share_pct`) are computed from prediction-vs-target observed contribution over group A.
 - Mismatch-risk metrics are computed from `prediction != target` rates in group A versus group B.
@@ -60,55 +60,55 @@ from contribution import (
 
 spec = AttributionSpec(
     target="col('GT SF')",
-    prediction="col('Measured SF (ungated)')",
+    prediction="col('Measured SF')",
     prediction_expr="class_sf + round(2 * log2(measured_bw / class_bw))", # formula to decompose into Shapley contributions.
     scope="sobel", # optional metadata for organizational purposes
     score_mode="absolute",  # or "signed", it just tells the attribution engine whether to interpret the resulting values as absolute amounts or as signed (directional) amounts when computing Shapley features and regime shares.
     hypotheses=[
         # Directional / conditional error regimes for risks and odds ratios (Koopman, Baptista-Pike)
         Hypothesis(
-            name="class_bw < gt_bw (beyond tol)",
-            condition="col('Detected BW (Hz)') < col('GT BW (Hz)') * (1 - 0.10)",
+            name="class_bw < gt_bw (upscale)",
+            condition="col('Class BW') < col('GT BW') * (1 - 0.10)",
         ),
         Hypothesis(
-            name="class_bw > gt_bw (beyond tol)",
-            condition="col('Detected BW (Hz)') > col('GT BW (Hz)') * (1 + 0.10)",
+            name="class_bw > gt_bw (downscale)",
+            condition="col('Class BW') > col('GT BW') * (1 + 0.10)",
         ),
         Hypothesis(
             name="class_bw within tol & sf wrong",
             condition=(
-                "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 "
-                "and col('Detected SF') != col('GT SF')"
+                "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10 "
+                "and col('Class SF') != col('GT SF')"
             ),
         ),
         Hypothesis(
             name="class_bw & sf ok, measured_bw off",
             condition=(
-                "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 "
-                "and col('Detected SF') == col('GT SF') "
-                "and abs(col('Measured BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') > 0.10"
+                "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10 "
+                "and col('Class SF') == col('GT SF') "
+                "and abs(col('Measured BW') - col('GT BW')) / col('GT BW') > 0.10"
             ),
         ),
         Hypothesis(
             name="class_bw & sf ok & measured ok (baseline)",
             condition=(
-                "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 "
-                "and col('Detected SF') == col('GT SF') "
-                "and abs(col('Measured BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10"
+                "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10 "
+                "and col('Class SF') == col('GT SF') "
+                "and abs(col('Measured BW') - col('GT BW')) / col('GT BW') <= 0.10"
             ),
         ),
         # Top-level equalities whose name is in prediction_expr become Shapley features. No special type is required.
         Hypothesis(
             name="class_sf",
-            condition="col('Detected SF') == col('GT SF')",
+            condition="col('Class SF') == col('GT SF')",
         ),
         Hypothesis(
             name="class_bw",
-            condition="col('Detected BW (Hz)') == col('GT BW (Hz)')",
+            condition="col('Class BW') == col('GT BW')",
         ),
         Hypothesis(
             name="measured_bw",
-            condition="col('Measured BW (Hz)') == col('GT BW (Hz)')",
+            condition="col('Measured BW') == col('GT BW')",
         ),
     ],
 )
@@ -135,20 +135,20 @@ result.save("outputs/run_001")  # writes contribution.csv, run.json, report.md
 
 | regime | count | mean_contribution | total_contribution | contribution_share_pct |
 |---|---:|---:|---:|---:|
-| class_bw < gt_bw (beyond tol) | 476 | 0.1996 | 95.00 | 24.87 |
-| class_bw > gt_bw (beyond tol) | 309 | 0.1165 | 36.00 | 9.42 |
+| class_bw < gt_bw (upscale) | 476 | 0.1996 | 95.00 | 24.87 |
+| class_bw > gt_bw (downscale) | 309 | 0.1165 | 36.00 | 9.42 |
 | class_bw within tol & sf wrong | 23 | 1.2174 | 28.00 | 7.33 |
 | class_bw & sf ok, measured_bw off | 497 | 0.4487 | 223.00 | 58.38 |
 | class_bw & sf ok & measured ok (baseline) | 11972 | 0.0000 | 0.00 | 0.00% |
 
 **Mismatch risk** — each regime's matching rows (group A) versus the rest (group B), using `prediction != target` as the mismatch indicator, with Koopman risk ratios \[[Koopman 1984](#ref-koopman84), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\] and Baptista-Pike odds ratios \[[Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2017](#ref-fagerland17)\]:
 
-| hypothesis | match mismatch rate | rest mismatch rate | risk ratio (95% CI) | odds ratio (95% CI) |
+| hypothesis | Regime mismatch rate | Rest mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
-| class_bw < gt_bw (beyond tol) | 19.12% (91/476) | 1.73% (222/12801) | 11.02 (8.79 to 13.82) | 13.42 (10.31 to 17.47) |
-| class_bw > gt_bw (beyond tol) | 10.36% (32/309) | 2.17% (281/12968) | 4.78 (3.38 to 6.77) | 5.28 (3.60 to 7.73) |
-| class_bw within tol & sf wrong | 95.65% (22/23) | 2.20% (291/13254) | 43.57 (37.75 to 50.27) | 667.08 (127.23 to 3497.46) |
-| class_bw & sf ok, measured_bw off | 33.80% (168/497) | 1.13% (145/12780) | 29.79 (24.31 to 36.51) | 44.41 (34.68 to 56.87) |
+| class_bw < gt_bw (upscale) | 19.12% (91:385) | 1.73% (222:12579) | 11.02 (8.10 to 16.35) | 13.39 (10.16 to 17.54) |
+| class_bw > gt_bw (downscale) | 10.36% (32:277) | 2.17% (281:12687) | 4.78 (3.27 to 7.16) | 5.22 (3.43 to 7.70) |
+| class_bw within tol & sf wrong | 95.65% (22:1) | 2.20% (291:12963) | 43.57 (37.75 to 50.27) | 980.02 (156.82 to 40450.82) |
+| class_bw & sf ok, measured_bw off | 33.80% (168:329) | 1.13% (145:12635) | 29.79 (24.31 to 36.51) | 44.50 (34.44 to 57.42) |
 
 ```
 Rows: 13277
@@ -184,8 +184,8 @@ contrib run      --config examples/continuous_lora/config.json --input examples/
 contrib help
 contrib validate  --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv
 contrib run       --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
-contrib contributor --input examples/continuous_lora/measurements.csv --mismatch-expr "col('Measured SF (ungated)') != col('GT SF')" --feature "detected_sf:col('Detected SF')" --out outputs/contributors.json
-contrib hypothesis --input examples/continuous_lora/measurements.csv --mismatch-expr "col('Measured SF (ungated)') != col('GT SF')" --name "Detected BW Underestimation" --group-a "col('Detected BW (Hz)') < col('GT BW (Hz)')" --group-b "col('Detected BW (Hz)') >= col('GT BW (Hz)')" --group-a-label "detected_bw < gt_bw" --group-b-label "detected_bw >= gt_bw" --out outputs/hypothesis.json
+contrib contributor --input examples/continuous_lora/measurements.csv --mismatch-expr "col('Measured SF') != col('GT SF')" --feature "class_sf:col('Class SF')" --out outputs/contributors.json
+contrib hypothesis --input examples/continuous_lora/measurements.csv --mismatch-expr "col('Measured SF') != col('GT SF')" --name "Class BW Underestimation" --group-a "col('Class BW') < col('GT BW')" --group-b "col('Class BW') >= col('GT BW')" --group-a-label "class_bw < gt_bw" --group-b-label "class_bw >= gt_bw" --out outputs/hypothesis.json
 ```
 
 Config files are JSON or YAML with `target`, `prediction`, `prediction_expr`, optional `scope` and `score_mode`, and a `hypotheses` list. Each hypothesis entry is `{ "name", "condition", "label"? }`. Classification is derived only from the `condition`. See [examples/continuous_lora/config.json](examples/continuous_lora/config.json) and its [measurements.csv](examples/continuous_lora/measurements.csv).
