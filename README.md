@@ -17,12 +17,18 @@ At a glance, the reported analyses are:
 - **Baptista-Pike odds-ratio intervals** (sparse-table robust mismatch odds; with automatic Haldane-Anscombe guardrail fallback only when exact inversion is non-finite/unordered for a finite point estimate)
 
 
-**Classification rule:** a hypothesis whose `condition` is a top-level equality (`==`) and whose `name` appears in `prediction_expr` becomes a Shapley feature; every other hypothesis is a regime. You never pick a type or set a flag — routing is derived entirely from the condition.
+**Classification rule:** a hypothesis whose `condition` is a top-level equality (`==`) becomes a Shapley feature; every other hypothesis is a regime. You never pick a type or set a flag — routing is derived entirely from the condition.
 
 The two hypothesis-routing outputs are:
 
 - **Regime (share + risk) — primary.** Any non-equality boolean condition declares a regime. The rows where it holds form a subset. For that subset, the toolkit reports observed-contribution share (`mean_contribution`, `total_contribution`, `contribution_share_pct`) and mismatch risk versus the remaining rows. Directional and conditional regimes are the main thing you declare.
-- **Formula feature (Shapley) — extra.** A top-level equality `actual == baseline` declares a feature. The left operand is the model-produced value, the right operand is the ground-truth baseline, and the feature joins the exact Shapley attribution of the prediction-formula contribution. The feature `name` must appear in `prediction_expr`.
+- **Formula feature (Shapley) — extra.** A top-level equality `actual == baseline` declares a feature. The left operand is the model-produced value, the right operand is the ground-truth baseline, and the feature joins the exact Shapley attribution of the prediction-formula contribution.
+
+Notes on routing semantics:
+
+- `!=` (and other non-`==` conditions) are always treated as regimes, never as Shapley features.
+- A single hypothesis is routed to one analysis path only (`feature` or `regime`), never both.
+- A feature `name` is used as the variable key in `prediction_expr`; if the expression does not reference that key, the feature can still be classified as a Shapley feature but may have zero effect on the formula value.
 
 Callers never construct regimes or binary tests directly — they only declare conditions, and the relevant sub-results are populated automatically.
 
