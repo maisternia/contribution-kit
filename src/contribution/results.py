@@ -145,6 +145,11 @@ class AssessmentResult:
             return f"outcome = ({prediction_expr}) - ({target})"
         return f"outcome = |({prediction_expr}) - ({target})|"
 
+    @staticmethod
+    def _include_risk_row(risk: BinaryHypothesisResult) -> bool:
+        """Hide degenerate baseline rows from the risk section."""
+        return risk.mismatch_count_a > 0
+
     def to_markdown(self) -> str:
         lines: list[str] = ["# Factor-Contribution Analysis Report", ""]
 
@@ -166,10 +171,6 @@ class AssessmentResult:
         if target:
             shapley_inputs.append(
                 f"- Target (`target`): `{target}`"
-            )
-        if prediction:
-            shapley_inputs.append(
-                f"- Observed prediction (`prediction`): `{prediction}`"
             )
         if prediction_expr:
             shapley_inputs.append(
@@ -221,12 +222,6 @@ class AssessmentResult:
                 regime_inputs.append(
                     f"- Observed prediction (`prediction`): `{prediction}`"
                 )
-            if prediction_expr:
-                regime_inputs.append(
-                    f"- Shapley formula (`prediction_expr`): `{prediction_expr}`"
-                )
-            if score_mode:
-                regime_inputs.append(f"- Scoring mode (`score_mode`): `{score_mode}`")
             if regime_inputs:
                 lines.append("")
                 lines.append("### Inputs")
@@ -246,7 +241,7 @@ class AssessmentResult:
                 f"at {top_regime.contribution_share_pct:.2f}%."
             )
 
-        risks = self.binary_results
+        risks = [risk for risk in self.binary_results if self._include_risk_row(risk)]
         if risks:
             lines.append("")
             lines.append("## Mismatch Risk")

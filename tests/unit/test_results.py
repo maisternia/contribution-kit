@@ -136,10 +136,12 @@ def test_markdown_accessible_presentation() -> None:
     assert "### Inputs" in markdown
     assert "- Shapley formula (`prediction_expr`):" in markdown
     assert "- Target (`target`):" in markdown
-    assert "- Observed prediction (`prediction`):" in markdown
+    assert markdown.count("- Observed prediction (`prediction`):") == 2
     assert "- Scoring mode (`score_mode`):" in markdown
     assert "- Mismatch definition: `prediction != target`" in markdown
     assert "- Formula apportioned across features:" in markdown
+    assert markdown.count("- Shapley formula (`prediction_expr`):") == 1
+    assert markdown.count("- Scoring mode (`score_mode`):") == 1
 
     # Human-readable Shapley column names instead of raw field identifiers.
     assert "| Feature | Description | Mean absolute | Mean signed | Total signed | Net share (%) |" in markdown
@@ -167,6 +169,78 @@ def test_markdown_omits_missing_input_line() -> None:
     markdown = result.to_markdown()
     assert "- Shapley formula (`prediction_expr`):" in markdown
     assert "- Mismatch definition: `prediction != target`" not in markdown
+
+
+def test_markdown_omits_zero_mismatch_risk_row() -> None:
+    visible_risk = BinaryHypothesisResult(
+        scope="s",
+        test_name="visible-risk",
+        group_a="A",
+        group_b="rest",
+        mismatch_rate_a_pct=20.0,
+        mismatch_rate_b_pct=5.0,
+        mismatch_count_a=2,
+        total_count_a=10,
+        mismatch_count_b=1,
+        total_count_b=20,
+        risk_ratio=4.0,
+        rr_ci_low=1.0,
+        rr_ci_high=8.0,
+        odds_ratio=4.5,
+        or_ci_low=1.1,
+        or_ci_high=9.0,
+    )
+    hidden_risk = BinaryHypothesisResult(
+        scope="s",
+        test_name="baseline-hidden",
+        group_a="A",
+        group_b="rest",
+        mismatch_rate_a_pct=0.0,
+        mismatch_rate_b_pct=25.0,
+        mismatch_count_a=0,
+        total_count_a=10,
+        mismatch_count_b=5,
+        total_count_b=20,
+        risk_ratio=0.0,
+        rr_ci_low=None,
+        rr_ci_high=None,
+        odds_ratio=0.0,
+        or_ci_low=0.0,
+        or_ci_high=0.0,
+    )
+    result = AssessmentResult(
+        hypotheses=[
+            HypothesisAssessment(
+                name="f",
+                label="F",
+                analysis="feature",
+                feature=FeatureAttribution("f", "F", 0.1, 0.1, 0.1, 100.0),
+            ),
+            HypothesisAssessment(
+                name="visible-risk",
+                label="Visible",
+                analysis="regime",
+                regime=RegimeSummary("visible-risk", 10, 0.2, 2.0, 66.0),
+                risk=visible_risk,
+            ),
+            HypothesisAssessment(
+                name="baseline-hidden",
+                label="Hidden",
+                analysis="regime",
+                regime=RegimeSummary("baseline-hidden", 10, 0.0, 0.0, 0.0),
+                risk=hidden_risk,
+            ),
+        ],
+        n_rows=20,
+        mean_observed_contribution=0.1,
+    )
+
+    markdown = result.to_markdown()
+    risk_section = markdown.split("## Mismatch Risk", maxsplit=1)[1]
+
+    assert "visible-risk" in risk_section
+    assert "baseline-hidden" not in risk_section
+    assert markdown.count("baseline-hidden") == 1
 
 
 def test_csv_json_keep_raw_field_names(tmp_path) -> None:

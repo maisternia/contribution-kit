@@ -155,7 +155,7 @@ Rows: 13277
 Mean observed contribution: 0.028772
 ```
 
-If a regime has no matching rows (or no contrasting rest), it still appears in the contribution-share table but is omitted from the mismatch-risk table.
+If a regime has no matching rows, no contrasting rest, or zero mismatches in its matching rows, it still appears in the contribution-share table but is omitted from the mismatch-risk table.
 
 ## CLI
 
