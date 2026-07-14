@@ -22,7 +22,7 @@ At a glance, the reported analyses are:
 The two output classes are:
 
 - **Regime (share + risk) — primary.** Any boolean condition in `hypotheses` declares a regime. The rows where it holds form a subset. For that subset, the toolkit reports observed-contribution share (`mean_contribution`, `total_contribution`, `contribution_share_pct`) and mismatch risk versus the remaining rows.
-- **Formula feature (Shapley) — explicit.** Each entry in `prediction_features` declares one feature with explicit `actual` and `baseline` expressions. These named features join the exact Shapley attribution of the prediction-formula contribution.
+- **Formula feature (Shapley) — explicit.** Each entry in `prediction_features` declares one feature with explicit `actual` and `baseline` expressions. Config files may also use a convenience shorthand string whose top-level expression is exactly `actual == baseline`; the loader normalizes it to the same internal feature shape, and labeled features should still use the explicit object form.
 
 Validation and routing semantics:
 
@@ -44,7 +44,7 @@ Mini-example (one regime):
 ## Features
 
 - **Safe expression DSL** — define hypotheses and formulas over CSV columns without executing arbitrary code. Supports `col('Column Name')`, arithmetic, comparisons, `and`/`or`/`not`, ternary `a if cond else b`, and the functions `abs`, `bool`, `ceil`, `floor`, `float`, `int`, `log2`, `max`, `min`, `round`, `str`.
-- **Explicit feature + regime model** — `prediction_features` declares Shapley features; `hypotheses` declares regimes.
+- **Explicit feature + regime model** — `prediction_features` declares Shapley features; `hypotheses` declares regimes; config files may use `lhs == rhs` shorthand only inside `prediction_features`.
 - **Exact Shapley** — closed-form decomposition for ≤12 features; deterministic sampling fallback for larger sets \[[Shapley 1953](#ref-shapley53), [Lundberg & Lee 2017](#ref-lundberg17)\].
 - **Binary effect sizes** — Koopman asymptotic-score risk-ratio CIs \[[Koopman 1984](#ref-koopman84), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\] and Baptista-Pike exact odds-ratio CIs \[[Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2017](#ref-fagerland17)\] for sparse 2×2 mismatch tables. For finite point estimates, if default interval inversion is non-finite or unordered, the toolkit applies an automatic guardrail fallback (Katz for risk ratio, Haldane-Anscombe for odds ratio) for that result only. If you need to force the legacy Katz / Haldane-Anscombe pair, pass `ci_method="wald"` to `assess()` or `--ci-method wald` to `contrib hypothesis`.
 - **Contributor ranking** — reusable lift/share/score scoring for categorical contribution buckets.
@@ -204,6 +204,7 @@ Config files are JSON or YAML with `target`, `prediction`, `prediction_expr`, re
 ```json
 {
     "prediction_features": {
+        "class_sf_match": "col('Class SF') == col('GT SF')",
         "class_bw": {
             "actual": "col('Class BW')",
             "baseline": "col('GT BW')",
@@ -228,6 +229,9 @@ Validation rules for object-valued hypotheses:
 Validation rules for `prediction_features` entries:
 
 - Each feature object must include `actual` and `baseline` string expressions.
+- As a config-only convenience, a feature may instead be a string whose parsed top-level expression is exactly one `actual == baseline` equality.
+- String shorthand does not carry a `label`; use the explicit object form whenever you need a custom label.
+- Non-equality string forms such as `!=`, `<`, chained comparisons, or compound boolean expressions are rejected.
 - Unknown keys are rejected.
 - Every free variable in `prediction_expr` must be declared in `prediction_features`.
 - Every declared feature must appear in `prediction_expr`.

@@ -498,3 +498,82 @@ def test_load_spec_prediction_feature_unknown_key_error(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match=r"unknown key\(s\): extra"):
         cli._load_spec(cfg)
+
+
+def test_load_spec_prediction_feature_string_shorthand_accepts_equality(tmp_path: Path) -> None:
+    cfg = tmp_path / "feature_string_shorthand.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "class_sf_correct",
+                "prediction_features": {
+                    "class_sf_correct": "col('Class SF') == col('GT SF')",
+                },
+                "hypotheses": {"h": "1 == 1"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = cli._load_spec(cfg)
+    assert loaded.prediction_features["class_sf_correct"].actual == "col('Class SF')"
+    assert loaded.prediction_features["class_sf_correct"].baseline == "col('GT SF')"
+    assert loaded.prediction_features["class_sf_correct"].label is None
+
+
+@pytest.mark.parametrize(
+    ("feature_source", "pattern"),
+    [
+        ("col('Class SF') != col('GT SF')", r"single top-level 'actual == baseline' equality"),
+        ("col('Class BW') < col('GT BW')", r"single top-level 'actual == baseline' equality"),
+        ("col('A') == col('B') == col('C')", r"single top-level 'actual == baseline' equality"),
+        (
+            "col('A') == col('B') and col('C') == col('D')",
+            r"single top-level 'actual == baseline' equality",
+        ),
+    ],
+)
+def test_load_spec_prediction_feature_string_shorthand_rejects_non_equality(
+    tmp_path: Path, feature_source: str, pattern: str
+) -> None:
+    cfg = tmp_path / "feature_string_invalid.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "f",
+                "prediction_features": {"f": feature_source},
+                "hypotheses": {"h": "1 == 1"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=pattern):
+        cli._load_spec(cfg)
+
+
+def test_main_validate_accepts_mixed_prediction_feature_forms(tmp_path: Path) -> None:
+    data = tmp_path / "in.csv"
+    _write_csv(data, _rows())
+    cfg = tmp_path / "mixed_features.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "col('GT SF')",
+                "prediction": "col('Measured SF (ungated)')",
+                "prediction_expr": "class_bw - class_bw + int(class_sf_correct)",
+                "prediction_features": {
+                    "class_sf_correct": "col('Detected SF') == col('GT SF')",
+                    "class_bw": {"actual": "col('Detected BW (Hz)')", "baseline": "col('GT BW (Hz)')"},
+                },
+                "hypotheses": {"under": "col('Detected BW (Hz)') < col('GT BW (Hz)')"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert cli.main(["validate", "--config", str(cfg), "--input", str(data)]) == 0

@@ -2,13 +2,14 @@
   "description": "BW-only diagnostic matrix for the continuous-LoRa Sobel example. Two orthogonal axes: class-BW vs GT BW (augmentation/alias axis, split by scaling direction) and measured BW vs GT BW (bounding-box height quality axis). No SF conditions: SF misclassification is delegated to mAP metrics. Cells are mutually exclusive and exhaustive.",
   "target": "col('GT SF')",
   "prediction": "col('Measured SF')",
-  "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
+  "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw)) + 0 * int(class_sf_match)",
   "prediction_features": {
     "class_sf": {
       "label": "Nominal class SF (detected vs GT SF)",
       "actual": "col('Class SF')",
       "baseline": "col('GT SF')"
     },
+    "class_sf_match": "col('Class SF') == col('GT SF')",
     "class_bw": {
       "label": "Nominal class BW (detected vs GT BW)",
       "actual": "col('Class BW')",

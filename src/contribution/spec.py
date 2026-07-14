@@ -17,7 +17,9 @@ class Hypothesis:
         remaining rows) are reported.
 
         Shapley features are declared separately through
-        ``AttributionSpec.prediction_features``.
+        ``AttributionSpec.prediction_features``. Equality conditions remain
+        regimes when declared here; the config-only ``actual == baseline``
+        shorthand is reserved for ``prediction_features``.
     """
 
     name: str
@@ -50,7 +52,13 @@ class FactorialCrossing:
 
 @dataclass(slots=True)
 class PredictionFeature:
-    """Explicit actual/baseline pair for a prediction-formula feature."""
+    """Canonical actual/baseline pair for a prediction-formula feature.
+
+    Python callers construct ``PredictionFeature`` explicitly. Config files may
+    also use a string shorthand whose top-level expression is exactly
+    ``actual == baseline``; the CLI loader normalizes that shorthand into this
+    dataclass before estimator code runs.
+    """
 
     actual: str
     baseline: str
@@ -66,7 +74,10 @@ class AttributionSpec:
     (``prediction_expr``) used only for Shapley decomposition.
 
     ``prediction_features`` explicitly declares the formula variables used for
-    Shapley attribution as named ``actual``/``baseline`` pairs.
+    Shapley attribution as named ``actual``/``baseline`` pairs. When loaded
+    from JSON/YAML, those entries may also use a config-only top-level
+    ``actual == baseline`` shorthand that is normalized to the same canonical
+    ``PredictionFeature`` form.
     ``hypotheses`` is a flat list of regime conditions.
     """
 

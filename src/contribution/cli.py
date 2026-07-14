@@ -12,7 +12,7 @@ from typing import Any
 
 from .contributor import combine_contributors, rank_contributors
 from .estimator import Estimator
-from .expr import build_row_context, evaluate_expression
+from .expr import build_row_context, evaluate_expression, parse_feature_equality_shorthand
 from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis
 from .results import (
     AssessmentResult,
@@ -118,9 +118,28 @@ def _load_spec(path: str | Path) -> AttributionSpec:
     prediction_features: dict[str, PredictionFeature] = {}
     allowed_feature_keys = {"actual", "baseline", "label"}
     for feature_name, feature_payload in prediction_features_payload.items():
+        if isinstance(feature_payload, str):
+            shorthand = feature_payload.strip()
+            if not shorthand:
+                raise ValueError(
+                    f"prediction feature '{feature_name}' string shorthand must be a non-empty top-level '==' equality"
+                )
+            try:
+                parsed = parse_feature_equality_shorthand(shorthand)
+            except (SyntaxError, ValueError) as error:
+                raise ValueError(
+                    f"prediction feature '{feature_name}' string shorthand must be a single top-level 'actual == baseline' equality"
+                ) from error
+            if parsed is None:
+                raise ValueError(
+                    f"prediction feature '{feature_name}' string shorthand must be a single top-level 'actual == baseline' equality"
+                )
+            actual, baseline = parsed
+            prediction_features[feature_name] = PredictionFeature(actual=actual, baseline=baseline)
+            continue
         if not isinstance(feature_payload, dict):
             raise ValueError(
-                f"prediction feature '{feature_name}' must be an object with required 'actual' and 'baseline'"
+                f"prediction feature '{feature_name}' must be an object with required 'actual' and 'baseline' or a top-level 'actual == baseline' string shorthand"
             )
         missing_keys = [key for key in ("actual", "baseline") if key not in feature_payload]
         if missing_keys:

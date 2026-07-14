@@ -41,6 +41,19 @@ def evaluate_expression(source: str, context: Mapping[str, Any]) -> Any:
     return compile_expression(source).evaluate(context)
 
 
+def parse_feature_equality_shorthand(source: str) -> tuple[str, str] | None:
+    tree = ast.parse(source, mode="eval")
+    _validate_node(tree)
+    body = tree.body
+    if not isinstance(body, ast.Compare):
+        return None
+    if len(body.ops) != 1 or len(body.comparators) != 1:
+        return None
+    if not isinstance(body.ops[0], ast.Eq):
+        return None
+    return ast.unparse(body.left), ast.unparse(body.comparators[0])
+
+
 def free_variables(expression: CompiledExpression) -> set[str]:
     names = {node.id for node in ast.walk(expression.tree) if isinstance(node, ast.Name)}
     return names.difference(_ALLOWED_FUNCTIONS).difference({"col"})
