@@ -2,13 +2,13 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-maisternia%2Fcontribution--kit-blue)](https://github.com/maisternia/contribution-kit)
 
-Reusable Python toolkit for attributing a modeled quantity to user-defined hypotheses. The quantity is whatever you define through `target`, `prediction`, and `score_mode` for observed outcomes, plus `prediction_expr` for Shapley decomposition. It can be a prediction *error*, but equally a reward, yield, deviation, or any signed contribution; the framing is entirely yours through the hypothesis conditions and how you name-interpret the results. You declare each hypothesis as a single boolean `condition` over CSV columns. The primary use case is directional or conditional **regimes** (e.g. "detected Height falls below GT Height"), whose observed-contribution share and condition-vs-rest mismatch risk are reported; top-level equality conditions are also supported as an extra **Shapley feature** of the decomposition formula.
+Reusable Python toolkit for attributing a modeled quantity to user-defined hypotheses. The quantity is whatever you define through `target`, `prediction`, and `score_mode` for observed outcomes, plus `prediction_expr` for Shapley decomposition. It can be a prediction *error*, but equally a reward, yield, deviation, or any signed contribution; the framing is entirely yours through explicit prediction-feature declarations and regime conditions. You declare regimes as boolean `condition` expressions over CSV columns. The primary use case is directional or conditional **regimes** (e.g. "detected Height falls below GT Height"), whose observed-contribution share and condition-vs-rest mismatch risk are reported.
 
 > Running example: throughout this README the modeled quantity is a prediction *error* (`|prediction - target|`), because that is the bundled dataset's use case. Swap the expressions and `score_mode` and the same math attributes any positive or negative contribution. See Dudarek & Martyniuk (2026) preprint for more information about the experiment used as the main example here \[[Dudarek & Martyniuk 2026](#ref-dudarek26)\].
 
 ## How it works
 
-You declare every hypothesis with the single `Hypothesis` type — a `name` plus one boolean `condition` written in the safe DSL. The condition is used only to select rows (inside regime vs outside regime). After that selection, the estimator computes observed-contribution statistics on the selected rows and compares mismatch rates between selected rows and the rest using `prediction != target`.
+You declare every regime with the single `Hypothesis` type — a `name` plus one boolean `condition` written in the safe DSL. The condition is used only to select rows (inside regime vs outside regime). After that selection, the estimator computes observed-contribution statistics on the selected rows and compares mismatch rates between selected rows and the rest using `prediction != target`.
 
 At a glance, the reported analyses are:
 
@@ -17,18 +17,19 @@ At a glance, the reported analyses are:
 - **Baptista-Pike odds-ratio intervals** (sparse-table robust mismatch odds; with automatic Haldane-Anscombe guardrail fallback only when exact inversion is non-finite/unordered for a finite point estimate)
 
 
-**Classification rule:** a hypothesis whose `condition` is a top-level equality (`==`) becomes a Shapley feature; every other hypothesis is a regime. You never pick a type or set a flag — routing is derived entirely from the condition.
+**Classification rule:** `prediction_features` is the only source of Shapley features. Every entry in `hypotheses` is analyzed as a regime, including equality conditions.
 
-The two hypothesis-routing outputs are:
+The two output classes are:
 
-- **Regime (share + risk) — primary.** Any non-equality boolean condition declares a regime. The rows where it holds form a subset. For that subset, the toolkit reports observed-contribution share (`mean_contribution`, `total_contribution`, `contribution_share_pct`) and mismatch risk versus the remaining rows. Directional and conditional regimes are the main thing you declare.
-- **Formula feature (Shapley) — extra.** A top-level equality `actual == baseline` declares a feature. The left operand is the model-produced value, the right operand is the ground-truth baseline, and the feature joins the exact Shapley attribution of the prediction-formula contribution.
+- **Regime (share + risk) — primary.** Any boolean condition in `hypotheses` declares a regime. The rows where it holds form a subset. For that subset, the toolkit reports observed-contribution share (`mean_contribution`, `total_contribution`, `contribution_share_pct`) and mismatch risk versus the remaining rows.
+- **Formula feature (Shapley) — explicit.** Each entry in `prediction_features` declares one feature with explicit `actual` and `baseline` expressions. These named features join the exact Shapley attribution of the prediction-formula contribution.
 
-Notes on routing semantics:
+Validation and routing semantics:
 
-- `!=` (and other non-`==` conditions) are always treated as regimes, never as Shapley features.
-- A single hypothesis is routed to one analysis path only (`feature` or `regime`), never both.
-- A feature `name` is used as the variable key in `prediction_expr`; if the expression does not reference that key, the feature can still be classified as a Shapley feature but may have zero effect on the formula value.
+- Every free variable in `prediction_expr` must have a matching `prediction_features` entry.
+- Every declared prediction feature must be used by `prediction_expr`.
+- Prediction feature names must not collide with hypothesis names.
+- Equality conditions in `hypotheses` are still legal, but they are analyzed only as regimes.
 
 Callers never construct regimes or binary tests directly — they only declare conditions, and the relevant sub-results are populated automatically.
 
@@ -43,7 +44,7 @@ Mini-example (one regime):
 ## Features
 
 - **Safe expression DSL** — define hypotheses and formulas over CSV columns without executing arbitrary code. Supports `col('Column Name')`, arithmetic, comparisons, `and`/`or`/`not`, ternary `a if cond else b`, and the functions `abs`, `bool`, `ceil`, `floor`, `float`, `int`, `log2`, `max`, `min`, `round`, `str`.
-- **Unified hypothesis model** — one named mapping of `condition` declarations drives regime shares, binary mismatch risk, and (for equality conditions) feature Shapley attribution.
+- **Explicit feature + regime model** — `prediction_features` declares Shapley features; `hypotheses` declares regimes.
 - **Exact Shapley** — closed-form decomposition for ≤12 features; deterministic sampling fallback for larger sets \[[Shapley 1953](#ref-shapley53), [Lundberg & Lee 2017](#ref-lundberg17)\].
 - **Binary effect sizes** — Koopman asymptotic-score risk-ratio CIs \[[Koopman 1984](#ref-koopman84), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\] and Baptista-Pike exact odds-ratio CIs \[[Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2017](#ref-fagerland17)\] for sparse 2×2 mismatch tables. For finite point estimates, if default interval inversion is non-finite or unordered, the toolkit applies an automatic guardrail fallback (Katz for risk ratio, Haldane-Anscombe for odds ratio) for that result only. If you need to force the legacy Katz / Haldane-Anscombe pair, pass `ci_method="wald"` to `assess()` or `--ci-method wald` to `contrib hypothesis`.
 - **Contributor ranking** — reusable lift/share/score scoring for categorical contribution buckets.
@@ -56,12 +57,30 @@ from contribution import (
     AttributionSpec,
     Estimator,
     Hypothesis,
+    PredictionFeature,
 )
 
 spec = AttributionSpec(
     target="col('GT SF')",
     prediction="col('Measured SF')",
     prediction_expr="class_sf + round(2 * log2(measured_bw / class_bw))", # formula to decompose into Shapley contributions.
+    prediction_features={
+        "class_sf": PredictionFeature(
+            actual="col('Class SF')",
+            baseline="col('GT SF')",
+            label="Nominal class SF (detected vs GT SF)",
+        ),
+        "class_bw": PredictionFeature(
+            actual="col('Class BW')",
+            baseline="col('GT BW')",
+            label="Nominal class BW (detected vs GT BW)",
+        ),
+        "measured_bw": PredictionFeature(
+            actual="col('Measured BW')",
+            baseline="col('GT BW')",
+            label="Measured BW (box estimate vs GT BW)",
+        ),
+    },
     scope="sobel", # optional metadata for organizational purposes
     score_mode="absolute",  # or "signed", it just tells the attribution engine whether to interpret the resulting values as absolute amounts or as signed (directional) amounts when computing Shapley features and regime shares.
     hypotheses=[
@@ -97,18 +116,10 @@ spec = AttributionSpec(
                 "and abs(col('Measured BW') - col('GT BW')) / col('GT BW') <= 0.10"
             ),
         ),
-        # Top-level equalities whose name is in prediction_expr become Shapley features. No special type is required.
+        # Equality conditions are legal regimes when declared in hypotheses.
         Hypothesis(
-            name="class_sf",
+            name="class_sf correct regime",
             condition="col('Class SF') == col('GT SF')",
-        ),
-        Hypothesis(
-            name="class_bw",
-            condition="col('Class BW') == col('GT BW')",
-        ),
-        Hypothesis(
-            name="measured_bw",
-            condition="col('Measured BW') == col('GT BW')",
         ),
     ],
 )
@@ -123,7 +134,7 @@ result.save("outputs/run_001")  # writes contribution.csv, run.json, report.md
 
 `save()` writes three files: `contribution.csv` (the feature-attribution table), `run.json` (the full machine-readable result), and `report.md`. The tables below are the real output of the Quick start spec on the bundled [examples/continuous_lora](examples/continuous_lora) dataset (13,277 rows of continuous-LoRa Sobel measurements). The prediction formula corresponds to formula (2.7), and the experimental data are referenced from \[[Dudarek & Martyniuk 2026](#ref-dudarek26)\].
 
-**Feature attributions** — Shapley decomposition of the prediction-formula contribution \[[Shapley 1953](#ref-shapley53), [Lundberg & Lee 2017](#ref-lundberg17)\], one row per equality hypothesis, ranked by net contribution share:
+**Feature attributions** — Shapley decomposition of the prediction-formula contribution \[[Shapley 1953](#ref-shapley53), [Lundberg & Lee 2017](#ref-lundberg17)\], one row per declared prediction feature, ranked by net contribution share:
 
 | name | label | mean_abs_shapley | mean_signed_shapley | total_signed_shapley | net_contribution_share_pct |
 |---|---:|---:|---:|---:|---:|
@@ -188,15 +199,22 @@ contrib contributor --input examples/continuous_lora/measurements.csv --mismatch
 contrib hypothesis --input examples/continuous_lora/measurements.csv --mismatch-expr "col('Measured SF') != col('GT SF')" --name "Class BW Underestimation" --group-a "col('Class BW') < col('GT BW')" --group-b "col('Class BW') >= col('GT BW')" --group-a-label "class_bw < gt_bw" --group-b-label "class_bw >= gt_bw" --out outputs/hypothesis.json
 ```
 
-Config files are JSON or YAML with `target`, `prediction`, `prediction_expr`, optional `scope` and `score_mode`, and a `hypotheses` mapping. Mapping keys are hypothesis names and values are either a condition string shorthand or an object with `condition` and optional `label`.
+Config files are JSON or YAML with `target`, `prediction`, `prediction_expr`, required `prediction_features` (when `prediction_expr` uses variables), optional `scope` and `score_mode`, and a `hypotheses` mapping. Mapping keys are hypothesis names and values are either a condition string shorthand or an object with `condition` and optional `label`.
 
 ```json
 {
+    "prediction_features": {
+        "class_bw": {
+            "actual": "col('Class BW')",
+            "baseline": "col('GT BW')",
+            "label": "Nominal class BW"
+        }
+    },
     "hypotheses": {
-        "class_bw": "col('Class BW') == col('GT BW')",
-        "class_sf": {
+        "class_bw_under": "col('Class BW') < col('GT BW') * (1 - 0.10)",
+        "class_sf_correct": {
             "condition": "col('Class SF') == col('GT SF')",
-            "label": "Nominal class SF (detected vs GT SF)"
+            "label": "Class SF matches GT SF (regime)"
         }
     }
 }
@@ -207,24 +225,56 @@ Validation rules for object-valued hypotheses:
 - The object must include `condition`.
 - The object must not include `name` (the mapping key already provides it).
 
+Validation rules for `prediction_features` entries:
+
+- Each feature object must include `actual` and `baseline` string expressions.
+- Unknown keys are rejected.
+- Every free variable in `prediction_expr` must be declared in `prediction_features`.
+- Every declared feature must appear in `prediction_expr`.
+
+Before/after migration example for old equality feature-hypotheses:
+
+```json
+{
+    "prediction_expr": "class_sf + class_bw",
+    "hypotheses": {
+        "class_sf": "col('Class SF') == col('GT SF')",
+        "class_bw": "col('Class BW') == col('GT BW')"
+    }
+}
+```
+
+```json
+{
+    "prediction_expr": "class_sf + class_bw",
+    "prediction_features": {
+        "class_sf": {"actual": "col('Class SF')", "baseline": "col('GT SF')"},
+        "class_bw": {"actual": "col('Class BW')", "baseline": "col('GT BW')"}
+    },
+    "hypotheses": {
+        "class_sf_correct": "col('Class SF') == col('GT SF')"
+    }
+}
+```
+
 Breaking change: the old list form of `hypotheses` is no longer accepted.
 
 Optional factorial regime declarations:
 
-- `factors`: object mapping axis name to ordered level conditions:
-    - `"factors": {"axis": {"level_a": "<bool expr>", "level_b": "<bool expr>"}}`
-- `factorials`: list of 2-axis crossings:
-    - `"factorials": [{"rows": "<axis>", "columns": "<axis>"}]`
+- `factorials`: list of 2-axis crossings with inline level maps:
+    - Each crossing is an object with `rows` (level map), `columns` (level map), and optional `label`:
+    - `"factorials": [{"rows": {"level_a": "<bool expr>", "level_b": "<bool expr>"}, "columns": {"level_c": "<bool expr>", ...}, "label": "My Factorial"}]`
+    - If `label` is omitted, a fallback label "Factorial <n>" is generated based on crossing position.
 
-Each crossing generates one regime cell per `(row_level, column_level)` with condition `(<row_cond>) and (<col_cond>)` and name `"<row_level> & <col_level>"`. Generated cells are appended to the same regime/risk pipeline used by declared non-equality hypotheses.
+Each crossing generates one regime cell per `(row_level, column_level)` with condition `(<row_cond>) and (<col_cond>)` and name `"<label>: rows=<row_level>, columns=<column_level>"`. Generated cells are appended to the same regime/risk pipeline used by declared non-equality hypotheses.
 
-If factors/factorials are present, reports add:
+If factorials are present, reports add:
 
 - `## Partition Warnings` when a factorial axis has overlaps or gaps over loaded rows
 - `## Factorial Matrices` with per-cell count, mismatch rate, risk ratio vs rest, and union-based row/column marginals
 - `## Within-stratum contrasts` with sibling-level pairwise contrasts inside each stratum using Koopman/Baptista-Pike intervals
 
-See [examples/continuous_lora/config.json](examples/continuous_lora/config.json), [examples/continuous_lora/config_bw_matrix.json](examples/continuous_lora/config_bw_matrix.json), and [examples/continuous_lora/measurements.csv](examples/continuous_lora/measurements.csv).
+See [examples/continuous_lora/config_factorial.json](examples/continuous_lora/config_factorial.json), and [examples/continuous_lora/measurements.csv](examples/continuous_lora/measurements.csv).
 
 ## Install
 
@@ -269,9 +319,9 @@ git submodule update --init path/to/contribution-kit
 
 ```
 src/contribution/  — reusable library
-  spec.py               — AttributionSpec, Hypothesis
-  estimator.py          — Estimator (from_csv, from_dataframe, assess); private feature/regime routing
-  expr.py               — safe AST expression evaluator and equality splitting
+    spec.py               — AttributionSpec, Hypothesis, PredictionFeature
+    estimator.py          — Estimator (from_csv, from_dataframe, assess); explicit feature + regime analyses
+    expr.py               — safe AST expression evaluator and free-variable discovery
   stats.py              — Koopman risk ratio and Baptista-Pike odds ratio
   contributor.py        — contributor lift/share/score ranking
   hypothesis.py         — binary mismatch hypothesis test helpers

@@ -27,9 +27,9 @@ from .results import (
 )
 from .spec import (
     AttributionSpec,
-    Factor,
     FactorialCrossing,
     Hypothesis,
+    PredictionFeature,
 )
 
 
@@ -58,8 +58,7 @@ def _result_from_run(payload: dict[str, Any]) -> AssessmentResult:
     for item in payload.get("factorial_matrices", []):
         factorial_matrices.append(
             FactorialMatrixResult(
-                rows_axis=item["rows_axis"],
-                columns_axis=item["columns_axis"],
+                label=item["label"],
                 cells=[FactorialCellResult(**cell) for cell in item.get("cells", [])],
                 row_marginals=[FactorialMarginalResult(**row) for row in item.get("row_marginals", [])],
                 column_marginals=[FactorialMarginalResult(**row) for row in item.get("column_marginals", [])],
@@ -113,44 +112,88 @@ def _load_spec(path: str | Path) -> AttributionSpec:
             f"hypothesis '{hypothesis_name}' must be a condition string or an object with 'condition' and optional 'label'"
         )
 
-    factors_payload = payload.get("factors", {})
-    if not isinstance(factors_payload, dict):
-        raise ValueError("'factors' must be an object mapping axis names to level conditions")
-    factors: dict[str, Factor] = {}
-    for axis_name, levels_payload in factors_payload.items():
-        if not isinstance(levels_payload, dict):
-            raise ValueError(f"factor '{axis_name}' must map level names to condition strings")
-        if not levels_payload:
-            raise ValueError(f"factor '{axis_name}' must declare at least one level")
-        levels: dict[str, str] = {}
-        for level_name, condition in levels_payload.items():
-            if not isinstance(condition, str) or not condition.strip():
-                raise ValueError(f"factor '{axis_name}' level '{level_name}' must have a non-empty condition string")
-            levels[level_name] = condition
-        factors[axis_name] = Factor(name=axis_name, levels=levels)
+    prediction_features_payload = payload.get("prediction_features", {})
+    if not isinstance(prediction_features_payload, dict):
+        raise ValueError("'prediction_features' must be an object mapping feature names to {actual, baseline, label?}")
+    prediction_features: dict[str, PredictionFeature] = {}
+    allowed_feature_keys = {"actual", "baseline", "label"}
+    for feature_name, feature_payload in prediction_features_payload.items():
+        if not isinstance(feature_payload, dict):
+            raise ValueError(
+                f"prediction feature '{feature_name}' must be an object with required 'actual' and 'baseline'"
+            )
+        missing_keys = [key for key in ("actual", "baseline") if key not in feature_payload]
+        if missing_keys:
+            raise ValueError(
+                f"prediction feature '{feature_name}' is missing required key(s): {', '.join(missing_keys)}"
+            )
+        unknown_keys = sorted(set(feature_payload).difference(allowed_feature_keys))
+        if unknown_keys:
+            raise ValueError(
+                f"prediction feature '{feature_name}' has unknown key(s): {', '.join(unknown_keys)}"
+            )
+        actual = feature_payload["actual"]
+        baseline = feature_payload["baseline"]
+        label = feature_payload.get("label")
+        if not isinstance(actual, str) or not actual.strip():
+            raise ValueError(f"prediction feature '{feature_name}' key 'actual' must be a non-empty string")
+        if not isinstance(baseline, str) or not baseline.strip():
+            raise ValueError(f"prediction feature '{feature_name}' key 'baseline' must be a non-empty string")
+        if label is not None and not isinstance(label, str):
+            raise ValueError(f"prediction feature '{feature_name}' key 'label' must be a string when provided")
+        prediction_features[feature_name] = PredictionFeature(actual=actual, baseline=baseline, label=label)
 
     factorials_payload = payload.get("factorials", [])
     if not isinstance(factorials_payload, list):
-        raise ValueError("'factorials' must be a list of {'rows': <axis>, 'columns': <axis>} objects")
+        raise ValueError("'factorials' must be a list of crossing objects")
     factorials: list[FactorialCrossing] = []
     for index, item in enumerate(factorials_payload):
         if not isinstance(item, dict):
-            raise ValueError(f"factorials[{index}] must be an object with 'rows' and 'columns'")
-        rows_axis = item.get("rows")
-        columns_axis = item.get("columns")
-        if not isinstance(rows_axis, str) or not isinstance(columns_axis, str):
-            raise ValueError(f"factorials[{index}] must declare string 'rows' and 'columns' axis names")
-        for axis_name in (rows_axis, columns_axis):
-            if axis_name not in factors:
-                raise ValueError(f"factorials[{index}] references unknown axis '{axis_name}'")
-        factorials.append(FactorialCrossing(rows=rows_axis, columns=columns_axis))
+            raise ValueError(f"factorials[{index}] must be an object")
+        
+        # Validate known keys
+        allowed_crossing_keys = {"rows", "columns", "label"}
+        unknown_keys = sorted(set(item).difference(allowed_crossing_keys))
+        if unknown_keys:
+            raise ValueError(f"factorials[{index}] has unknown key(s): {', '.join(unknown_keys)}")
+        
+        # Parse rows axis
+        rows_payload = item.get("rows")
+        if not isinstance(rows_payload, dict):
+            raise ValueError(f"factorials[{index}] must declare 'rows' as an object mapping level names to conditions")
+        if not rows_payload:
+            raise ValueError(f"factorials[{index}] 'rows' axis must declare at least one level")
+        rows: dict[str, str] = {}
+        for level_name, condition in rows_payload.items():
+            if not isinstance(condition, str) or not condition.strip():
+                raise ValueError(f"factorials[{index}] rows level '{level_name}' must have a non-empty condition string")
+            rows[level_name] = condition
+        
+        # Parse columns axis
+        columns_payload = item.get("columns")
+        if not isinstance(columns_payload, dict):
+            raise ValueError(f"factorials[{index}] must declare 'columns' as an object mapping level names to conditions")
+        if not columns_payload:
+            raise ValueError(f"factorials[{index}] 'columns' axis must declare at least one level")
+        columns: dict[str, str] = {}
+        for level_name, condition in columns_payload.items():
+            if not isinstance(condition, str) or not condition.strip():
+                raise ValueError(f"factorials[{index}] columns level '{level_name}' must have a non-empty condition string")
+            columns[level_name] = condition
+        
+        # Parse optional label
+        label = item.get("label")
+        if label is not None and (not isinstance(label, str) or not label.strip()):
+            raise ValueError(f"factorials[{index}] 'label' must be a non-empty string when provided")
+        
+        factorials.append(FactorialCrossing(rows=rows, columns=columns, label=label))
 
     return AttributionSpec(
         target=payload["target"],
         prediction=payload["prediction"],
         prediction_expr=payload["prediction_expr"],
+        prediction_features=prediction_features,
         hypotheses=hypotheses,
-        factors=factors,
         factorials=factorials,
         scope=payload.get("scope", "global"),
         score_mode=payload.get("score_mode", "absolute"),

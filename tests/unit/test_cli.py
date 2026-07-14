@@ -46,10 +46,12 @@ def _config(path: Path) -> Path:
         "target": "col('GT SF')",
         "prediction": "col('Measured SF (ungated)')",
         "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
+        "prediction_features": {
+            "class_sf": {"actual": "col('Detected SF')", "baseline": "col('GT SF')"},
+            "class_bw": {"actual": "col('Detected BW (Hz)')", "baseline": "col('GT BW (Hz)')"},
+            "measured_bw": {"actual": "col('Measured BW (Hz)')", "baseline": "col('GT BW (Hz)')"},
+        },
         "hypotheses": {
-            "class_sf": "col('Detected SF') == col('GT SF')",
-            "class_bw": "col('Detected BW (Hz)') == col('GT BW (Hz)')",
-            "measured_bw": "col('Measured BW (Hz)') == col('GT BW (Hz)')",
             "under": "col('Detected BW (Hz)') < col('GT BW (Hz)')",
         },
     }
@@ -70,7 +72,7 @@ def test_load_spec_json_and_yaml(tmp_path: Path) -> None:
 
     yaml_cfg = tmp_path / "cfg.yaml"
     yaml_cfg.write_text(
-        "target: \"1\"\nprediction: \"1\"\nprediction_expr: \"1\"\nhypotheses:\n  h: \"1 == 1\"\n",
+        "target: \"1\"\nprediction: \"1\"\nprediction_expr: \"1\"\nprediction_features: {}\nhypotheses:\n  h: \"1 == 1\"\n",
         encoding="utf-8",
     )
     loaded_yaml = cli._load_spec(yaml_cfg)
@@ -208,7 +210,7 @@ def test_main_returns_one_for_unrecognized_command(monkeypatch) -> None:
     assert cli.main([]) == 1
 
 
-def test_load_spec_parses_factors_and_factorials(tmp_path: Path) -> None:
+def test_load_spec_parses_inline_factorials(tmp_path: Path) -> None:
     cfg = tmp_path / "factorial.json"
     cfg.write_text(
         json.dumps(
@@ -216,24 +218,27 @@ def test_load_spec_parses_factors_and_factorials(tmp_path: Path) -> None:
                 "target": "target",
                 "prediction": "prediction",
                 "prediction_expr": "f",
-                "hypotheses": {"f": "1 == 1"},
-                "factors": {
-                    "row_axis": {"up": "row == 'up'", "down": "row == 'down'"},
-                    "col_axis": {"ok": "col == 'ok'", "off": "col == 'off'"},
-                },
-                "factorials": [{"rows": "row_axis", "columns": "col_axis"}],
+                "prediction_features": {"f": {"actual": "f", "baseline": "0"}},
+                "hypotheses": {"all": "1 == 1"},
+                "factorials": [
+                    {
+                        "rows": {"up": "row == 'up'", "down": "row == 'down'"},
+                        "columns": {"ok": "col == 'ok'", "off": "col == 'off'"},
+                        "label": "My Factorial"
+                    }
+                ],
             }
         ),
         encoding="utf-8",
     )
     loaded = cli._load_spec(cfg)
-    assert sorted(loaded.factors) == ["col_axis", "row_axis"]
-    assert loaded.factorials[0].rows == "row_axis"
-    assert loaded.factorials[0].columns == "col_axis"
+    assert loaded.factorials[0].rows == {"up": "row == 'up'", "down": "row == 'down'"}
+    assert loaded.factorials[0].columns == {"ok": "col == 'ok'", "off": "col == 'off'"}
+    assert loaded.factorials[0].label == "My Factorial"
 
 
-def test_load_spec_factorial_unknown_axis_error(tmp_path: Path) -> None:
-    cfg = tmp_path / "bad_axis.json"
+def test_load_spec_factorial_with_fallback_label(tmp_path: Path) -> None:
+    cfg = tmp_path / "factorial_no_label.json"
     cfg.write_text(
         json.dumps(
             {
@@ -241,18 +246,23 @@ def test_load_spec_factorial_unknown_axis_error(tmp_path: Path) -> None:
                 "prediction": "1",
                 "prediction_expr": "1",
                 "hypotheses": {"h": "1 == 1"},
-                "factors": {"known": {"a": "1 == 1"}},
-                "factorials": [{"rows": "known", "columns": "missing"}],
+                "factorials": [
+                    {
+                        "rows": {"a": "1 == 1"},
+                        "columns": {"b": "1 == 1"},
+                    }
+                ],
             }
         ),
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match="unknown axis 'missing'"):
-        cli._load_spec(cfg)
+    loaded = cli._load_spec(cfg)
+    # Without explicit label, should use None (fallback "Factorial 1" will be computed during expansion)
+    assert loaded.factorials[0].label is None
 
 
-def test_load_spec_empty_factor_axis_error(tmp_path: Path) -> None:
-    cfg = tmp_path / "empty_factor.json"
+def test_load_spec_factorial_empty_axis_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "empty_axis.json"
     cfg.write_text(
         json.dumps(
             {
@@ -260,12 +270,65 @@ def test_load_spec_empty_factor_axis_error(tmp_path: Path) -> None:
                 "prediction": "1",
                 "prediction_expr": "1",
                 "hypotheses": {"h": "1 == 1"},
-                "factors": {"empty": {}},
+                "factorials": [
+                    {
+                        "rows": {},
+                        "columns": {"b": "1 == 1"},
+                    }
+                ],
             }
         ),
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="must declare at least one level"):
+        cli._load_spec(cfg)
+
+
+def test_load_spec_factorial_empty_label_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "empty_label.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "1",
+                "hypotheses": {"h": "1 == 1"},
+                "factorials": [
+                    {
+                        "rows": {"a": "1 == 1"},
+                        "columns": {"b": "1 == 1"},
+                        "label": "   "
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="label.*non-empty string"):
+        cli._load_spec(cfg)
+
+
+def test_load_spec_factorial_unknown_key_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "unknown_key.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "1",
+                "hypotheses": {"h": "1 == 1"},
+                "factorials": [
+                    {
+                        "rows": {"a": "1 == 1"},
+                        "columns": {"b": "1 == 1"},
+                        "unknown_field": "should error"
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="unknown key"):
         cli._load_spec(cfg)
 
 
@@ -277,6 +340,7 @@ def test_load_spec_hypotheses_mapping_string_shorthand(tmp_path: Path) -> None:
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "h",
+                "prediction_features": {"h": {"actual": "1", "baseline": "0"}},
                 "hypotheses": {"h": "1 == 1"},
             }
         ),
@@ -297,6 +361,7 @@ def test_load_spec_hypotheses_mapping_object_explicit_label(tmp_path: Path) -> N
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "h",
+                "prediction_features": {"h": {"actual": "1", "baseline": "0"}},
                 "hypotheses": {"h": {"condition": "1 == 1", "label": "Hypothesis H"}},
             }
         ),
@@ -317,6 +382,7 @@ def test_load_spec_hypotheses_object_missing_condition_error(tmp_path: Path) -> 
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "h",
+                "prediction_features": {"h": {"actual": "1", "baseline": "0"}},
                 "hypotheses": {"h": {"label": "no condition"}},
             }
         ),
@@ -335,6 +401,7 @@ def test_load_spec_hypotheses_object_redundant_name_error(tmp_path: Path) -> Non
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "h",
+                "prediction_features": {"h": {"actual": "1", "baseline": "0"}},
                 "hypotheses": {"h": {"name": "other", "condition": "1 == 1"}},
             }
         ),
@@ -353,6 +420,11 @@ def test_load_spec_hypotheses_mapping_order_is_preserved(tmp_path: Path) -> None
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "a + b + c",
+                "prediction_features": {
+                    "a": {"actual": "1", "baseline": "0"},
+                    "b": {"actual": "1", "baseline": "0"},
+                    "c": {"actual": "1", "baseline": "0"},
+                },
                 "hypotheses": {
                     "first": "1 == 1",
                     "second": {"condition": "2 == 2", "label": "Second"},
@@ -390,3 +462,39 @@ def test_load_spec_migrated_example_matches_legacy_list_hypotheses() -> None:
         (item["name"], item["condition"], item.get("label")) for item in old_style_hypotheses
     ]
     assert [(hypothesis.name, hypothesis.condition, hypothesis.label) for hypothesis in migrated.hypotheses] == legacy_tuples
+
+
+def test_load_spec_prediction_feature_missing_key_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "missing_feature_key.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "f",
+                "prediction_features": {"f": {"actual": "1"}},
+                "hypotheses": {"h": "1 == 1"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match=r"missing required key\(s\): baseline"):
+        cli._load_spec(cfg)
+
+
+def test_load_spec_prediction_feature_unknown_key_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "unknown_feature_key.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "f",
+                "prediction_features": {"f": {"actual": "1", "baseline": "0", "extra": "x"}},
+                "hypotheses": {"h": "1 == 1"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match=r"unknown key\(s\): extra"):
+        cli._load_spec(cfg)

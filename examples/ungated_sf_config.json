@@ -3,6 +3,23 @@
   "prediction": "col('Measured SF (ungated)')",
   "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
   "scope": "sobel",
+  "prediction_features": {
+    "class_sf": {
+      "label": "Nominal class SF (detected vs GT SF)",
+      "actual": "col('Detected SF')",
+      "baseline": "col('GT SF')"
+    },
+    "class_bw": {
+      "label": "Nominal class BW (detected vs GT BW)",
+      "actual": "col('Detected BW (Hz)')",
+      "baseline": "col('GT BW (Hz)')"
+    },
+    "measured_bw": {
+      "label": "Measured BW (box estimate vs GT BW)",
+      "actual": "col('Measured BW (Hz)')",
+      "baseline": "col('GT BW (Hz)')"
+    }
+  },
   "hypotheses": {
     "class_bw < gt_bw (beyond tol)": {
       "label": "Detected BW underestimates GT BW (beyond 10%)",
@@ -20,17 +37,9 @@
       "label": "Detected BW and SF correct but measured BW off GT BW (beyond 10%)",
       "condition": "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 and col('Detected SF') == col('GT SF') and abs(col('Measured BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') > 0.10"
     },
-    "class_sf": {
-      "label": "Nominal class SF (detected vs GT SF)",
-      "condition": "col('Detected SF') == col('GT SF')"
-    },
-    "class_bw": {
-      "label": "Nominal class BW (detected vs GT BW)",
-      "condition": "col('Detected BW (Hz)') == col('GT BW (Hz)')"
-    },
-    "measured_bw": {
-      "label": "Measured BW (box estimate vs GT BW)",
-      "condition": "col('Measured BW (Hz)') == col('GT BW (Hz)')"
+    "class_bw & sf ok & measured_bw ok": {
+      "label": "Detected BW and SF correct and measured BW near GT BW",
+      "condition": "abs(col('Detected BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10 and col('Detected SF') == col('GT SF') and abs(col('Measured BW (Hz)') - col('GT BW (Hz)')) / col('GT BW (Hz)') <= 0.10"
     }
   },
   "score_mode": "absolute"

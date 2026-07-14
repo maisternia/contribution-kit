@@ -23,9 +23,9 @@ from .spec import (
     AttributionSpec,
     CategoricalHypothesis,
     ContinuousHypothesis,
-    Factor,
     FactorialCrossing,
     Hypothesis,
+    PredictionFeature,
 )
 from .stats import OddsRatioResult, RiskRatioResult, baptista_pike_odds_ratio, haldane_anscombe_odds_ratio, katz_risk_ratio, koopman_risk_ratio
 
@@ -40,7 +40,6 @@ __all__ = [
     "ContrastResult",
     "RegimeSummary",
     "Estimator",
-    "Factor",
     "FactorialCellResult",
     "FactorialCrossing",
     "FactorialMarginalResult",
@@ -58,5 +57,6 @@ __all__ = [
     "katz_risk_ratio",
     "koopman_risk_ratio",
     "PartitionWarning",
+    "PredictionFeature",
     "rank_contributors",
 ]

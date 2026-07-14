@@ -10,23 +10,14 @@ from typing import Literal
 class Hypothesis:
     """A single declarative hypothesis about what may contribute to a formula outcome.
 
-    ``Hypothesis`` is the one type callers need to construct. Each hypothesis is a
-    ``name`` plus one boolean ``condition`` DSL string. The estimator privately
-    decides how to analyse it from a single classification rule:
+        ``Hypothesis`` is the one type callers need to construct for regime analysis.
+        Each hypothesis is a ``name`` plus one boolean ``condition`` DSL string.
+        Every hypothesis is treated as a regime: rows where the condition holds form a
+        subset whose observed-contribution share and mismatch risk (versus the
+        remaining rows) are reported.
 
-    * A hypothesis whose ``condition`` is a top-level equality (``actual ==
-      baseline``) and whose ``name`` appears in
-      ``AttributionSpec.prediction_expr`` becomes a *Shapley feature*. The left
-      operand is the model-produced value, the right operand is the ground-truth
-      baseline, and the feature joins the Shapley attribution of the
-      prediction-formula contribution.
-    * Every other hypothesis is a *regime*: the rows where the condition
-      holds form a subset whose observed-contribution share and mismatch risk
-      (versus the remaining rows) are reported.
-
-    Routing depends only on the ``condition`` shape and ``prediction_expr``
-    membership. Callers never declare regimes or binary tests directly; they only
-    declare conditions.
+        Shapley features are declared separately through
+        ``AttributionSpec.prediction_features``.
     """
 
     name: str
@@ -45,19 +36,25 @@ class ContinuousHypothesis(Hypothesis):
 
 
 @dataclass(slots=True)
-class Factor:
-    """Named axis whose levels map to boolean condition expressions."""
+class FactorialCrossing:
+    """Two-axis crossing declaration used to generate factorial cells.
+    
+    Axes are declared inline as maps of level name to boolean condition DSL strings.
+    An optional label provides the human-readable display identity for the crossing.
+    """
 
-    name: str
-    levels: dict[str, str] = field(default_factory=dict)
+    rows: dict[str, str]
+    columns: dict[str, str]
+    label: str | None = None
 
 
 @dataclass(slots=True)
-class FactorialCrossing:
-    """Two-axis crossing declaration used to generate factorial cells."""
+class PredictionFeature:
+    """Explicit actual/baseline pair for a prediction-formula feature."""
 
-    rows: str
-    columns: str
+    actual: str
+    baseline: str
+    label: str | None = None
 
 
 @dataclass(slots=True)
@@ -66,15 +63,18 @@ class AttributionSpec:
 
     Callers declare the observed target expression (``target``), observed
     prediction expression (``prediction``), and a formula expression
-    (``prediction_expr``) used only for Shapley decomposition. A flat list of
-    ``hypotheses`` drives both feature and regime analyses.
+    (``prediction_expr``) used only for Shapley decomposition.
+
+    ``prediction_features`` explicitly declares the formula variables used for
+    Shapley attribution as named ``actual``/``baseline`` pairs.
+    ``hypotheses`` is a flat list of regime conditions.
     """
 
     target: str
     prediction: str
     prediction_expr: str
+    prediction_features: dict[str, PredictionFeature] = field(default_factory=dict)
     hypotheses: list[Hypothesis] = field(default_factory=list)
-    factors: dict[str, Factor] = field(default_factory=dict)
     factorials: list[FactorialCrossing] = field(default_factory=list)
     scope: str = "global"
     score_mode: Literal["absolute", "signed"] = "absolute"

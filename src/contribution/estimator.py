@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from .expr import CompiledExpression, build_row_context, compile_expression, evaluate_expression, split_equality
+from .expr import CompiledExpression, build_row_context, compile_expression, evaluate_expression, free_variables
 from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis
 from .results import (
     AssessmentResult,
@@ -50,7 +50,7 @@ def _score(prediction: float, target: float, score_mode: str) -> float:
 
 @dataclass(slots=True)
 class _Feature:
-    """A formula feature derived from an ``actual == baseline`` hypothesis."""
+    """A compiled formula feature defined by explicit actual/baseline expressions."""
 
     name: str
     label: str
@@ -60,8 +60,7 @@ class _Feature:
 
 @dataclass(slots=True)
 class _FactorialPlan:
-    rows_axis: str
-    columns_axis: str
+    label: str
     row_levels: list[str]
     column_levels: list[str]
     cell_names: dict[tuple[str, str], str]
@@ -99,7 +98,7 @@ class Estimator:
         generated_hypotheses, factorial_plans, partition_warnings = self._expand_factorials()
         effective_hypotheses = [*self.spec.hypotheses, *generated_hypotheses]
 
-        features = self._formula_features(effective_hypotheses)
+        features = self._formula_features()
         feature_names = [feature.name for feature in features]
 
         totals = {name: 0.0 for name in feature_names}
@@ -131,26 +130,26 @@ class Estimator:
 
         mismatch_fn = self._mismatch_fn()
         assessments: list[HypothesisAssessment] = []
+        for feature_name, feature_spec in self.spec.prediction_features.items():
+            feature_result = feature_attr[feature_name]
+            assessments.append(
+                HypothesisAssessment(
+                    name=feature_name,
+                    label=feature_spec.label or feature_name,
+                    analysis="feature",
+                    feature=feature_result,
+                )
+            )
         for hypothesis in effective_hypotheses:
-            if hypothesis.name in feature_attr:
-                assessments.append(
-                    HypothesisAssessment(
-                        name=hypothesis.name,
-                        label=hypothesis.label or hypothesis.name,
-                        analysis="feature",
-                        feature=feature_attr[hypothesis.name],
-                    )
+            assessments.append(
+                HypothesisAssessment(
+                    name=hypothesis.name,
+                    label=hypothesis.label or hypothesis.name,
+                    analysis="regime",
+                    regime=self._regime_summary(hypothesis, observed_contributions, observed_contribution_total),
+                    risk=self._regime_risk(hypothesis, mismatch_fn, ci_method=ci_method),
                 )
-            else:
-                assessments.append(
-                    HypothesisAssessment(
-                        name=hypothesis.name,
-                        label=hypothesis.label or hypothesis.name,
-                        analysis="regime",
-                        regime=self._regime_summary(hypothesis, observed_contributions, observed_contribution_total),
-                        risk=self._regime_risk(hypothesis, mismatch_fn, ci_method=ci_method),
-                    )
-                )
+            )
 
         factorial_matrices = self._build_factorial_matrices(factorial_plans, mismatch_fn, ci_method=ci_method)
         contrast_results = self._build_contrast_results(factorial_plans, mismatch_fn, ci_method=ci_method)
@@ -174,15 +173,18 @@ class Estimator:
             },
         )
 
-    def _formula_features(self, hypotheses: Sequence[Hypothesis]) -> list[_Feature]:
+    def _formula_features(self) -> list[_Feature]:
         assert self.spec is not None
         features: list[_Feature] = []
-        for hypothesis in hypotheses:
-            split = split_equality(compile_expression(hypothesis.condition))
-            if split is None:
-                continue
-            actual, baseline = split
-            features.append(_Feature(name=hypothesis.name, label=hypothesis.label or hypothesis.name, actual=actual, baseline=baseline))
+        for feature_name, feature_spec in self.spec.prediction_features.items():
+            features.append(
+                _Feature(
+                    name=feature_name,
+                    label=feature_spec.label or feature_name,
+                    actual=compile_expression(feature_spec.actual),
+                    baseline=compile_expression(feature_spec.baseline),
+                )
+            )
         return features
 
     def _regime_summary(self, hypothesis: Hypothesis, observed_contributions: Sequence[float], observed_contribution_total: float) -> RegimeSummary:
@@ -266,78 +268,115 @@ class Estimator:
             raise ValueError("Attribution spec is required for assess()")
         if not self.spec.hypotheses:
             raise ValueError("At least one hypothesis is required")
+        prediction_expression = compile_expression(self.spec.prediction_expr)
+        formula_variables = free_variables(prediction_expression)
+        declared_features = set(self.spec.prediction_features)
+        undeclared_variables = sorted(formula_variables.difference(declared_features))
+        if undeclared_variables:
+            raise ValueError(
+                "prediction_expr references undeclared prediction feature(s): "
+                + ", ".join(undeclared_variables)
+            )
+        unused_features = sorted(declared_features.difference(formula_variables))
+        if unused_features:
+            raise ValueError(
+                "prediction_features declared but unused by prediction_expr: "
+                + ", ".join(unused_features)
+            )
         names = [hypothesis.name for hypothesis in self.spec.hypotheses]
         if len(names) != len(set(names)):
             raise ValueError("Hypothesis names must be unique")
-        for axis_name, factor in self.spec.factors.items():
-            if not factor.levels:
-                raise ValueError(f"factor '{axis_name}' must declare at least one level")
-        used_axes: set[str] = set()
-        for crossing in self.spec.factorials:
-            for axis_name in (crossing.rows, crossing.columns):
-                used_axes.add(axis_name)
-                if axis_name not in self.spec.factors:
-                    raise ValueError(f"factorial references unknown axis '{axis_name}'")
-        unused_axes = sorted(set(self.spec.factors).difference(used_axes))
-        if unused_axes:
-            warnings.warn(
-                "Declared factors are unused by any factorial crossing: " + ", ".join(unused_axes),
-                stacklevel=2,
+        colliding_names = sorted(set(names).intersection(declared_features))
+        if colliding_names:
+            raise ValueError(
+                "prediction_features names must not collide with hypothesis names: "
+                + ", ".join(colliding_names)
             )
+        for crossing in self.spec.factorials:
+            if not crossing.rows:
+                raise ValueError("Factorial crossing 'rows' axis must declare at least one level")
+            if not crossing.columns:
+                raise ValueError("Factorial crossing 'columns' axis must declare at least one level")
 
     def _expand_factorials(self) -> tuple[list[Hypothesis], list[_FactorialPlan], list[PartitionWarning]]:
         assert self.spec is not None
         if not self.spec.factorials:
             return [], [], []
 
-        axis_membership: dict[str, dict[str, list[bool]]] = {}
-        partition_warnings: list[PartitionWarning] = []
-        used_axes = {crossing.rows for crossing in self.spec.factorials}.union({crossing.columns for crossing in self.spec.factorials})
-        for axis_name in sorted(used_axes):
-            factor = self.spec.factors[axis_name]
-            level_matches: dict[str, list[bool]] = {}
-            for level_name, condition in factor.levels.items():
-                compiled = compile_expression(condition)
-                level_matches[level_name] = [bool(compiled.evaluate(build_row_context(row))) for row in self.rows]
-            axis_membership[axis_name] = level_matches
-            overlap_count = 0
-            gap_count = 0
-            for row_index in range(len(self.rows)):
-                match_count = sum(1 for matches in level_matches.values() if matches[row_index])
-                if match_count > 1:
-                    overlap_count += 1
-                elif match_count == 0:
-                    gap_count += 1
-            if overlap_count or gap_count:
-                warnings.warn(
-                    f"factor axis '{axis_name}' is not a strict partition: overlap_rows={overlap_count}, gap_rows={gap_count}",
-                    stacklevel=2,
-                )
-                partition_warnings.append(
-                    PartitionWarning(axis=axis_name, overlap_count=overlap_count, gap_count=gap_count)
-                )
-
         declared_names = {hypothesis.name for hypothesis in self.spec.hypotheses}
         generated_names: set[str] = set()
         generated_hypotheses: list[Hypothesis] = []
         plans: list[_FactorialPlan] = []
-        for crossing in self.spec.factorials:
-            row_factor = self.spec.factors[crossing.rows]
-            col_factor = self.spec.factors[crossing.columns]
-            row_levels = list(row_factor.levels)
-            column_levels = list(col_factor.levels)
+        partition_warnings: list[PartitionWarning] = []
+
+        for crossing_index, crossing in enumerate(self.spec.factorials):
+            # Compute effective label (1-based position as fallback)
+            effective_label = crossing.label if crossing.label else f"Factorial {crossing_index + 1}"
+
+            # Evaluate rows axis
+            row_levels = list(crossing.rows)
+            row_level_matches: dict[str, list[bool]] = {}
+            for level_name, condition in crossing.rows.items():
+                compiled = compile_expression(condition)
+                row_level_matches[level_name] = [bool(compiled.evaluate(build_row_context(row))) for row in self.rows]
+
+            # Check for partition violations in rows
+            rows_overlap_count = 0
+            rows_gap_count = 0
+            for row_index in range(len(self.rows)):
+                match_count = sum(1 for matches in row_level_matches.values() if matches[row_index])
+                if match_count > 1:
+                    rows_overlap_count += 1
+                elif match_count == 0:
+                    rows_gap_count += 1
+            if rows_overlap_count or rows_gap_count:
+                warnings.warn(
+                    f"factorial '{effective_label}' rows axis is not a strict partition: overlap_rows={rows_overlap_count}, gap_rows={rows_gap_count}",
+                    stacklevel=2,
+                )
+                partition_warnings.append(
+                    PartitionWarning(axis=f"{effective_label}: rows", overlap_count=rows_overlap_count, gap_count=rows_gap_count)
+                )
+
+            # Evaluate columns axis
+            column_levels = list(crossing.columns)
+            column_level_matches: dict[str, list[bool]] = {}
+            for level_name, condition in crossing.columns.items():
+                compiled = compile_expression(condition)
+                column_level_matches[level_name] = [bool(compiled.evaluate(build_row_context(row))) for row in self.rows]
+
+            # Check for partition violations in columns
+            columns_overlap_count = 0
+            columns_gap_count = 0
+            for row_index in range(len(self.rows)):
+                match_count = sum(1 for matches in column_level_matches.values() if matches[row_index])
+                if match_count > 1:
+                    columns_overlap_count += 1
+                elif match_count == 0:
+                    columns_gap_count += 1
+            if columns_overlap_count or columns_gap_count:
+                warnings.warn(
+                    f"factorial '{effective_label}' columns axis is not a strict partition: overlap_rows={columns_overlap_count}, gap_rows={columns_gap_count}",
+                    stacklevel=2,
+                )
+                partition_warnings.append(
+                    PartitionWarning(axis=f"{effective_label}: columns", overlap_count=columns_overlap_count, gap_count=columns_gap_count)
+                )
+
+            # Expand cells
             cell_names: dict[tuple[str, str], str] = {}
             cell_masks: dict[tuple[str, str], list[bool]] = {}
             for row_level in row_levels:
-                row_condition = row_factor.levels[row_level]
-                row_matches = axis_membership[crossing.rows][row_level]
+                row_matches = row_level_matches[row_level]
                 for column_level in column_levels:
-                    column_condition = col_factor.levels[column_level]
-                    column_matches = axis_membership[crossing.columns][column_level]
+                    column_matches = column_level_matches[column_level]
                     name = f"{row_level} & {column_level}"
                     if name in declared_names or name in generated_names:
                         raise ValueError(f"Generated factorial cell name collision: '{name}'")
                     generated_names.add(name)
+                    # Get the conditions from the crossing
+                    row_condition = crossing.rows[row_level]
+                    column_condition = crossing.columns[column_level]
                     condition = f"({row_condition}) and ({column_condition})"
                     generated_hypotheses.append(Hypothesis(name=name, condition=condition))
                     cell_names[(row_level, column_level)] = name
@@ -345,16 +384,17 @@ class Estimator:
                         row_match and column_match
                         for row_match, column_match in zip(row_matches, column_matches)
                     ]
+
             plans.append(
                 _FactorialPlan(
-                    rows_axis=crossing.rows,
-                    columns_axis=crossing.columns,
+                    label=effective_label,
                     row_levels=row_levels,
                     column_levels=column_levels,
                     cell_names=cell_names,
                     cell_masks=cell_masks,
                 )
             )
+
         return generated_hypotheses, plans, partition_warnings
 
     def _mask_mismatch_stats(self, mask: Sequence[bool], mismatch_fn) -> tuple[int, float]:
@@ -378,7 +418,7 @@ class Estimator:
     ) -> list[FactorialMatrixResult]:
         matrices: list[FactorialMatrixResult] = []
         for plan in plans:
-            matrix = FactorialMatrixResult(rows_axis=plan.rows_axis, columns_axis=plan.columns_axis)
+            matrix = FactorialMatrixResult(label=plan.label)
             for row_level in plan.row_levels:
                 for column_level in plan.column_levels:
                     mask = plan.cell_masks[(row_level, column_level)]
@@ -463,11 +503,10 @@ class Estimator:
     ) -> list[ContrastResult]:
         contrasts: list[ContrastResult] = []
         for plan in plans:
-            factorial_name = f"{plan.rows_axis} x {plan.columns_axis}"
             for row_level in plan.row_levels:
                 for level_a, level_b in itertools.combinations(plan.column_levels, 2):
                     risk = self._evaluate_binary_from_masks(
-                        test_name=f"{factorial_name}: {row_level} [{level_a} vs {level_b}]",
+                        test_name=f"{plan.label}: rows={row_level} [{level_a} vs {level_b}]",
                         group_a_label=level_a,
                         group_b_label=level_b,
                         group_a_matches=plan.cell_masks[(row_level, level_a)],
@@ -479,8 +518,8 @@ class Estimator:
                         continue
                     contrasts.append(
                         ContrastResult(
-                            factorial=factorial_name,
-                            stratum=f"{factorial_name} :: {plan.rows_axis}={row_level}",
+                            factorial=plan.label,
+                            stratum=f"rows={row_level}",
                             level_a=level_a,
                             level_b=level_b,
                             mismatch_rate_a_pct=risk.mismatch_rate_a_pct,
@@ -501,7 +540,7 @@ class Estimator:
             for column_level in plan.column_levels:
                 for level_a, level_b in itertools.combinations(plan.row_levels, 2):
                     risk = self._evaluate_binary_from_masks(
-                        test_name=f"{factorial_name}: {column_level} [{level_a} vs {level_b}]",
+                        test_name=f"{plan.label}: columns={column_level} [{level_a} vs {level_b}]",
                         group_a_label=level_a,
                         group_b_label=level_b,
                         group_a_matches=plan.cell_masks[(level_a, column_level)],
@@ -513,8 +552,8 @@ class Estimator:
                         continue
                     contrasts.append(
                         ContrastResult(
-                            factorial=factorial_name,
-                            stratum=f"{factorial_name} :: {plan.columns_axis}={column_level}",
+                            factorial=plan.label,
+                            stratum=f"columns={column_level}",
                             level_a=level_a,
                             level_b=level_b,
                             mismatch_rate_a_pct=risk.mismatch_rate_a_pct,

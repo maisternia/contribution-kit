@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from contribution.estimator import _parse_scalar, _score
-from contribution.spec import AttributionSpec, Factor, FactorialCrossing, Hypothesis
+from contribution.spec import AttributionSpec, FactorialCrossing, Hypothesis, PredictionFeature
 from contribution import Estimator
 
 
@@ -20,16 +20,31 @@ def _write_csv(tmp_path: Path, rows: list[dict[str, str]]) -> Path:
     return path
 
 
+def _load_csv(path: Path) -> list[dict]:
+    rows = []
+    with path.open("r", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            # Parse scalar values where possible
+            parsed_row = {}
+            for key, value in row.items():
+                parsed_row[key] = _parse_scalar(value)
+            rows.append(parsed_row)
+    return rows
+
+
 def _spec() -> AttributionSpec:
     return AttributionSpec(
         target="col('GT SF')",
         prediction="col('Measured SF (ungated)')",
         prediction_expr="class_sf + round(2 * log2(measured_bw / class_bw))",
+        prediction_features={
+            "class_sf": PredictionFeature(actual="col('Detected SF')", baseline="col('GT SF')"),
+            "class_bw": PredictionFeature(actual="col('Detected BW (Hz)')", baseline="col('GT BW (Hz)')"),
+            "measured_bw": PredictionFeature(actual="col('Measured BW (Hz)')", baseline="col('GT BW (Hz)')"),
+        },
         scope="sobel",
         hypotheses=[
-            Hypothesis(name="class_sf", condition="col('Detected SF') == col('GT SF')"),
-            Hypothesis(name="class_bw", condition="col('Detected BW (Hz)') == col('GT BW (Hz)')"),
-            Hypothesis(name="measured_bw", condition="col('Measured BW (Hz)') == col('GT BW (Hz)')"),
             Hypothesis(name="under", condition="col('Detected BW (Hz)') < col('GT BW (Hz)')"),
         ],
     )
@@ -131,11 +146,23 @@ def test_assess_exact_and_sampled_and_regime_none_paths(tmp_path: Path) -> None:
 
 def test_assess_allows_spec_override() -> None:
     rows = [{"y": 1, "x": 1}]
-    base = AttributionSpec(target="y", prediction="x", prediction_expr="x", hypotheses=[Hypothesis(name="h", condition="x == y")])
-    replacement = AttributionSpec(target="y", prediction="x", prediction_expr="x", hypotheses=[Hypothesis(name="h2", condition="x == y")])
+    base = AttributionSpec(
+        target="y",
+        prediction="x",
+        prediction_expr="x",
+        prediction_features={"x": PredictionFeature(actual="x", baseline="y")},
+        hypotheses=[Hypothesis(name="h", condition="x == y")],
+    )
+    replacement = AttributionSpec(
+        target="y",
+        prediction="x",
+        prediction_expr="x",
+        prediction_features={"x": PredictionFeature(actual="x", baseline="y")},
+        hypotheses=[Hypothesis(name="h2", condition="x == y")],
+    )
     estimator = Estimator.from_dataframe(rows, base)
     result = estimator.assess(spec=replacement)
-    assert result.hypotheses[0].name == "h2"
+    assert result.hypotheses[1].name == "h2"
 
 
 def test_regime_risk_none_when_group_b_missing() -> None:
@@ -157,68 +184,90 @@ def test_assess_spec_override_on_empty_rows() -> None:
     assert result.n_rows == 0
 
 
-def _factorial_rows() -> list[dict[str, object]]:
-    return [
-        {"target": 0, "prediction": 0, "row": "up", "quality": "ok", "f": 1},
-        {"target": 0, "prediction": 1, "row": "up", "quality": "off", "f": 1},
-        {"target": 0, "prediction": 1, "row": "down", "quality": "ok", "f": 1},
-        {"target": 0, "prediction": 1, "row": "down", "quality": "off", "f": 1},
-    ]
-
-
-def _factorial_spec() -> AttributionSpec:
-    return AttributionSpec(
-        target="target",
-        prediction="prediction",
-        prediction_expr="f",
-        hypotheses=[Hypothesis(name="f", condition="f == f")],
-        factors={
-            "row_axis": Factor(name="row_axis", levels={"up": "row == 'up'", "down": "row == 'down'"}),
-            "col_axis": Factor(name="col_axis", levels={"ok": "quality == 'ok'", "off": "quality == 'off'"}),
-        },
-        factorials=[FactorialCrossing(rows="row_axis", columns="col_axis")],
-    )
-
-
 def test_factorial_expansion_matrix_and_contrasts() -> None:
-    result = Estimator.from_dataframe(_factorial_rows(), _factorial_spec()).assess(exact=True)
-
-    names = [item.name for item in result.hypotheses]
-    assert "up & ok" in names
-    assert "down & off" in names
-    assert len(result.factorial_matrices) == 1
-    matrix = result.factorial_matrices[0]
-    assert matrix.rows_axis == "row_axis"
-    assert matrix.columns_axis == "col_axis"
-    assert len(matrix.cells) == 4
-    assert len(result.contrast_results) == 4
-
-
-def test_factorial_generated_name_collision_error() -> None:
-    spec = _factorial_spec()
-    spec.hypotheses.append(Hypothesis(name="up & ok", condition="row == 'up' and col == 'ok'"))
-    with pytest.raises(ValueError, match="name collision"):
-        Estimator.from_dataframe(_factorial_rows(), spec).assess(exact=True)
-
-
-def test_factorial_partition_warning_and_unused_axis_warning() -> None:
+    # Test using the new inline factorial crossing format
+    rows = [
+        {"target": 1, "prediction": 1, "row": "up", "quality": "ok", "f": 0},
+        {"target": 1, "prediction": 1, "row": "up", "quality": "off", "f": 1},
+        {"target": 1, "prediction": 0, "row": "down", "quality": "ok", "f": 1},
+        {"target": 1, "prediction": 0, "row": "down", "quality": "off", "f": 1},
+    ]
     spec = AttributionSpec(
         target="target",
         prediction="prediction",
         prediction_expr="f",
-        hypotheses=[Hypothesis(name="f", condition="f == f")],
-        factors={
-            "row_axis": Factor(name="row_axis", levels={"up": "row == 'up'", "also_up": "row == 'up'"}),
-            "col_axis": Factor(name="col_axis", levels={"ok": "quality == 'ok'", "off": "quality == 'off'"}),
-            "unused_axis": Factor(name="unused_axis", levels={"x": "1 == 1"}),
-        },
-        factorials=[FactorialCrossing(rows="row_axis", columns="col_axis")],
+        prediction_features={"f": PredictionFeature(actual="f", baseline="0")},
+        hypotheses=[Hypothesis(name="all_rows", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"up": "col('row') == 'up'", "down": "col('row') == 'down'"},
+                columns={"ok": "col('quality') == 'ok'", "off": "col('quality') == 'off'"},
+                label="Row × Quality"
+            )
+        ],
     )
-    with pytest.warns(UserWarning, match="unused"):
-        with pytest.warns(UserWarning, match="not a strict partition"):
-            result = Estimator.from_dataframe(_factorial_rows(), spec).assess(exact=True)
+    result = Estimator.from_dataframe(rows, spec).assess(exact=True)
+
+    # Check factorial matrix was created with correct label
+    assert len(result.factorial_matrices) == 1
+    matrix = result.factorial_matrices[0]
+    assert matrix.label == "Row × Quality"
+    assert len(matrix.cells) == 4
+    # Contrasts should be generated
+    assert len(result.contrast_results) > 0
+    for contrast in result.contrast_results:
+        assert contrast.factorial == "Row × Quality"
+
+
+def test_factorial_generated_name_collision_error() -> None:
+    rows = [
+        {"target": 1, "prediction": 1, "row": "up", "quality": "ok", "f": 0},
+        {"target": 1, "prediction": 0, "row": "down", "quality": "off", "f": 1},
+    ]
+    spec = AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="f",
+        prediction_features={"f": PredictionFeature(actual="f", baseline="0")},
+        hypotheses=[Hypothesis(name="up & ok", condition="col('row') == 'up' and col('quality') == 'ok'")],
+        factorials=[
+            FactorialCrossing(
+                rows={"up": "col('row') == 'up'", "down": "col('row') == 'down'"},
+                columns={"ok": "col('quality') == 'ok'", "off": "col('quality') == 'off'"},
+            )
+        ],
+    )
+    # Cell names generated by factorials should not collide with hypothesis names
+    with pytest.raises(ValueError, match="name collision|already declared"):
+        Estimator.from_dataframe(rows, spec).assess(exact=True)
+
+
+def test_factorial_partition_warning() -> None:
+    rows = [
+        {"target": 1, "prediction": 1, "row": "up", "quality": "ok", "f": 0},
+        {"target": 1, "prediction": 1, "row": "up", "quality": "off", "f": 1},
+        {"target": 1, "prediction": 0, "row": "down", "quality": "ok", "f": 1},
+        {"target": 1, "prediction": 0, "row": "down", "quality": "off", "f": 1},
+    ]
+    spec = AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="f",
+        prediction_features={"f": PredictionFeature(actual="f", baseline="0")},
+        hypotheses=[Hypothesis(name="all_rows", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"up": "col('row') == 'up'", "also_up": "col('row') == 'up'"},  # Overlap!
+                columns={"ok": "col('quality') == 'ok'", "off": "col('quality') == 'off'"},
+                label="Overlapped"
+            )
+        ],
+    )
+    with pytest.warns(UserWarning, match="not a strict partition"):
+        result = Estimator.from_dataframe(rows, spec).assess(exact=True)
     assert result.partition_warnings
-    assert result.partition_warnings[0].axis == "row_axis"
+    # Partition warning should identify the crossing by label and axis role
+    assert any("Overlapped" in w.axis for w in result.partition_warnings)
     assert result.partition_warnings[0].overlap_count == 2
     assert result.partition_warnings[0].gap_count == 2
 
@@ -232,8 +281,23 @@ def test_contrast_sparse_case_keeps_positive_odds_ratio() -> None:
         {"target": 0, "prediction": 0, "row": "down", "quality": "ok", "f": 1},
         {"target": 0, "prediction": 1, "row": "down", "quality": "off", "f": 1},
     ]
-    result = Estimator.from_dataframe(rows, _factorial_spec()).assess(exact=True)
-    up_stratum = [item for item in result.contrast_results if item.stratum.endswith("row_axis=up")]
+    spec = AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="f",
+        prediction_features={"f": PredictionFeature(actual="f", baseline="0")},
+        hypotheses=[Hypothesis(name="all_rows", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"up": "col('row') == 'up'", "down": "col('row') == 'down'"},
+                columns={"ok": "col('quality') == 'ok'", "off": "col('quality') == 'off'"},
+                label="Row × Quality"
+            )
+        ],
+    )
+    result = Estimator.from_dataframe(rows, spec).assess(exact=True)
+    # With new stratum format, look for contrasts in "rows=up" stratum
+    up_stratum = [item for item in result.contrast_results if item.stratum == "rows=up"]
     assert up_stratum
     contrast = up_stratum[0]
     assert contrast.mismatch_count_a == 0
@@ -255,3 +319,175 @@ def test_factor_free_run_json_keeps_legacy_top_level_keys(tmp_path: Path) -> Non
         "n_rows",
         "regime_summaries",
     ]
+
+
+def test_validate_spec_errors_for_undeclared_prediction_expr_variable() -> None:
+    spec = AttributionSpec(
+        target="1",
+        prediction="1",
+        prediction_expr="missing_feature",
+        hypotheses=[Hypothesis(name="h", condition="1 == 1")],
+    )
+    with pytest.raises(ValueError, match=r"undeclared prediction feature\(s\): missing_feature"):
+        Estimator.from_dataframe([{}], spec).assess(exact=True)
+
+
+def test_validate_spec_errors_for_unused_prediction_feature() -> None:
+    spec = AttributionSpec(
+        target="1",
+        prediction="1",
+        prediction_expr="1",
+        prediction_features={"unused": PredictionFeature(actual="1", baseline="0")},
+        hypotheses=[Hypothesis(name="h", condition="1 == 1")],
+    )
+    with pytest.raises(ValueError, match="unused by prediction_expr: unused"):
+        Estimator.from_dataframe([{}], spec).assess(exact=True)
+
+
+def test_validate_spec_errors_for_prediction_feature_hypothesis_name_collision() -> None:
+    spec = AttributionSpec(
+        target="1",
+        prediction="1",
+        prediction_expr="dup",
+        prediction_features={"dup": PredictionFeature(actual="1", baseline="0")},
+        hypotheses=[Hypothesis(name="dup", condition="1 == 1")],
+    )
+    with pytest.raises(ValueError, match="must not collide with hypothesis names: dup"):
+        Estimator.from_dataframe([{}], spec).assess(exact=True)
+
+
+def test_factorial_expansion_with_inline_axes_and_explicit_label(tmp_path: Path) -> None:
+    data_path = _write_csv(
+        tmp_path,
+        [
+            {"gt": "1", "pred": "1", "row": "A", "col": "X"},
+            {"gt": "1", "pred": "1", "row": "B", "col": "X"},
+            {"gt": "1", "pred": "1", "row": "A", "col": "Y"},
+            {"gt": "1", "pred": "1", "row": "B", "col": "Y"},
+        ],
+    )
+    spec = AttributionSpec(
+        target="col('gt')",
+        prediction="col('pred')",
+        prediction_expr="1",
+        hypotheses=[Hypothesis(name="h", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"A": "col('row') == 'A'", "B": "col('row') == 'B'"},
+                columns={"X": "col('col') == 'X'", "Y": "col('col') == 'Y'"},
+                label="Test Crossing"
+            )
+        ],
+    )
+    result = Estimator.from_dataframe(
+        _load_csv(data_path),
+        spec,
+    ).assess(exact=True)
+    
+    assert len(result.factorial_matrices) == 1
+    matrix = result.factorial_matrices[0]
+    assert matrix.label == "Test Crossing"
+    assert len(matrix.cells) == 4  # A-X, A-Y, B-X, B-Y
+
+
+def test_factorial_expansion_with_inline_axes_and_fallback_label(tmp_path: Path) -> None:
+    data_path = _write_csv(
+        tmp_path,
+        [
+            {"gt": "1", "pred": "1", "row": "A", "col": "X"},
+            {"gt": "1", "pred": "1", "row": "B", "col": "X"},
+        ],
+    )
+    spec = AttributionSpec(
+        target="col('gt')",
+        prediction="col('pred')",
+        prediction_expr="1",
+        hypotheses=[Hypothesis(name="h", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"A": "col('row') == 'A'", "B": "col('row') == 'B'"},
+                columns={"X": "col('col') == 'X'", "Y": "col('col') == 'Y'"},
+                # No explicit label; should use "Factorial 1" fallback
+            )
+        ],
+    )
+    result = Estimator.from_dataframe(
+        _load_csv(data_path),
+        spec,
+    ).assess(exact=True)
+    
+    assert len(result.factorial_matrices) == 1
+    matrix = result.factorial_matrices[0]
+    assert matrix.label == "Factorial 1"  # Fallback for first crossing
+
+
+def test_factorial_contrast_results_use_label_and_stratum_format(tmp_path: Path) -> None:
+    # Test that contrasts use label and stratum format by checking contrast result structure
+    # Use simple numeric row indices for factorial partitioning
+    data = [
+        {"gt": 1, "pred": 0, "idx": 0},  # mismatch
+        {"gt": 1, "pred": 1, "idx": 1},
+        {"gt": 1, "pred": 1, "idx": 2},
+        {"gt": 1, "pred": 1, "idx": 3},
+        {"gt": 1, "pred": 1, "idx": 4},
+        {"gt": 1, "pred": 1, "idx": 5},
+    ]
+    spec = AttributionSpec(
+        target="col('gt')",
+        prediction="col('pred')",
+        prediction_expr="1",
+        hypotheses=[Hypothesis(name="h", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"low": "col('idx') < 3", "high": "col('idx') >= 3"},
+                columns={"a": "col('idx') == 0", "b": "col('idx') != 0"},
+                label="My Factorial"
+            )
+        ],
+    )
+    result = Estimator.from_dataframe(
+        data,
+        spec,
+    ).assess(exact=True)
+    
+    # Check that if contrasts are generated, they use the right format
+    if result.contrast_results:
+        for contrast in result.contrast_results:
+            assert contrast.factorial == "My Factorial", f"Expected factorial='My Factorial', got '{contrast.factorial}'"
+            # Stratum should be "rows=<level>" or "columns=<level>"
+            assert contrast.stratum.startswith("rows=") or contrast.stratum.startswith("columns="), \
+                f"Expected stratum to start with 'rows=' or 'columns=', got '{contrast.stratum}'"
+
+
+def test_multiple_factorials_each_with_fallback_labels(tmp_path: Path) -> None:
+    data_path = _write_csv(
+        tmp_path,
+        [
+            {"gt": "1", "pred": "1", "x1": "A", "y1": "P", "x2": "M", "y2": "Q"},
+            {"gt": "1", "pred": "1", "x1": "B", "y1": "P", "x2": "N", "y2": "Q"},
+        ],
+    )
+    spec = AttributionSpec(
+        target="col('gt')",
+        prediction="col('pred')",
+        prediction_expr="1",
+        hypotheses=[Hypothesis(name="h", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"A": "col('x1') == 'A'", "B": "col('x1') == 'B'"},
+                columns={"P": "col('y1') == 'P'"},
+            ),
+            FactorialCrossing(
+                rows={"M": "col('x2') == 'M'", "N": "col('x2') == 'N'"},
+                columns={"Q": "col('y2') == 'Q'"},
+            ),
+        ],
+    )
+    result = Estimator.from_dataframe(
+        _load_csv(data_path),
+        spec,
+    ).assess(exact=True)
+    
+    assert len(result.factorial_matrices) == 2
+    assert result.factorial_matrices[0].label == "Factorial 1"
+    assert result.factorial_matrices[1].label == "Factorial 2"

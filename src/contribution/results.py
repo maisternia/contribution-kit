@@ -129,8 +129,7 @@ class FactorialMarginalResult:
 
 @dataclass(slots=True)
 class FactorialMatrixResult:
-    rows_axis: str
-    columns_axis: str
+    label: str
     cells: list[FactorialCellResult] = field(default_factory=list)
     row_marginals: list[FactorialMarginalResult] = field(default_factory=list)
     column_marginals: list[FactorialMarginalResult] = field(default_factory=list)
@@ -380,7 +379,7 @@ class AssessmentResult:
             )
             for matrix in self.factorial_matrices:
                 lines.append("")
-                lines.append(f"### {matrix.rows_axis} x {matrix.columns_axis}")
+                lines.append(f"### {matrix.label}")
                 lines.append("")
                 column_levels = [m.level for m in matrix.column_marginals]
                 header = "| Row level | " + " | ".join(column_levels) + " | Row marginal |"
@@ -417,16 +416,17 @@ class AssessmentResult:
                 "Sibling-level contrasts within each stratum reuse Koopman risk-ratio and "
                 "Baptista-Pike odds-ratio intervals."
             )
-            grouped: dict[str, list[ContrastResult]] = {}
+            grouped: dict[tuple[str, str], list[ContrastResult]] = {}
             for contrast in self.contrast_results:
-                grouped.setdefault(contrast.stratum, []).append(contrast)
-            for stratum in sorted(grouped):
+                key = (contrast.factorial, contrast.stratum)
+                grouped.setdefault(key, []).append(contrast)
+            for (factorial, stratum) in sorted(grouped):
                 lines.append("")
-                lines.append(f"### {stratum}")
+                lines.append(f"### {factorial} :: {stratum}")
                 lines.append("")
                 lines.append("| Comparison | A mismatch rate | B mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |")
                 lines.append("|---|---:|---:|---:|---:|")
-                for contrast in grouped[stratum]:
+                for contrast in grouped[(factorial, stratum)]:
                     rr = _format_effect_ci(contrast.risk_ratio, contrast.rr_ci_low, contrast.rr_ci_high)
                     or_ = _format_effect_ci(contrast.odds_ratio, contrast.or_ci_low, contrast.or_ci_high)
                     lines.append(

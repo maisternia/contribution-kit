@@ -3,19 +3,24 @@
   "target": "col('GT SF')",
   "prediction": "col('Measured SF')",
   "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
-  "hypotheses": {
+  "prediction_features": {
     "class_sf": {
       "label": "Nominal class SF (detected vs GT SF)",
-      "condition": "col('Class SF') == col('GT SF')"
+      "actual": "col('Class SF')",
+      "baseline": "col('GT SF')"
     },
     "class_bw": {
       "label": "Nominal class BW (detected vs GT BW)",
-      "condition": "col('Class BW') == col('GT BW')"
+      "actual": "col('Class BW')",
+      "baseline": "col('GT BW')"
     },
     "measured_bw": {
       "label": "Measured BW (box estimate vs GT BW)",
-      "condition": "col('Measured BW') == col('GT BW')"
-    },
+      "actual": "col('Measured BW')",
+      "baseline": "col('GT BW')"
+    }
+  },
+  "hypotheses": {
     "class_bw < gt_bw (upscale)": {
       "label": "Class BW upscaled to GT BW (beyond 10%)",
       "condition": "col('Class BW') < col('GT BW') * (1 - 0.10)"

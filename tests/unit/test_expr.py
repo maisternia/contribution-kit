@@ -4,7 +4,7 @@ import ast
 
 import pytest
 
-from contribution.expr import build_row_context, compile_expression, evaluate_expression, split_equality
+from contribution.expr import build_row_context, compile_expression, evaluate_expression, free_variables
 
 
 def test_build_row_context_with_extra() -> None:
@@ -41,13 +41,14 @@ def test_col_helper_and_arity_error() -> None:
         evaluate_expression("col('x', 'y')", {"x": 2, "y": 1})
 
 
-def test_split_equality() -> None:
-    split = split_equality(compile_expression("col('a') == col('b')"))
-    assert split is not None
-    left, right = split
-    assert left.source == "col('a')"
-    assert right.source == "col('b')"
-    assert split_equality(compile_expression("col('a') > col('b')")) is None
+def test_free_variables() -> None:
+    expression = compile_expression("class_sf + round(2 * log2(measured_bw / class_bw))")
+    assert free_variables(expression) == {"class_sf", "measured_bw", "class_bw"}
+
+
+def test_free_variables_excludes_allowed_function_names_and_col() -> None:
+    expression = compile_expression("col('x') + max(1, 2)")
+    assert free_variables(expression) == set()
 
 
 def test_unsupported_function_and_node_raise() -> None:

@@ -3,35 +3,41 @@
   "target": "col('GT SF')",
   "prediction": "col('Measured SF')",
   "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
-  "hypotheses": {
+  "prediction_features": {
     "class_sf": {
       "label": "Nominal class SF (detected vs GT SF)",
-      "condition": "col('Class SF') == col('GT SF')"
+      "actual": "col('Class SF')",
+      "baseline": "col('GT SF')"
     },
     "class_bw": {
       "label": "Nominal class BW (detected vs GT BW)",
-      "condition": "col('Class BW') == col('GT BW')"
+      "actual": "col('Class BW')",
+      "baseline": "col('GT BW')"
     },
     "measured_bw": {
       "label": "Measured BW (box estimate vs GT BW)",
-      "condition": "col('Measured BW') == col('GT BW')"
+      "actual": "col('Measured BW')",
+      "baseline": "col('GT BW')"
     }
   },
-  "factors": {
-    "class_axis": {
-      "class_ok": "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10",
-      "upscale": "col('Class BW') < col('GT BW') * (1 - 0.10)",
-      "downscale": "col('Class BW') > col('GT BW') * (1 + 0.10)"
-    },
-    "measured_axis": {
-      "measured_ok": "abs(col('Measured BW') - col('GT BW')) / col('GT BW') <= 0.10",
-      "measured_off": "abs(col('Measured BW') - col('GT BW')) / col('GT BW') > 0.10"
+  "hypotheses": {
+    "class_sf_correct": {
+      "label": "Class SF equals GT SF",
+      "condition": "col('Class SF') == col('GT SF')"
     }
   },
   "factorials": [
     {
-      "rows": "class_axis",
-      "columns": "measured_axis"
+      "label": "BW quality × scaling direction",
+      "rows": {
+        "class_ok": "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10",
+        "upscale": "col('Class BW') < col('GT BW') * (1 - 0.10)",
+        "downscale": "col('Class BW') > col('GT BW') * (1 + 0.10)"
+      },
+      "columns": {
+        "measured_ok": "abs(col('Measured BW') - col('GT BW')) / col('GT BW') <= 0.10",
+        "measured_off": "abs(col('Measured BW') - col('GT BW')) / col('GT BW') > 0.10"
+      }
     }
   ],
   "score_mode": "absolute"
