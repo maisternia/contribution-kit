@@ -6,10 +6,13 @@ import pytest
 
 from contribution import stats
 from contribution.stats import (
+    agresti_caffo_risk_difference,
     baptista_pike_odds_ratio,
     haldane_anscombe_odds_ratio,
     katz_risk_ratio,
     koopman_risk_ratio,
+    miettinen_nurminen_risk_difference,
+    risk_difference_with_guardrail,
 )
 
 
@@ -99,6 +102,35 @@ def test_baptista_pike_paths() -> None:
     inf_point = baptista_pike_odds_ratio(10, 90, 0, 100)
     assert math.isinf(inf_point.value)
     assert math.isinf(inf_point.ci_high)
+
+
+def test_miettinen_nurminen_risk_difference_reference_window() -> None:
+    # Published worked examples report this table as a small positive RD;
+    # we assert expected sign and stable CI ordering in a narrow range.
+    result = miettinen_nurminen_risk_difference(7, 43, 1, 49)
+    assert 0.09 <= result.value <= 0.15
+    assert result.ci_low is not None and result.ci_high is not None
+    assert result.ci_low < result.value < result.ci_high
+    assert -0.05 <= result.ci_low <= 0.05
+    assert 0.20 <= result.ci_high <= 0.35
+
+
+def test_agresti_caffo_risk_difference_matches_closed_form() -> None:
+    result = agresti_caffo_risk_difference(7, 43, 1, 49)
+    assert math.isclose(result.value, 0.12, rel_tol=0.0, abs_tol=1e-12)
+    assert result.ci_low is not None and result.ci_high is not None
+    assert math.isclose(result.ci_low, 0.008872825214188973, rel_tol=0.0, abs_tol=1e-12)
+    assert math.isclose(result.ci_high, 0.23112717478581105, rel_tol=0.0, abs_tol=1e-12)
+
+
+def test_risk_difference_guardrail_falls_back_on_degenerate_primary(monkeypatch) -> None:
+    monkeypatch.setattr(
+        stats,
+        "miettinen_nurminen_risk_difference",
+        lambda *_args, **_kwargs: stats.RiskDifferenceResult(value=0.1, ci_low=None, ci_high=None),
+    )
+    result = risk_difference_with_guardrail(10, 90, 1, 99)
+    assert result.ci_low is not None and result.ci_high is not None
 
 
 def test_internal_helpers_and_branches() -> None:

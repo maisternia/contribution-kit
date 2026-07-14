@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from dataclasses import asdict
 from pathlib import Path
 from textwrap import dedent
@@ -16,6 +17,8 @@ from .expr import build_row_context, evaluate_expression, parse_feature_equality
 from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis
 from .results import (
     AssessmentResult,
+    BurdenRankingEntry,
+    BurdenRankingResult,
     ContrastResult,
     FactorialCellResult,
     FactorialMarginalResult,
@@ -67,6 +70,21 @@ def _result_from_run(payload: dict[str, Any]) -> AssessmentResult:
 
     contrast_results = [ContrastResult(**item) for item in payload.get("contrast_results", [])]
     partition_warnings = [PartitionWarning(**item) for item in payload.get("partition_warnings", [])]
+    burden_rankings: list[BurdenRankingResult] = []
+    for item in payload.get("burden_rankings", []):
+        burden_rankings.append(
+            BurdenRankingResult(
+                crossing_label=item["crossing_label"],
+                baseline_cell=item["baseline_cell"],
+                entries=[BurdenRankingEntry(**entry) for entry in item.get("entries", [])],
+                overlap_suppressed=item.get("overlap_suppressed", False),
+                coverage_gap_excluded_rows=item.get("coverage_gap_excluded_rows", 0),
+                baseline_sanity_warning=item.get("baseline_sanity_warning"),
+                observed_accuracy_pct=item.get("observed_accuracy_pct", 0.0),
+                ceiling_accuracy_pct=item.get("ceiling_accuracy_pct", 0.0),
+                total_mismatches=item.get("total_mismatches", 0),
+            )
+        )
 
     return AssessmentResult(
         hypotheses=hypotheses,
@@ -76,6 +94,7 @@ def _result_from_run(payload: dict[str, Any]) -> AssessmentResult:
         factorial_matrices=factorial_matrices,
         contrast_results=contrast_results,
         partition_warnings=partition_warnings,
+        burden_rankings=burden_rankings,
     )
 
 
@@ -171,7 +190,7 @@ def _load_spec(path: str | Path) -> AttributionSpec:
             raise ValueError(f"factorials[{index}] must be an object")
         
         # Validate known keys
-        allowed_crossing_keys = {"rows", "columns", "label"}
+        allowed_crossing_keys = {"rows", "columns", "label", "baseline"}
         unknown_keys = sorted(set(item).difference(allowed_crossing_keys))
         if unknown_keys:
             raise ValueError(f"factorials[{index}] has unknown key(s): {', '.join(unknown_keys)}")
@@ -204,8 +223,38 @@ def _load_spec(path: str | Path) -> AttributionSpec:
         label = item.get("label")
         if label is not None and (not isinstance(label, str) or not label.strip()):
             raise ValueError(f"factorials[{index}] 'label' must be a non-empty string when provided")
+
+        baseline_payload = item.get("baseline")
+        baseline: dict[str, str] | None = None
+        if baseline_payload is not None:
+            if not isinstance(baseline_payload, dict):
+                raise ValueError(f"factorials[{index}] 'baseline' must be an object with keys 'rows' and 'columns'")
+            baseline_unknown_keys = sorted(set(baseline_payload).difference({"rows", "columns"}))
+            if baseline_unknown_keys:
+                raise ValueError(
+                    f"factorials[{index}] 'baseline' has unknown key(s): {', '.join(baseline_unknown_keys)}"
+                )
+            if "rows" not in baseline_payload or "columns" not in baseline_payload:
+                raise ValueError(f"factorials[{index}] 'baseline' must include both 'rows' and 'columns'")
+            baseline_row = baseline_payload["rows"]
+            baseline_column = baseline_payload["columns"]
+            if not isinstance(baseline_row, str) or not baseline_row.strip():
+                raise ValueError(f"factorials[{index}] baseline 'rows' must be a non-empty string")
+            if not isinstance(baseline_column, str) or not baseline_column.strip():
+                raise ValueError(f"factorials[{index}] baseline 'columns' must be a non-empty string")
+            if baseline_row not in rows:
+                crossing_name = label or f"factorials[{index}]"
+                raise ValueError(
+                    f"crossing '{crossing_name}' baseline rows level '{baseline_row}' is not declared on rows axis"
+                )
+            if baseline_column not in columns:
+                crossing_name = label or f"factorials[{index}]"
+                raise ValueError(
+                    f"crossing '{crossing_name}' baseline columns level '{baseline_column}' is not declared on columns axis"
+                )
+            baseline = {"rows": baseline_row, "columns": baseline_column}
         
-        factorials.append(FactorialCrossing(rows=rows, columns=columns, label=label))
+        factorials.append(FactorialCrossing(rows=rows, columns=columns, label=label, baseline=baseline))
 
     return AttributionSpec(
         target=payload["target"],
@@ -340,6 +389,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         spec = _load_spec(args.config)
+        for index, crossing in enumerate(spec.factorials):
+            if crossing.baseline is not None:
+                continue
+            crossing_name = crossing.label or f"Factorial {index + 1}"
+            print(
+                f"hint: crossing \"{crossing_name}\" has no baseline - declare one to get an attributable-burden ranking",
+                file=sys.stderr,
+            )
         result = Estimator.from_csv(args.input, spec=spec).assess(exact=True)
         result.save(args.out)
         return 0

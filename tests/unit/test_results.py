@@ -3,7 +3,15 @@ from __future__ import annotations
 import json
 
 from contribution.hypothesis import BinaryHypothesisResult
-from contribution.results import AssessmentResult, FeatureAttribution, HypothesisAssessment, RegimeSummary, _format_effect_ci
+from contribution.results import (
+    AssessmentResult,
+    BurdenRankingEntry,
+    BurdenRankingResult,
+    FeatureAttribution,
+    HypothesisAssessment,
+    RegimeSummary,
+    _format_effect_ci,
+)
 
 
 def _sample_result(include_risk: bool = True) -> AssessmentResult:
@@ -268,3 +276,53 @@ def test_csv_json_keep_raw_field_names(tmp_path) -> None:
     assert "mean_abs_shapley" in payload["feature_attributions"][0]
     assert "net_contribution_share_pct" in payload["feature_attributions"][0]
     assert "contribution_share_pct" in payload["regime_summaries"][0]
+
+
+def test_markdown_and_json_include_burden_when_present(tmp_path) -> None:
+    result = _sample_result(include_risk=False)
+    result.burden_rankings = [
+        BurdenRankingResult(
+            crossing_label="BW quality × scaling direction",
+            baseline_cell="class_ok & measured_ok",
+            entries=[
+                BurdenRankingEntry(
+                    rank=1,
+                    cell="class_ok & measured_off",
+                    row_level="class_ok",
+                    column_level="measured_off",
+                    count=10,
+                    mismatch_count=5,
+                    mismatch_rate_pct=50.0,
+                    baseline_rate_pct=5.0,
+                    recoverable_mismatches=4.5,
+                    share_total_mismatches_pct=45.0,
+                    risk_difference=0.45,
+                    rd_ci_low=0.30,
+                    rd_ci_high=0.58,
+                    cumulative_accuracy_if_eliminated_pct=91.0,
+                    recoverable=True,
+                )
+            ],
+            overlap_suppressed=False,
+            coverage_gap_excluded_rows=2,
+            baseline_sanity_warning="Declared baseline is not the minimum-rate cell.",
+            observed_accuracy_pct=86.0,
+            ceiling_accuracy_pct=91.0,
+            total_mismatches=10,
+        )
+    ]
+
+    markdown = result.to_markdown()
+    assert "## Attributable burden" in markdown
+    assert "Counterfactual caveat" in markdown
+    assert "Risk difference CI: Miettinen & Nurminen (1985)" in markdown
+
+    json_path = tmp_path / "run.json"
+    result.to_json(json_path)
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+    assert "burden_rankings" in payload
+
+
+def test_markdown_omits_burden_reference_without_burden_table() -> None:
+    markdown = _sample_result(include_risk=False).to_markdown()
+    assert "Risk difference CI: Miettinen & Nurminen (1985)" not in markdown

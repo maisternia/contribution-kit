@@ -224,7 +224,8 @@ def test_load_spec_parses_inline_factorials(tmp_path: Path) -> None:
                     {
                         "rows": {"up": "row == 'up'", "down": "row == 'down'"},
                         "columns": {"ok": "col == 'ok'", "off": "col == 'off'"},
-                        "label": "My Factorial"
+                        "label": "My Factorial",
+                        "baseline": {"rows": "up", "columns": "ok"},
                     }
                 ],
             }
@@ -235,6 +236,113 @@ def test_load_spec_parses_inline_factorials(tmp_path: Path) -> None:
     assert loaded.factorials[0].rows == {"up": "row == 'up'", "down": "row == 'down'"}
     assert loaded.factorials[0].columns == {"ok": "col == 'ok'", "off": "col == 'off'"}
     assert loaded.factorials[0].label == "My Factorial"
+    assert loaded.factorials[0].baseline == {"rows": "up", "columns": "ok"}
+
+
+def test_load_spec_factorial_baseline_unknown_level_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "baseline_bad_level.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "1",
+                "hypotheses": {"h": "1 == 1"},
+                "factorials": [
+                    {
+                        "rows": {"a": "1 == 1"},
+                        "columns": {"b": "1 == 1"},
+                        "label": "Cross",
+                        "baseline": {"rows": "missing", "columns": "b"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="baseline rows level 'missing'"):
+        cli._load_spec(cfg)
+
+
+def test_load_spec_factorial_baseline_unknown_key_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "baseline_bad_key.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "1",
+                "hypotheses": {"h": "1 == 1"},
+                "factorials": [
+                    {
+                        "rows": {"a": "1 == 1"},
+                        "columns": {"b": "1 == 1"},
+                        "baseline": {"rows": "a", "columns": "b", "extra": "x"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="baseline' has unknown key"):
+        cli._load_spec(cfg)
+
+
+def test_run_prints_hint_for_unbaselined_crossing(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    data = tmp_path / "in.csv"
+    _write_csv(data, _rows())
+    cfg = tmp_path / "cfg_unbaselined.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "1",
+                "hypotheses": {"h": "1 == 1"},
+                "factorials": [
+                    {
+                        "label": "No Baseline",
+                        "rows": {"a": "1 == 1"},
+                        "columns": {"b": "1 == 1"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert cli.main(["run", "--config", str(cfg), "--input", str(data), "--out", str(tmp_path / "out")]) == 0
+    captured = capsys.readouterr()
+    assert 'hint: crossing "No Baseline" has no baseline' in captured.err
+
+
+def test_run_hint_absent_when_all_crossings_are_baselined(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    data = tmp_path / "in.csv"
+    _write_csv(data, _rows())
+    cfg = tmp_path / "cfg_baselined.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "1",
+                "hypotheses": {"h": "1 == 1"},
+                "factorials": [
+                    {
+                        "label": "With Baseline",
+                        "rows": {"a": "1 == 1"},
+                        "columns": {"b": "1 == 1"},
+                        "baseline": {"rows": "a", "columns": "b"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert cli.main(["run", "--config", str(cfg), "--input", str(data), "--out", str(tmp_path / "out")]) == 0
+    captured = capsys.readouterr()
+    assert "has no baseline" not in captured.err
 
 
 def test_load_spec_factorial_with_fallback_label(tmp_path: Path) -> None:

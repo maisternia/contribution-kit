@@ -10,6 +10,8 @@ from .hypothesis import (
 )
 from .results import (
     AssessmentResult,
+    BurdenRankingEntry,
+    BurdenRankingResult,
     ContrastResult,
     FactorialCellResult,
     FactorialMarginalResult,
@@ -27,13 +29,26 @@ from .spec import (
     Hypothesis,
     PredictionFeature,
 )
-from .stats import OddsRatioResult, RiskRatioResult, baptista_pike_odds_ratio, haldane_anscombe_odds_ratio, katz_risk_ratio, koopman_risk_ratio
+from .stats import (
+    OddsRatioResult,
+    RiskDifferenceResult,
+    RiskRatioResult,
+    agresti_caffo_risk_difference,
+    baptista_pike_odds_ratio,
+    haldane_anscombe_odds_ratio,
+    katz_risk_ratio,
+    koopman_risk_ratio,
+    miettinen_nurminen_risk_difference,
+    risk_difference_with_guardrail,
+)
 
 __all__ = [
     "AssessmentResult",
     "AttributionSpec",
     "BinaryHypothesisResult",
     "BinaryHypothesisTest",
+    "BurdenRankingEntry",
+    "BurdenRankingResult",
     "CategoricalHypothesis",
     "ContributorRow",
     "ContinuousHypothesis",
@@ -48,7 +63,9 @@ __all__ = [
     "Hypothesis",
     "HypothesisAssessment",
     "OddsRatioResult",
+    "RiskDifferenceResult",
     "RiskRatioResult",
+    "agresti_caffo_risk_difference",
     "baptista_pike_odds_ratio",
     "combine_contributors",
     "evaluate_binary_hypotheses",
@@ -56,7 +73,9 @@ __all__ = [
     "haldane_anscombe_odds_ratio",
     "katz_risk_ratio",
     "koopman_risk_ratio",
+    "miettinen_nurminen_risk_difference",
     "PartitionWarning",
     "PredictionFeature",
     "rank_contributors",
+    "risk_difference_with_guardrail",
 ]

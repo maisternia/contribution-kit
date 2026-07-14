@@ -28,6 +28,7 @@ def test_factorial_crossing_inline_axes() -> None:
     assert crossing.rows["low"] == "x < 0"
     assert crossing.columns["a"] == "y == 1"
     assert crossing.label is None
+    assert crossing.baseline is None
 
 
 def test_factorial_crossing_with_label() -> None:
@@ -37,6 +38,15 @@ def test_factorial_crossing_with_label() -> None:
         label="Test Crossing"
     )
     assert crossing.label == "Test Crossing"
+
+
+def test_factorial_crossing_with_baseline() -> None:
+    crossing = FactorialCrossing(
+        rows={"low": "x < 0", "high": "x >= 0"},
+        columns={"a": "y == 1", "b": "y == 2"},
+        baseline={"rows": "low", "columns": "a"},
+    )
+    assert crossing.baseline == {"rows": "low", "columns": "a"}
 
 
 def test_backcompat_hypothesis_aliases() -> None:

@@ -23,11 +23,18 @@
   },
   "hypotheses": {
     "class_sf_match": "col('Class SF') == col('GT SF')",
-    "class_sf_mismatch": "col('Class SF') != col('GT SF')"
+    "class_bw within tol & sf wrong": {
+      "label": "Class BW within 10% of GT BW but class SF wrong",
+      "condition": "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10 and col('Class SF') != col('GT SF')"
+    }
   },    
   "factorials": [
     {
       "label": "BW quality × scaling direction",
+      "baseline": {
+        "rows": "class_ok",
+        "columns": "measured_ok"
+      },
       "rows": {
         "class_ok": "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10",
         "upscale": "col('Class BW') < col('GT BW') * (1 - 0.10)",

@@ -15,6 +15,8 @@ from .expr import CompiledExpression, build_row_context, compile_expression, eva
 from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis
 from .results import (
     AssessmentResult,
+    BurdenRankingEntry,
+    BurdenRankingResult,
     ContrastResult,
     FactorialCellResult,
     FactorialMarginalResult,
@@ -25,6 +27,7 @@ from .results import (
     RegimeSummary,
 )
 from .spec import AttributionSpec, Hypothesis
+from .stats import risk_difference_with_guardrail
 
 
 def _parse_scalar(value: str) -> Any:
@@ -65,6 +68,7 @@ class _FactorialPlan:
     column_levels: list[str]
     cell_names: dict[tuple[str, str], str]
     cell_masks: dict[tuple[str, str], list[bool]]
+    baseline: tuple[str, str] | None
 
 
 @dataclass(slots=True)
@@ -153,6 +157,7 @@ class Estimator:
 
         factorial_matrices = self._build_factorial_matrices(factorial_plans, mismatch_fn, ci_method=ci_method)
         contrast_results = self._build_contrast_results(factorial_plans, mismatch_fn, ci_method=ci_method)
+        burden_rankings = self._build_burden_rankings(factorial_plans, mismatch_fn, partition_warnings)
 
         return AssessmentResult(
             hypotheses=assessments,
@@ -161,6 +166,7 @@ class Estimator:
             factorial_matrices=factorial_matrices,
             contrast_results=contrast_results,
             partition_warnings=partition_warnings,
+            burden_rankings=burden_rankings,
             metadata={
                 "exact": exact,
                 "n_samples": n_samples,
@@ -297,6 +303,18 @@ class Estimator:
                 raise ValueError("Factorial crossing 'rows' axis must declare at least one level")
             if not crossing.columns:
                 raise ValueError("Factorial crossing 'columns' axis must declare at least one level")
+            if crossing.baseline is not None:
+                baseline_row = crossing.baseline.get("rows")
+                baseline_column = crossing.baseline.get("columns")
+                crossing_name = crossing.label or "unnamed"
+                if baseline_row not in crossing.rows:
+                    raise ValueError(
+                        f"crossing '{crossing_name}' baseline rows level '{baseline_row}' is not declared on rows axis"
+                    )
+                if baseline_column not in crossing.columns:
+                    raise ValueError(
+                        f"crossing '{crossing_name}' baseline columns level '{baseline_column}' is not declared on columns axis"
+                    )
 
     def _expand_factorials(self) -> tuple[list[Hypothesis], list[_FactorialPlan], list[PartitionWarning]]:
         assert self.spec is not None
@@ -392,6 +410,7 @@ class Estimator:
                     column_levels=column_levels,
                     cell_names=cell_names,
                     cell_masks=cell_masks,
+                    baseline=(crossing.baseline["rows"], crossing.baseline["columns"]) if crossing.baseline else None,
                 )
             )
 
@@ -403,6 +422,12 @@ class Estimator:
         mismatch_count = sum(1 for row in rows if mismatch_fn(row))
         mismatch_rate = (mismatch_count / count * 100.0) if count else 0.0
         return count, mismatch_rate
+
+    def _mask_mismatch_count(self, mask: Sequence[bool], mismatch_fn) -> tuple[int, int]:
+        rows = [row for row, matched in zip(self.rows, mask) if matched]
+        count = len(rows)
+        mismatch_count = sum(1 for row in rows if mismatch_fn(row))
+        return count, mismatch_count
 
     def _union_masks(self, masks: Sequence[Sequence[bool]]) -> list[bool]:
         if not masks:
@@ -571,6 +596,161 @@ class Estimator:
                         )
                     )
         return contrasts
+
+    def _build_burden_rankings(
+        self,
+        plans: Sequence[_FactorialPlan],
+        mismatch_fn,
+        partition_warnings: Sequence[PartitionWarning],
+    ) -> list[BurdenRankingResult]:
+        rankings: list[BurdenRankingResult] = []
+        total_rows = len(self.rows)
+        total_mismatches = sum(1 for row in self.rows if mismatch_fn(row))
+        observed_accuracy_pct = ((total_rows - total_mismatches) / total_rows * 100.0) if total_rows else 0.0
+
+        for plan in plans:
+            if plan.baseline is None:
+                continue
+
+            overlap_suppressed = any(
+                warning.axis.startswith(f"{plan.label}:") and warning.overlap_count > 0
+                for warning in partition_warnings
+            )
+            union_mask = self._union_masks(list(plan.cell_masks.values()))
+            coverage_gap_excluded_rows = sum(1 for matched in union_mask if not matched)
+
+            baseline_row, baseline_column = plan.baseline
+            baseline_cell_name = plan.cell_names[(baseline_row, baseline_column)]
+            baseline_count, baseline_mismatches = self._mask_mismatch_count(
+                plan.cell_masks[(baseline_row, baseline_column)], mismatch_fn
+            )
+            if baseline_count == 0:
+                raise ValueError(
+                    f"crossing '{plan.label}' baseline cell '{baseline_cell_name}' matches zero rows"
+                )
+
+            baseline_rate = baseline_mismatches / baseline_count
+
+            baseline_sanity_warning: str | None = None
+            all_cell_rates: list[float] = []
+            for row_level in plan.row_levels:
+                for column_level in plan.column_levels:
+                    cell_count, cell_mismatches = self._mask_mismatch_count(
+                        plan.cell_masks[(row_level, column_level)], mismatch_fn
+                    )
+                    rate = (cell_mismatches / cell_count) if cell_count else 0.0
+                    all_cell_rates.append(rate)
+            if any(rate < baseline_rate for rate in all_cell_rates):
+                baseline_sanity_warning = (
+                    f"Declared baseline '{baseline_cell_name}' is not the lowest mismatch-rate cell in '{plan.label}'."
+                )
+
+            if overlap_suppressed:
+                rankings.append(
+                    BurdenRankingResult(
+                        crossing_label=plan.label,
+                        baseline_cell=baseline_cell_name,
+                        entries=[],
+                        overlap_suppressed=True,
+                        coverage_gap_excluded_rows=coverage_gap_excluded_rows,
+                        baseline_sanity_warning=baseline_sanity_warning,
+                        observed_accuracy_pct=observed_accuracy_pct,
+                        ceiling_accuracy_pct=observed_accuracy_pct,
+                        total_mismatches=total_mismatches,
+                    )
+                )
+                continue
+
+            ranked_candidates: list[dict[str, Any]] = []
+            for row_index, row_level in enumerate(plan.row_levels):
+                for column_index, column_level in enumerate(plan.column_levels):
+                    if (row_level, column_level) == plan.baseline:
+                        continue
+                    cell_name = plan.cell_names[(row_level, column_level)]
+                    cell_count, cell_mismatches = self._mask_mismatch_count(
+                        plan.cell_masks[(row_level, column_level)], mismatch_fn
+                    )
+                    cell_rate = (cell_mismatches / cell_count) if cell_count else 0.0
+                    excess = cell_count * (cell_rate - baseline_rate)
+                    risk_difference = risk_difference_with_guardrail(
+                        cell_mismatches,
+                        cell_count - cell_mismatches,
+                        baseline_mismatches,
+                        baseline_count - baseline_mismatches,
+                    )
+                    ranked_candidates.append(
+                        {
+                            "row_index": row_index,
+                            "column_index": column_index,
+                            "cell_name": cell_name,
+                            "row_level": row_level,
+                            "column_level": column_level,
+                            "count": cell_count,
+                            "mismatch_count": cell_mismatches,
+                            "cell_rate": cell_rate,
+                            "excess": excess,
+                            "share": (excess / total_mismatches * 100.0) if total_mismatches else 0.0,
+                            "rd": risk_difference,
+                        }
+                    )
+
+            ranked_candidates.sort(
+                key=lambda entry: (
+                    0 if entry["excess"] > 0.0 else 1,
+                    -entry["excess"] if entry["excess"] > 0.0 else 0.0,
+                    entry["row_index"],
+                    entry["column_index"],
+                )
+            )
+
+            entries: list[BurdenRankingEntry] = []
+            cumulative_recovered = 0.0
+            for position, entry in enumerate(ranked_candidates, start=1):
+                recoverable = entry["excess"] > 0.0
+                if recoverable:
+                    cumulative_recovered += entry["excess"]
+                cumulative_accuracy_pct = (
+                    ((total_rows - total_mismatches + cumulative_recovered) / total_rows) * 100.0
+                    if total_rows
+                    else 0.0
+                )
+                entries.append(
+                    BurdenRankingEntry(
+                        rank=position,
+                        cell=entry["cell_name"],
+                        row_level=entry["row_level"],
+                        column_level=entry["column_level"],
+                        count=entry["count"],
+                        mismatch_count=entry["mismatch_count"],
+                        mismatch_rate_pct=entry["cell_rate"] * 100.0,
+                        baseline_rate_pct=baseline_rate * 100.0,
+                        recoverable_mismatches=entry["excess"] if recoverable else None,
+                        share_total_mismatches_pct=entry["share"] if recoverable else None,
+                        risk_difference=entry["rd"].value,
+                        rd_ci_low=entry["rd"].ci_low,
+                        rd_ci_high=entry["rd"].ci_high,
+                        cumulative_accuracy_if_eliminated_pct=cumulative_accuracy_pct,
+                        recoverable=recoverable,
+                    )
+                )
+
+            rankings.append(
+                BurdenRankingResult(
+                    crossing_label=plan.label,
+                    baseline_cell=baseline_cell_name,
+                    entries=entries,
+                    overlap_suppressed=False,
+                    coverage_gap_excluded_rows=coverage_gap_excluded_rows,
+                    baseline_sanity_warning=baseline_sanity_warning,
+                    observed_accuracy_pct=observed_accuracy_pct,
+                    ceiling_accuracy_pct=(
+                        entries[-1].cumulative_accuracy_if_eliminated_pct if entries else observed_accuracy_pct
+                    ),
+                    total_mismatches=total_mismatches,
+                )
+            )
+
+        return rankings
 
     def _evaluate_target(self, row: Mapping[str, Any]) -> Any:
         return evaluate_expression(self.spec.target, build_row_context(row))

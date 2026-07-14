@@ -20,6 +20,13 @@ class OddsRatioResult:
     ci_high: float
 
 
+@dataclass(slots=True)
+class RiskDifferenceResult:
+    value: float
+    ci_low: float | None
+    ci_high: float | None
+
+
 def _validate_2x2_counts(a: int, b: int, c: int, d: int) -> None:
     if min(a, b, c, d) < 0:
         raise ValueError("2x2 table counts must be non-negative")
@@ -165,6 +172,148 @@ def _rr_point_estimate(a: int, b: int, c: int, d: int) -> float:
     if risk_b == 0:
         return float("inf")
     return risk_a / risk_b
+
+
+def _risk_difference_value(a: int, b: int, c: int, d: int) -> float:
+    return (a / (a + b)) - (c / (c + d))
+
+
+def _mn_constrained_p0(a: int, b: int, c: int, d: int, risk_difference: float) -> float:
+    eps = 1e-12
+    lower = max(0.0, -risk_difference) + eps
+    upper = min(1.0, 1.0 - risk_difference) - eps
+    if lower >= upper:
+        return max(min((lower + upper) / 2.0, 1.0), 0.0)
+
+    def derivative(p0: float) -> float:
+        p1 = p0 + risk_difference
+        return (
+            (a / p1)
+            - (b / (1.0 - p1))
+            + (c / p0)
+            - (d / (1.0 - p0))
+        )
+
+    low_value = derivative(lower)
+    high_value = derivative(upper)
+    if low_value <= 0.0:
+        return lower
+    if high_value >= 0.0:
+        return upper
+    return _bisect_root(derivative, lower, upper)
+
+
+def _mn_score_z(a: int, b: int, c: int, d: int, risk_difference: float) -> float:
+    n1 = a + b
+    n0 = c + d
+    n_total = n1 + n0
+    observed_difference = _risk_difference_value(a, b, c, d)
+
+    p0 = _mn_constrained_p0(a, b, c, d, risk_difference)
+    p1 = p0 + risk_difference
+    p0 = min(max(p0, 0.0), 1.0)
+    p1 = min(max(p1, 0.0), 1.0)
+    variance = (p1 * (1.0 - p1) / n1) + (p0 * (1.0 - p0) / n0)
+    if n_total > 1:
+        variance *= n_total / (n_total - 1.0)
+    if variance <= 0.0:
+        if observed_difference > risk_difference:
+            return float("inf")
+        if observed_difference < risk_difference:
+            return float("-inf")
+        return 0.0
+    return (observed_difference - risk_difference) / math.sqrt(variance)
+
+
+def _solve_mn_bound(a: int, b: int, c: int, d: int, z: float, *, lower: bool) -> float:
+    target = z if lower else -z
+
+    def objective(risk_difference: float) -> float:
+        return _mn_score_z(a, b, c, d, risk_difference) - target
+
+    grid = 1024
+    domain_low = -1.0
+    domain_high = 1.0
+    step = (domain_high - domain_low) / grid
+    previous_x = domain_low
+    previous_value = objective(previous_x)
+
+    for index in range(1, grid + 1):
+        current_x = domain_low + index * step
+        current_value = objective(current_x)
+        if math.isnan(previous_value) or math.isnan(current_value):
+            previous_x = current_x
+            previous_value = current_value
+            continue
+        if previous_value == 0.0:
+            return previous_x
+        if current_value == 0.0:
+            return current_x
+        if previous_value * current_value < 0.0:
+            return _bisect_root(objective, previous_x, current_x)
+        previous_x = current_x
+        previous_value = current_value
+
+    if lower:
+        return domain_low
+    return domain_high
+
+
+def miettinen_nurminen_risk_difference(a: int, b: int, c: int, d: int, z: float = 1.96) -> RiskDifferenceResult:
+    """Compute risk difference and Miettinen-Nurminen score confidence interval.
+
+    Reference:
+        Miettinen, O., & Nurminen, M. (1985). Comparative analysis of two rates.
+        Statistics in Medicine, 4(2), 213-226.
+    """
+
+    _validate_2x2_counts(a, b, c, d)
+    _validate_z_score(z)
+
+    value = _risk_difference_value(a, b, c, d)
+    lower = _solve_mn_bound(a, b, c, d, z, lower=True)
+    upper = _solve_mn_bound(a, b, c, d, z, lower=False)
+    lower = max(min(lower, 1.0), -1.0)
+    upper = max(min(upper, 1.0), -1.0)
+    if upper < lower:
+        return RiskDifferenceResult(value=value, ci_low=None, ci_high=None)
+    return RiskDifferenceResult(value=value, ci_low=lower, ci_high=upper)
+
+
+def agresti_caffo_risk_difference(a: int, b: int, c: int, d: int, z: float = 1.96) -> RiskDifferenceResult:
+    """Compute risk difference with Agresti-Caffo add-two confidence interval.
+
+    Reference:
+        Agresti, A., & Caffo, B. (2000). Simple and effective confidence
+        intervals for proportions and differences of proportions result from
+        adding two successes and two failures. The American Statistician,
+        54(4), 280-288.
+    """
+
+    _validate_2x2_counts(a, b, c, d)
+    _validate_z_score(z)
+
+    n1 = a + b
+    n0 = c + d
+    value = _risk_difference_value(a, b, c, d)
+    p1_tilde = (a + 1.0) / (n1 + 2.0)  # @cite: Agresti & Caffo, 2000
+    p0_tilde = (c + 1.0) / (n0 + 2.0)  # @cite: Agresti & Caffo, 2000
+    se = math.sqrt((p1_tilde * (1.0 - p1_tilde) / (n1 + 2.0)) + (p0_tilde * (1.0 - p0_tilde) / (n0 + 2.0)))
+    ci_low = value - z * se
+    ci_high = value + z * se
+    ci_low = max(ci_low, -1.0)
+    ci_high = min(ci_high, 1.0)
+    return RiskDifferenceResult(value=value, ci_low=ci_low, ci_high=ci_high)
+
+
+def risk_difference_with_guardrail(a: int, b: int, c: int, d: int, z: float = 1.96) -> RiskDifferenceResult:
+    primary = miettinen_nurminen_risk_difference(a, b, c, d, z=z)
+    if math.isfinite(primary.value) and _finite_ordered_interval(primary.ci_low, primary.ci_high):
+        return primary
+    fallback = agresti_caffo_risk_difference(a, b, c, d, z=z)
+    if _finite_ordered_interval(fallback.ci_low, fallback.ci_high):
+        return fallback
+    return primary
 
 
 def _odds_ratio_value(a: int, b: int, c: int, d: int) -> float:

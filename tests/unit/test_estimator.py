@@ -421,7 +421,7 @@ def test_factorial_expansion_with_inline_axes_and_fallback_label(tmp_path: Path)
     assert matrix.label == "Factorial 1"  # Fallback for first crossing
 
 
-def test_factorial_contrast_results_use_label_and_stratum_format(tmp_path: Path) -> None:
+def test_factorial_contrast_results_use_label_and_stratum_format() -> None:
     # Test that contrasts use label and stratum format by checking contrast result structure
     # Use simple numeric row indices for factorial partitioning
     data = [
@@ -491,3 +491,158 @@ def test_multiple_factorials_each_with_fallback_labels(tmp_path: Path) -> None:
     assert len(result.factorial_matrices) == 2
     assert result.factorial_matrices[0].label == "Factorial 1"
     assert result.factorial_matrices[1].label == "Factorial 2"
+
+
+def test_burden_ranking_excess_share_and_cumulative_ordering() -> None:
+    rows = [
+        {"target": 0, "prediction": 0, "row": "a", "axis_col": "x"},
+        {"target": 0, "prediction": 0, "row": "a", "axis_col": "x"},
+        {"target": 0, "prediction": 0, "row": "a", "axis_col": "x"},
+        {"target": 0, "prediction": 1, "row": "a", "axis_col": "x"},
+        {"target": 0, "prediction": 1, "row": "a", "axis_col": "y"},
+        {"target": 0, "prediction": 1, "row": "a", "axis_col": "y"},
+        {"target": 0, "prediction": 1, "row": "a", "axis_col": "y"},
+        {"target": 0, "prediction": 0, "row": "a", "axis_col": "y"},
+        {"target": 0, "prediction": 1, "row": "b", "axis_col": "x"},
+        {"target": 0, "prediction": 1, "row": "b", "axis_col": "x"},
+        {"target": 0, "prediction": 0, "row": "b", "axis_col": "x"},
+        {"target": 0, "prediction": 0, "row": "b", "axis_col": "x"},
+        {"target": 0, "prediction": 0, "row": "b", "axis_col": "y"},
+        {"target": 0, "prediction": 0, "row": "b", "axis_col": "y"},
+        {"target": 0, "prediction": 0, "row": "b", "axis_col": "y"},
+        {"target": 0, "prediction": 0, "row": "b", "axis_col": "y"},
+    ]
+    spec = AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="1",
+        hypotheses=[Hypothesis(name="all", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"a": "col('row') == 'a'", "b": "col('row') == 'b'"},
+                columns={"x": "col('axis_col') == 'x'", "y": "col('axis_col') == 'y'"},
+                baseline={"rows": "a", "columns": "x"},
+                label="Burden",
+            )
+        ],
+    )
+    result = Estimator.from_dataframe(rows, spec).assess(exact=True)
+    assert len(result.burden_rankings) == 1
+    ranking = result.burden_rankings[0]
+    assert [entry.cell for entry in ranking.entries] == ["a & y", "b & x", "b & y"]
+    assert ranking.entries[0].recoverable_mismatches is not None
+    assert ranking.entries[1].recoverable_mismatches is not None
+    assert ranking.entries[2].recoverable_mismatches is None
+    assert ranking.entries[0].cumulative_accuracy_if_eliminated_pct >= ranking.observed_accuracy_pct
+    assert ranking.entries[1].cumulative_accuracy_if_eliminated_pct >= ranking.entries[0].cumulative_accuracy_if_eliminated_pct
+
+
+def test_burden_tie_breaks_by_declaration_order() -> None:
+    rows = [
+        {"target": 0, "prediction": 0, "row": "r1", "axis_col": "c1"},
+        {"target": 0, "prediction": 0, "row": "r1", "axis_col": "c1"},
+        {"target": 0, "prediction": 1, "row": "r1", "axis_col": "c2"},
+        {"target": 0, "prediction": 1, "row": "r1", "axis_col": "c2"},
+        {"target": 0, "prediction": 1, "row": "r2", "axis_col": "c1"},
+        {"target": 0, "prediction": 1, "row": "r2", "axis_col": "c1"},
+        {"target": 0, "prediction": 0, "row": "r2", "axis_col": "c2"},
+        {"target": 0, "prediction": 0, "row": "r2", "axis_col": "c2"},
+    ]
+    spec = AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="1",
+        hypotheses=[Hypothesis(name="all", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"r1": "col('row') == 'r1'", "r2": "col('row') == 'r2'"},
+                columns={"c1": "col('axis_col') == 'c1'", "c2": "col('axis_col') == 'c2'"},
+                baseline={"rows": "r1", "columns": "c1"},
+            )
+        ],
+    )
+    result = Estimator.from_dataframe(rows, spec).assess(exact=True)
+    cells = [entry.cell for entry in result.burden_rankings[0].entries]
+    assert cells[0] == "r1 & c2"
+    assert cells[1] == "r2 & c1"
+
+
+def test_burden_guards_overlap_gap_and_baseline_sanity() -> None:
+    rows = [
+        {"target": 0, "prediction": 1, "row": "up", "quality": "ok"},
+        {"target": 0, "prediction": 0, "row": "up", "quality": "off"},
+        {"target": 0, "prediction": 0, "row": "down", "quality": "ok"},
+        {"target": 0, "prediction": 0, "row": "down", "quality": "unknown"},
+    ]
+    spec = AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="1",
+        hypotheses=[Hypothesis(name="all", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"up": "col('row') == 'up'", "also_up": "col('row') == 'up'"},
+                columns={"ok": "col('quality') == 'ok'", "off": "col('quality') == 'off'"},
+                baseline={"rows": "up", "columns": "ok"},
+                label="Guarded",
+            )
+        ],
+    )
+    with pytest.warns(UserWarning):
+        result = Estimator.from_dataframe(rows, spec).assess(exact=True)
+    ranking = result.burden_rankings[0]
+    assert ranking.overlap_suppressed is True
+    assert ranking.entries == []
+    assert ranking.coverage_gap_excluded_rows > 0
+    assert ranking.baseline_sanity_warning is not None
+
+
+def test_burden_raises_on_empty_baseline_cell() -> None:
+    rows = [
+        {"target": 0, "prediction": 0, "row": "a", "axis_col": "x"},
+        {"target": 0, "prediction": 1, "row": "a", "axis_col": "x"},
+    ]
+    spec = AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="1",
+        hypotheses=[Hypothesis(name="all", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"a": "col('row') == 'a'", "b": "col('row') == 'b'"},
+                columns={"x": "col('axis_col') == 'x'", "y": "col('axis_col') == 'y'"},
+                baseline={"rows": "b", "columns": "y"},
+                label="Empty Baseline",
+            )
+        ],
+    )
+    with pytest.raises(ValueError, match="matches zero rows"):
+        Estimator.from_dataframe(rows, spec).assess(exact=True)
+
+
+def test_baseline_free_outputs_do_not_add_burden_fields(tmp_path: Path) -> None:
+    rows = [
+        {"target": 0, "prediction": 0, "row": "a", "axis_col": "x"},
+        {"target": 0, "prediction": 1, "row": "a", "axis_col": "y"},
+    ]
+    spec = AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="1",
+        hypotheses=[Hypothesis(name="all", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"a": "col('row') == 'a'"},
+                columns={"x": "col('axis_col') == 'x'", "y": "col('axis_col') == 'y'"},
+                label="No Baseline",
+            )
+        ],
+    )
+    result = Estimator.from_dataframe(rows, spec).assess(exact=True)
+    assert result.burden_rankings == []
+
+    out = tmp_path / "run.json"
+    result.to_json(out)
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert "burden_rankings" not in payload
+    assert "## Attributable burden" not in result.to_markdown()

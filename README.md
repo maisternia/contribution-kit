@@ -47,6 +47,7 @@ Mini-example (one regime):
 - **Explicit feature + regime model** — `prediction_features` declares Shapley features; `hypotheses` declares regimes; config files may use `lhs == rhs` shorthand only inside `prediction_features`.
 - **Exact Shapley** — closed-form decomposition for ≤12 features; deterministic sampling fallback for larger sets \[[Shapley 1953](#ref-shapley53), [Lundberg & Lee 2017](#ref-lundberg17)\].
 - **Binary effect sizes** — Koopman asymptotic-score risk-ratio CIs \[[Koopman 1984](#ref-koopman84), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\] and Baptista-Pike exact odds-ratio CIs \[[Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2017](#ref-fagerland17)\] for sparse 2×2 mismatch tables. For finite point estimates, if default interval inversion is non-finite or unordered, the toolkit applies an automatic guardrail fallback (Katz for risk ratio, Haldane-Anscombe for odds ratio) for that result only. If you need to force the legacy Katz / Haldane-Anscombe pair, pass `ci_method="wald"` to `assess()` or `--ci-method wald` to `contrib hypothesis`.
+- **Attributable burden ranking** — for factorial crossings that declare a baseline cell, reports rank non-baseline cells by recoverable mismatches and cumulative accuracy-if-eliminated. Risk differences use Miettinen-Nurminen score CIs with Agresti-Caffo guardrail fallback \[[Miettinen & Nurminen 1985](#ref-miettinen85), [Agresti & Caffo 2000](#ref-agresti00)\].
 - **Contributor ranking** — reusable lift/share/score scoring for categorical contribution buckets.
 - **CLI + Python API** — use from scripts, notebooks, or shell pipelines.
 
@@ -266,8 +267,9 @@ Breaking change: the old list form of `hypotheses` is no longer accepted.
 Optional factorial regime declarations:
 
 - `factorials`: list of 2-axis crossings with inline level maps:
-    - Each crossing is an object with `rows` (level map), `columns` (level map), and optional `label`:
+    - Each crossing is an object with `rows` (level map), `columns` (level map), optional `label`, and optional `baseline`:
     - `"factorials": [{"rows": {"level_a": "<bool expr>", "level_b": "<bool expr>"}, "columns": {"level_c": "<bool expr>", ...}, "label": "My Factorial"}]`
+    - Baseline form: `"baseline": {"rows": "<row_level>", "columns": "<column_level>"}`
     - If `label` is omitted, a fallback label "Factorial <n>" is generated based on crossing position.
 
 Each crossing generates one regime cell per `(row_level, column_level)` with condition `(<row_cond>) and (<col_cond>)` and name `"<label>: rows=<row_level>, columns=<column_level>"`. Generated cells are appended to the same regime/risk pipeline used by declared non-equality hypotheses.
@@ -277,6 +279,14 @@ If factorials are present, reports add:
 - `## Partition Warnings` when a factorial axis has overlaps or gaps over loaded rows
 - `## Factorial Matrices` with per-cell count, mismatch rate, risk ratio vs rest, and union-based row/column marginals
 - `## Within-stratum contrasts` with sibling-level pairwise contrasts inside each stratum using Koopman/Baptista-Pike intervals
+- `## Attributable burden` per baselined crossing: rank, cell size, mismatch rate, recoverable mismatches, share of all mismatches, risk difference CI, and cumulative accuracy-if-eliminated
+
+Burden table semantics:
+
+- Recoverable mismatches for a cell are `n_cell * (p_cell - p_baseline)`.
+- Non-positive recoverable cells are listed last and shown as not recoverable.
+- Accuracy-if-eliminated is cumulative and always uses all dataset rows as denominator.
+- Counterfactual caveat: recoverable counts assume rows in a fixed regime revert to the baseline mismatch rate.
 
 See [examples/continuous_lora/config_factorial.json](examples/continuous_lora/config_factorial.json) and [examples/continuous_lora/measurements.csv](examples/continuous_lora/measurements.csv) for the factorial example inputs, and [build/bw_matrix_factorial/report.md](build/bw_matrix_factorial/report.md) plus [build/bw_matrix_factorial/run.json](build/bw_matrix_factorial/run.json) for the resulting report and structured results.
 
@@ -373,6 +383,12 @@ Each folder ships a `config.json` and a matching `measurements.csv` that can be 
 
 <a id="ref-agresti13"></a>
 [Agresti 2013] Agresti, A. (2013). *Categorical Data Analysis* (3rd ed.). Wiley.
+
+<a id="ref-miettinen85"></a>
+[Miettinen & Nurminen 1985] Miettinen, O., & Nurminen, M. (1985). Comparative analysis of two rates. *Statistics in Medicine*, 4(2), 213-226.
+
+<a id="ref-agresti00"></a>
+[Agresti & Caffo 2000] Agresti, A., & Caffo, B. (2000). Simple and effective confidence intervals for proportions and differences of proportions result from adding two successes and two failures. *The American Statistician*, 54(4), 280-288.
 
 <a id="ref-shapley53"></a>
 [Shapley 1953] Shapley, L. S. (1953). A value for n-person games. In *Contributions to the Theory of Games II* (pp. 307–317). Princeton University Press.

@@ -48,6 +48,7 @@ class FactorialCrossing:
     rows: dict[str, str]
     columns: dict[str, str]
     label: str | None = None
+    baseline: dict[str, str] | None = None
 
 
 @dataclass(slots=True)

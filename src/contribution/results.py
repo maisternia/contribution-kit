@@ -40,6 +40,12 @@ def _format_rr(value: float | None, ci_low: float | None, ci_high: float | None)
     return f"{point} ({ci_low:.2f} to {ci_high:.2f})"
 
 
+def _format_rd(value: float, ci_low: float | None, ci_high: float | None) -> str:
+    if ci_low is None or ci_high is None:
+        return f"{value:.3f} (n/a)"
+    return f"{value:.3f} ({ci_low:.3f} to {ci_high:.3f})"
+
+
 
 @dataclass(slots=True)
 class FeatureAttribution:
@@ -156,6 +162,38 @@ class ContrastResult:
 
 
 @dataclass(slots=True)
+class BurdenRankingEntry:
+    rank: int
+    cell: str
+    row_level: str
+    column_level: str
+    count: int
+    mismatch_count: int
+    mismatch_rate_pct: float
+    baseline_rate_pct: float
+    recoverable_mismatches: float | None
+    share_total_mismatches_pct: float | None
+    risk_difference: float
+    rd_ci_low: float | None
+    rd_ci_high: float | None
+    cumulative_accuracy_if_eliminated_pct: float
+    recoverable: bool
+
+
+@dataclass(slots=True)
+class BurdenRankingResult:
+    crossing_label: str
+    baseline_cell: str
+    entries: list[BurdenRankingEntry] = field(default_factory=list)
+    overlap_suppressed: bool = False
+    coverage_gap_excluded_rows: int = 0
+    baseline_sanity_warning: str | None = None
+    observed_accuracy_pct: float = 0.0
+    ceiling_accuracy_pct: float = 0.0
+    total_mismatches: int = 0
+
+
+@dataclass(slots=True)
 class AssessmentResult:
     hypotheses: list[HypothesisAssessment]
     n_rows: int
@@ -164,6 +202,7 @@ class AssessmentResult:
     factorial_matrices: list[FactorialMatrixResult] = field(default_factory=list)
     contrast_results: list[ContrastResult] = field(default_factory=list)
     partition_warnings: list[PartitionWarning] = field(default_factory=list)
+    burden_rankings: list[BurdenRankingResult] = field(default_factory=list)
 
     @property
     def mean_observed_error(self) -> float:
@@ -436,6 +475,53 @@ class AssessmentResult:
                         f"{rr} | {or_} |"
                     )
 
+        if self.burden_rankings:
+            lines.append("")
+            lines.append("## Attributable burden")
+            lines.append("")
+            lines.append(
+                "Per baselined factorial crossing, rows are ranked by recoverable mismatches relative to the declared baseline cell."
+            )
+            for ranking in self.burden_rankings:
+                lines.append("")
+                lines.append(f"### {ranking.crossing_label}")
+                lines.append("")
+                lines.append(f"Baseline cell: `{ranking.baseline_cell}`")
+                if ranking.overlap_suppressed:
+                    lines.append("")
+                    lines.append("Ranking suppressed due to overlapping axis levels in this crossing.")
+                else:
+                    lines.append("")
+                    lines.append(
+                        "| Rank | Cell | n | Mismatch rate | Baseline rate | Recoverable mismatches | Share of all mismatches | Risk difference (95% CI) | Accuracy if eliminated |"
+                    )
+                    lines.append("|---:|---|---:|---:|---:|---:|---:|---:|---:|")
+                    for entry in ranking.entries:
+                        recoverable = "-" if entry.recoverable_mismatches is None else f"{entry.recoverable_mismatches:.2f}"
+                        share = "-" if entry.share_total_mismatches_pct is None else f"{entry.share_total_mismatches_pct:.2f}%"
+                        rd = _format_rd(entry.risk_difference, entry.rd_ci_low, entry.rd_ci_high)
+                        lines.append(
+                            f"| {entry.rank} | {entry.cell} | {entry.count} | {entry.mismatch_rate_pct:.2f}% | "
+                            f"{entry.baseline_rate_pct:.2f}% | {recoverable} | {share} | {rd} | "
+                            f"{entry.cumulative_accuracy_if_eliminated_pct:.2f}% |"
+                        )
+                if ranking.coverage_gap_excluded_rows > 0:
+                    lines.append("")
+                    lines.append(
+                        f"Coverage gap note: {ranking.coverage_gap_excluded_rows} rows were outside all crossing cells and were excluded from ranking, but kept in the accuracy denominator."
+                    )
+                if ranking.baseline_sanity_warning:
+                    lines.append("")
+                    lines.append(f"Baseline sanity warning: {ranking.baseline_sanity_warning}")
+                lines.append("")
+                lines.append(
+                    "Counterfactual caveat: recoverable mismatches assume rows in a fixed regime revert to the baseline mismatch rate."
+                )
+                lines.append("")
+                lines.append(
+                    f"Observed accuracy: {ranking.observed_accuracy_pct:.2f}% | Ceiling accuracy after ranked eliminations: {ranking.ceiling_accuracy_pct:.2f}% | Total observed mismatches: {ranking.total_mismatches}"
+                )
+
         lines.append("")
         lines.append(f"Rows: {self.n_rows}")
         lines.append(f"Mean observed contribution: {self.mean_observed_contribution:.6f}")
@@ -451,6 +537,11 @@ class AssessmentResult:
             "Odds ratio CI: Baptista & Pike (1977) *J. Roy. Statist. Soc. C* 26(2):214-220. "
             "Small-sample recommendation: Fagerland, Lydersen & Laake (2015, 2017)."
         )
+        if self.burden_rankings:
+            lines.append(
+                "Risk difference CI: Miettinen & Nurminen (1985) *Statistics in Medicine* 4(2):213-226. "
+                "Guardrail: Agresti & Caffo (2000) *Amer. Statist.* 54(4):280-288."
+            )
         return "\n".join(lines)
 
     def to_json(self, path: str | Path) -> None:
@@ -471,6 +562,8 @@ class AssessmentResult:
             payload["contrast_results"] = [asdict(row) for row in self.contrast_results]
         if self.partition_warnings:
             payload["partition_warnings"] = [asdict(row) for row in self.partition_warnings]
+        if self.burden_rankings:
+            payload["burden_rankings"] = [asdict(row) for row in self.burden_rankings]
         with target.open("w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, sort_keys=True)
 
