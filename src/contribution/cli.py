@@ -89,9 +89,29 @@ def _load_spec(path: str | Path) -> AttributionSpec:
         payload = yaml.safe_load(raw_text)
     else:
         payload = json.loads(raw_text)
+    hypotheses_payload = payload.get("hypotheses", {})
+    if not isinstance(hypotheses_payload, dict):
+        raise ValueError("'hypotheses' must be an object mapping hypothesis names to condition strings or objects")
+
     hypotheses: list[Hypothesis] = []
-    for item in payload.get("hypotheses", []):
-        hypotheses.append(Hypothesis(**item))
+    for hypothesis_name, hypothesis_value in hypotheses_payload.items():
+        if isinstance(hypothesis_value, str):
+            hypotheses.append(Hypothesis(name=hypothesis_name, condition=hypothesis_value))
+            continue
+
+        if isinstance(hypothesis_value, dict):
+            if "condition" not in hypothesis_value:
+                raise ValueError(f"hypothesis '{hypothesis_name}' must declare a 'condition' string")
+            if "name" in hypothesis_value:
+                raise ValueError(
+                    f"hypothesis '{hypothesis_name}' must not redeclare 'name'; the mapping key is the name"
+                )
+            hypotheses.append(Hypothesis(name=hypothesis_name, **hypothesis_value))
+            continue
+
+        raise ValueError(
+            f"hypothesis '{hypothesis_name}' must be a condition string or an object with 'condition' and optional 'label'"
+        )
 
     factors_payload = payload.get("factors", {})
     if not isinstance(factors_payload, dict):

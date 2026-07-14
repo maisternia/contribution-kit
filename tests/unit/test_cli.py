@@ -46,12 +46,12 @@ def _config(path: Path) -> Path:
         "target": "col('GT SF')",
         "prediction": "col('Measured SF (ungated)')",
         "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
-        "hypotheses": [
-            {"name": "class_sf", "condition": "col('Detected SF') == col('GT SF')"},
-            {"name": "class_bw", "condition": "col('Detected BW (Hz)') == col('GT BW (Hz)')"},
-            {"name": "measured_bw", "condition": "col('Measured BW (Hz)') == col('GT BW (Hz)')"},
-            {"name": "under", "condition": "col('Detected BW (Hz)') < col('GT BW (Hz)')"},
-        ],
+        "hypotheses": {
+            "class_sf": "col('Detected SF') == col('GT SF')",
+            "class_bw": "col('Detected BW (Hz)') == col('GT BW (Hz)')",
+            "measured_bw": "col('Measured BW (Hz)') == col('GT BW (Hz)')",
+            "under": "col('Detected BW (Hz)') < col('GT BW (Hz)')",
+        },
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
@@ -70,7 +70,7 @@ def test_load_spec_json_and_yaml(tmp_path: Path) -> None:
 
     yaml_cfg = tmp_path / "cfg.yaml"
     yaml_cfg.write_text(
-        "target: \"1\"\nprediction: \"1\"\nprediction_expr: \"1\"\nhypotheses:\n  - name: h\n    condition: \"1 == 1\"\n",
+        "target: \"1\"\nprediction: \"1\"\nprediction_expr: \"1\"\nhypotheses:\n  h: \"1 == 1\"\n",
         encoding="utf-8",
     )
     loaded_yaml = cli._load_spec(yaml_cfg)
@@ -216,7 +216,7 @@ def test_load_spec_parses_factors_and_factorials(tmp_path: Path) -> None:
                 "target": "target",
                 "prediction": "prediction",
                 "prediction_expr": "f",
-                "hypotheses": [{"name": "f", "condition": "1 == 1"}],
+                "hypotheses": {"f": "1 == 1"},
                 "factors": {
                     "row_axis": {"up": "row == 'up'", "down": "row == 'down'"},
                     "col_axis": {"ok": "col == 'ok'", "off": "col == 'off'"},
@@ -240,7 +240,7 @@ def test_load_spec_factorial_unknown_axis_error(tmp_path: Path) -> None:
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "1",
-                "hypotheses": [{"name": "h", "condition": "1 == 1"}],
+                "hypotheses": {"h": "1 == 1"},
                 "factors": {"known": {"a": "1 == 1"}},
                 "factorials": [{"rows": "known", "columns": "missing"}],
             }
@@ -259,7 +259,7 @@ def test_load_spec_empty_factor_axis_error(tmp_path: Path) -> None:
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "1",
-                "hypotheses": [{"name": "h", "condition": "1 == 1"}],
+                "hypotheses": {"h": "1 == 1"},
                 "factors": {"empty": {}},
             }
         ),
@@ -267,3 +267,126 @@ def test_load_spec_empty_factor_axis_error(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="must declare at least one level"):
         cli._load_spec(cfg)
+
+
+def test_load_spec_hypotheses_mapping_string_shorthand(tmp_path: Path) -> None:
+    cfg = tmp_path / "mapping_string.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "h",
+                "hypotheses": {"h": "1 == 1"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = cli._load_spec(cfg)
+    assert loaded.hypotheses[0].name == "h"
+    assert loaded.hypotheses[0].condition == "1 == 1"
+    assert loaded.hypotheses[0].label is None
+
+
+def test_load_spec_hypotheses_mapping_object_explicit_label(tmp_path: Path) -> None:
+    cfg = tmp_path / "mapping_object.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "h",
+                "hypotheses": {"h": {"condition": "1 == 1", "label": "Hypothesis H"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = cli._load_spec(cfg)
+    assert loaded.hypotheses[0].name == "h"
+    assert loaded.hypotheses[0].condition == "1 == 1"
+    assert loaded.hypotheses[0].label == "Hypothesis H"
+
+
+def test_load_spec_hypotheses_object_missing_condition_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "missing_condition.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "h",
+                "hypotheses": {"h": {"label": "no condition"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="hypothesis 'h' must declare a 'condition' string"):
+        cli._load_spec(cfg)
+
+
+def test_load_spec_hypotheses_object_redundant_name_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "redundant_name.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "h",
+                "hypotheses": {"h": {"name": "other", "condition": "1 == 1"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="hypothesis 'h' must not redeclare 'name'"):
+        cli._load_spec(cfg)
+
+
+def test_load_spec_hypotheses_mapping_order_is_preserved(tmp_path: Path) -> None:
+    cfg = tmp_path / "ordered.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "a + b + c",
+                "hypotheses": {
+                    "first": "1 == 1",
+                    "second": {"condition": "2 == 2", "label": "Second"},
+                    "third": "3 == 3",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = cli._load_spec(cfg)
+    assert [hypothesis.name for hypothesis in loaded.hypotheses] == ["first", "second", "third"]
+
+
+def test_load_spec_migrated_example_matches_legacy_list_hypotheses() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    cfg_path = repo_root / "examples" / "continuous_lora" / "config.json"
+    payload = json.loads(cfg_path.read_text(encoding="utf-8"))
+
+    old_style_hypotheses = []
+    for hypothesis_name, hypothesis_value in payload["hypotheses"].items():
+        if isinstance(hypothesis_value, str):
+            old_style_hypotheses.append({"name": hypothesis_name, "condition": hypothesis_value})
+        else:
+            old_style_hypotheses.append(
+                {
+                    "name": hypothesis_name,
+                    "condition": hypothesis_value["condition"],
+                    **({"label": hypothesis_value["label"]} if "label" in hypothesis_value else {}),
+                }
+            )
+
+    migrated = cli._load_spec(cfg_path)
+    legacy_tuples = [
+        (item["name"], item["condition"], item.get("label")) for item in old_style_hypotheses
+    ]
+    assert [(hypothesis.name, hypothesis.condition, hypothesis.label) for hypothesis in migrated.hypotheses] == legacy_tuples

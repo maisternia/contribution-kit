@@ -15,7 +15,9 @@
     "measured_bw": {
       "label": "Measured BW (box estimate vs GT BW)",
       "condition": "col('Measured BW') == col('GT BW')"
-    },
+    }
+  },
+  "factors": {
     "class_axis": {
       "class_ok": "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10",
       "upscale": "col('Class BW') < col('GT BW') * (1 - 0.10)",
@@ -26,9 +28,11 @@
       "measured_off": "abs(col('Measured BW') - col('GT BW')) / col('GT BW') > 0.10"
     }
   },
-    "factorials": {
-        "rows": "class_axis",
-        "columns": "measured_axis"
-    },
+  "factorials": [
+    {
+      "rows": "class_axis",
+      "columns": "measured_axis"
+    }
+  ],
   "score_mode": "absolute"
 }

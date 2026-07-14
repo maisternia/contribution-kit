@@ -43,7 +43,7 @@ Mini-example (one regime):
 ## Features
 
 - **Safe expression DSL** — define hypotheses and formulas over CSV columns without executing arbitrary code. Supports `col('Column Name')`, arithmetic, comparisons, `and`/`or`/`not`, ternary `a if cond else b`, and the functions `abs`, `bool`, `ceil`, `floor`, `float`, `int`, `log2`, `max`, `min`, `round`, `str`.
-- **Unified hypothesis model** — one flat list of `condition` strings drives regime shares, binary mismatch risk, and (for equality conditions) feature Shapley attribution.
+- **Unified hypothesis model** — one named mapping of `condition` declarations drives regime shares, binary mismatch risk, and (for equality conditions) feature Shapley attribution.
 - **Exact Shapley** — closed-form decomposition for ≤12 features; deterministic sampling fallback for larger sets \[[Shapley 1953](#ref-shapley53), [Lundberg & Lee 2017](#ref-lundberg17)\].
 - **Binary effect sizes** — Koopman asymptotic-score risk-ratio CIs \[[Koopman 1984](#ref-koopman84), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\] and Baptista-Pike exact odds-ratio CIs \[[Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2017](#ref-fagerland17)\] for sparse 2×2 mismatch tables. For finite point estimates, if default interval inversion is non-finite or unordered, the toolkit applies an automatic guardrail fallback (Katz for risk ratio, Haldane-Anscombe for odds ratio) for that result only. If you need to force the legacy Katz / Haldane-Anscombe pair, pass `ci_method="wald"` to `assess()` or `--ci-method wald` to `contrib hypothesis`.
 - **Contributor ranking** — reusable lift/share/score scoring for categorical contribution buckets.
@@ -188,7 +188,26 @@ contrib contributor --input examples/continuous_lora/measurements.csv --mismatch
 contrib hypothesis --input examples/continuous_lora/measurements.csv --mismatch-expr "col('Measured SF') != col('GT SF')" --name "Class BW Underestimation" --group-a "col('Class BW') < col('GT BW')" --group-b "col('Class BW') >= col('GT BW')" --group-a-label "class_bw < gt_bw" --group-b-label "class_bw >= gt_bw" --out outputs/hypothesis.json
 ```
 
-Config files are JSON or YAML with `target`, `prediction`, `prediction_expr`, optional `scope` and `score_mode`, and a `hypotheses` list. Each hypothesis entry is `{ "name", "condition", "label"? }`. Classification is derived only from the `condition`.
+Config files are JSON or YAML with `target`, `prediction`, `prediction_expr`, optional `scope` and `score_mode`, and a `hypotheses` mapping. Mapping keys are hypothesis names and values are either a condition string shorthand or an object with `condition` and optional `label`.
+
+```json
+{
+    "hypotheses": {
+        "class_bw": "col('Class BW') == col('GT BW')",
+        "class_sf": {
+            "condition": "col('Class SF') == col('GT SF')",
+            "label": "Nominal class SF (detected vs GT SF)"
+        }
+    }
+}
+```
+
+Validation rules for object-valued hypotheses:
+
+- The object must include `condition`.
+- The object must not include `name` (the mapping key already provides it).
+
+Breaking change: the old list form of `hypotheses` is no longer accepted.
 
 Optional factorial regime declarations:
 
