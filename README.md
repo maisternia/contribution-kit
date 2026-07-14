@@ -278,7 +278,7 @@ If factorials are present, reports add:
 - `## Factorial Matrices` with per-cell count, mismatch rate, risk ratio vs rest, and union-based row/column marginals
 - `## Within-stratum contrasts` with sibling-level pairwise contrasts inside each stratum using Koopman/Baptista-Pike intervals
 
-See [examples/continuous_lora/config_factorial.json](examples/continuous_lora/config_factorial.json), and [examples/continuous_lora/measurements.csv](examples/continuous_lora/measurements.csv).
+See [examples/continuous_lora/config_factorial.json](examples/continuous_lora/config_factorial.json) and [examples/continuous_lora/measurements.csv](examples/continuous_lora/measurements.csv) for the factorial example inputs, and [build/bw_matrix_factorial/report.md](build/bw_matrix_factorial/report.md) plus [build/bw_matrix_factorial/run.json](build/bw_matrix_factorial/run.json) for the resulting report and structured results.
 
 ## Install
 
