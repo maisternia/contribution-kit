@@ -188,7 +188,24 @@ contrib contributor --input examples/continuous_lora/measurements.csv --mismatch
 contrib hypothesis --input examples/continuous_lora/measurements.csv --mismatch-expr "col('Measured SF') != col('GT SF')" --name "Class BW Underestimation" --group-a "col('Class BW') < col('GT BW')" --group-b "col('Class BW') >= col('GT BW')" --group-a-label "class_bw < gt_bw" --group-b-label "class_bw >= gt_bw" --out outputs/hypothesis.json
 ```
 
-Config files are JSON or YAML with `target`, `prediction`, `prediction_expr`, optional `scope` and `score_mode`, and a `hypotheses` list. Each hypothesis entry is `{ "name", "condition", "label"? }`. Classification is derived only from the `condition`. See [examples/continuous_lora/config.json](examples/continuous_lora/config.json) and its [measurements.csv](examples/continuous_lora/measurements.csv).
+Config files are JSON or YAML with `target`, `prediction`, `prediction_expr`, optional `scope` and `score_mode`, and a `hypotheses` list. Each hypothesis entry is `{ "name", "condition", "label"? }`. Classification is derived only from the `condition`.
+
+Optional factorial regime declarations:
+
+- `factors`: object mapping axis name to ordered level conditions:
+    - `"factors": {"axis": {"level_a": "<bool expr>", "level_b": "<bool expr>"}}`
+- `factorials`: list of 2-axis crossings:
+    - `"factorials": [{"rows": "<axis>", "columns": "<axis>"}]`
+
+Each crossing generates one regime cell per `(row_level, column_level)` with condition `(<row_cond>) and (<col_cond>)` and name `"<row_level> & <col_level>"`. Generated cells are appended to the same regime/risk pipeline used by declared non-equality hypotheses.
+
+If factors/factorials are present, reports add:
+
+- `## Partition Warnings` when a factorial axis has overlaps or gaps over loaded rows
+- `## Factorial Matrices` with per-cell count, mismatch rate, risk ratio vs rest, and union-based row/column marginals
+- `## Within-stratum contrasts` with sibling-level pairwise contrasts inside each stratum using Koopman/Baptista-Pike intervals
+
+See [examples/continuous_lora/config.json](examples/continuous_lora/config.json), [examples/continuous_lora/config_bw_matrix.json](examples/continuous_lora/config_bw_matrix.json), and [examples/continuous_lora/measurements.csv](examples/continuous_lora/measurements.csv).
 
 ## Install
 

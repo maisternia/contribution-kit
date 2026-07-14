@@ -45,6 +45,22 @@ class ContinuousHypothesis(Hypothesis):
 
 
 @dataclass(slots=True)
+class Factor:
+    """Named axis whose levels map to boolean condition expressions."""
+
+    name: str
+    levels: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class FactorialCrossing:
+    """Two-axis crossing declaration used to generate factorial cells."""
+
+    rows: str
+    columns: str
+
+
+@dataclass(slots=True)
 class AttributionSpec:
     """Single declarative entry point for an attribution analysis.
 
@@ -58,5 +74,7 @@ class AttributionSpec:
     prediction: str
     prediction_expr: str
     hypotheses: list[Hypothesis] = field(default_factory=list)
+    factors: dict[str, Factor] = field(default_factory=dict)
+    factorials: list[FactorialCrossing] = field(default_factory=list)
     scope: str = "global"
     score_mode: Literal["absolute", "signed"] = "absolute"

@@ -206,3 +206,64 @@ def test_main_returns_one_for_unrecognized_command(monkeypatch) -> None:
 
     monkeypatch.setattr(cli, "build_parser", lambda: _Parser())
     assert cli.main([]) == 1
+
+
+def test_load_spec_parses_factors_and_factorials(tmp_path: Path) -> None:
+    cfg = tmp_path / "factorial.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "target",
+                "prediction": "prediction",
+                "prediction_expr": "f",
+                "hypotheses": [{"name": "f", "condition": "1 == 1"}],
+                "factors": {
+                    "row_axis": {"up": "row == 'up'", "down": "row == 'down'"},
+                    "col_axis": {"ok": "col == 'ok'", "off": "col == 'off'"},
+                },
+                "factorials": [{"rows": "row_axis", "columns": "col_axis"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    loaded = cli._load_spec(cfg)
+    assert sorted(loaded.factors) == ["col_axis", "row_axis"]
+    assert loaded.factorials[0].rows == "row_axis"
+    assert loaded.factorials[0].columns == "col_axis"
+
+
+def test_load_spec_factorial_unknown_axis_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "bad_axis.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "1",
+                "hypotheses": [{"name": "h", "condition": "1 == 1"}],
+                "factors": {"known": {"a": "1 == 1"}},
+                "factorials": [{"rows": "known", "columns": "missing"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="unknown axis 'missing'"):
+        cli._load_spec(cfg)
+
+
+def test_load_spec_empty_factor_axis_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "empty_factor.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "1",
+                "hypotheses": [{"name": "h", "condition": "1 == 1"}],
+                "factors": {"empty": {}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="must declare at least one level"):
+        cli._load_spec(cfg)

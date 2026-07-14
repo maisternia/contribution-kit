@@ -8,11 +8,23 @@ from .hypothesis import (
     evaluate_binary_hypotheses,
     evaluate_binary_hypothesis,
 )
-from .results import AssessmentResult, RegimeSummary, FeatureAttribution, HypothesisAssessment
+from .results import (
+    AssessmentResult,
+    ContrastResult,
+    FactorialCellResult,
+    FactorialMarginalResult,
+    FactorialMatrixResult,
+    FeatureAttribution,
+    HypothesisAssessment,
+    PartitionWarning,
+    RegimeSummary,
+)
 from .spec import (
     AttributionSpec,
     CategoricalHypothesis,
     ContinuousHypothesis,
+    Factor,
+    FactorialCrossing,
     Hypothesis,
 )
 from .stats import OddsRatioResult, RiskRatioResult, baptista_pike_odds_ratio, haldane_anscombe_odds_ratio, katz_risk_ratio, koopman_risk_ratio
@@ -25,8 +37,14 @@ __all__ = [
     "CategoricalHypothesis",
     "ContributorRow",
     "ContinuousHypothesis",
+    "ContrastResult",
     "RegimeSummary",
     "Estimator",
+    "Factor",
+    "FactorialCellResult",
+    "FactorialCrossing",
+    "FactorialMarginalResult",
+    "FactorialMatrixResult",
     "FeatureAttribution",
     "Hypothesis",
     "HypothesisAssessment",
@@ -39,5 +57,6 @@ __all__ = [
     "haldane_anscombe_odds_ratio",
     "katz_risk_ratio",
     "koopman_risk_ratio",
+    "PartitionWarning",
     "rank_contributors",
 ]

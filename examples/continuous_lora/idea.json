@@ -1,0 +1,34 @@
+{
+  "description": "BW-only diagnostic matrix for the continuous-LoRa Sobel example. Two orthogonal axes: class-BW vs GT BW (augmentation/alias axis, split by scaling direction) and measured BW vs GT BW (bounding-box height quality axis). No SF conditions: SF misclassification is delegated to mAP metrics. Cells are mutually exclusive and exhaustive.",
+  "target": "col('GT SF')",
+  "prediction": "col('Measured SF')",
+  "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
+  "hypotheses": {
+    "class_sf": {
+      "label": "Nominal class SF (detected vs GT SF)",
+      "condition": "col('Class SF') == col('GT SF')"
+    },
+    "class_bw": {
+      "label": "Nominal class BW (detected vs GT BW)",
+      "condition": "col('Class BW') == col('GT BW')"
+    },
+    "measured_bw": {
+      "label": "Measured BW (box estimate vs GT BW)",
+      "condition": "col('Measured BW') == col('GT BW')"
+    },
+    "class_axis": {
+      "class_ok": "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10",
+      "upscale": "col('Class BW') < col('GT BW') * (1 - 0.10)",
+      "downscale": "col('Class BW') > col('GT BW') * (1 + 0.10)"
+    },
+    "measured_axis": {
+      "measured_ok": "abs(col('Measured BW') - col('GT BW')) / col('GT BW') <= 0.10",
+      "measured_off": "abs(col('Measured BW') - col('GT BW')) / col('GT BW') > 0.10"
+    }
+  },
+    "factorials": {
+        "rows": "class_axis",
+        "columns": "measured_axis"
+    },
+  "score_mode": "absolute"
+}

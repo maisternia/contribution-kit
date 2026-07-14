@@ -16,12 +16,19 @@ from .expr import build_row_context, evaluate_expression
 from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis
 from .results import (
     AssessmentResult,
+    ContrastResult,
+    FactorialCellResult,
+    FactorialMarginalResult,
+    FactorialMatrixResult,
     FeatureAttribution,
     HypothesisAssessment,
+    PartitionWarning,
     RegimeSummary,
 )
 from .spec import (
     AttributionSpec,
+    Factor,
+    FactorialCrossing,
     Hypothesis,
 )
 
@@ -47,11 +54,29 @@ def _result_from_run(payload: dict[str, Any]) -> AssessmentResult:
                 risk=risk,
             )
         )
+    factorial_matrices: list[FactorialMatrixResult] = []
+    for item in payload.get("factorial_matrices", []):
+        factorial_matrices.append(
+            FactorialMatrixResult(
+                rows_axis=item["rows_axis"],
+                columns_axis=item["columns_axis"],
+                cells=[FactorialCellResult(**cell) for cell in item.get("cells", [])],
+                row_marginals=[FactorialMarginalResult(**row) for row in item.get("row_marginals", [])],
+                column_marginals=[FactorialMarginalResult(**row) for row in item.get("column_marginals", [])],
+            )
+        )
+
+    contrast_results = [ContrastResult(**item) for item in payload.get("contrast_results", [])]
+    partition_warnings = [PartitionWarning(**item) for item in payload.get("partition_warnings", [])]
+
     return AssessmentResult(
         hypotheses=hypotheses,
         n_rows=payload["n_rows"],
         mean_observed_contribution=payload["mean_observed_contribution"],
         metadata=payload.get("metadata", {}),
+        factorial_matrices=factorial_matrices,
+        contrast_results=contrast_results,
+        partition_warnings=partition_warnings,
     )
 
 
@@ -67,11 +92,46 @@ def _load_spec(path: str | Path) -> AttributionSpec:
     hypotheses: list[Hypothesis] = []
     for item in payload.get("hypotheses", []):
         hypotheses.append(Hypothesis(**item))
+
+    factors_payload = payload.get("factors", {})
+    if not isinstance(factors_payload, dict):
+        raise ValueError("'factors' must be an object mapping axis names to level conditions")
+    factors: dict[str, Factor] = {}
+    for axis_name, levels_payload in factors_payload.items():
+        if not isinstance(levels_payload, dict):
+            raise ValueError(f"factor '{axis_name}' must map level names to condition strings")
+        if not levels_payload:
+            raise ValueError(f"factor '{axis_name}' must declare at least one level")
+        levels: dict[str, str] = {}
+        for level_name, condition in levels_payload.items():
+            if not isinstance(condition, str) or not condition.strip():
+                raise ValueError(f"factor '{axis_name}' level '{level_name}' must have a non-empty condition string")
+            levels[level_name] = condition
+        factors[axis_name] = Factor(name=axis_name, levels=levels)
+
+    factorials_payload = payload.get("factorials", [])
+    if not isinstance(factorials_payload, list):
+        raise ValueError("'factorials' must be a list of {'rows': <axis>, 'columns': <axis>} objects")
+    factorials: list[FactorialCrossing] = []
+    for index, item in enumerate(factorials_payload):
+        if not isinstance(item, dict):
+            raise ValueError(f"factorials[{index}] must be an object with 'rows' and 'columns'")
+        rows_axis = item.get("rows")
+        columns_axis = item.get("columns")
+        if not isinstance(rows_axis, str) or not isinstance(columns_axis, str):
+            raise ValueError(f"factorials[{index}] must declare string 'rows' and 'columns' axis names")
+        for axis_name in (rows_axis, columns_axis):
+            if axis_name not in factors:
+                raise ValueError(f"factorials[{index}] references unknown axis '{axis_name}'")
+        factorials.append(FactorialCrossing(rows=rows_axis, columns=columns_axis))
+
     return AttributionSpec(
         target=payload["target"],
         prediction=payload["prediction"],
         prediction_expr=payload["prediction_expr"],
         hypotheses=hypotheses,
+        factors=factors,
+        factorials=factorials,
         scope=payload.get("scope", "global"),
         score_mode=payload.get("score_mode", "absolute"),
     )

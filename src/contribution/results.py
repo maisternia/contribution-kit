@@ -31,6 +31,15 @@ def _format_mismatch_split(mismatch_count: int, total_count: int) -> str:
     return f"{mismatch_count}:{matched_count}"
 
 
+def _format_rr(value: float | None, ci_low: float | None, ci_high: float | None) -> str:
+    if value is None:
+        return "n/a"
+    point = "inf" if value == float("inf") else f"{value:.2f}"
+    if ci_low is None or ci_high is None or value == float("inf"):
+        return f"{point} (n/a)"
+    return f"{point} ({ci_low:.2f} to {ci_high:.2f})"
+
+
 
 @dataclass(slots=True)
 class FeatureAttribution:
@@ -90,11 +99,72 @@ class HypothesisAssessment:
 
 
 @dataclass(slots=True)
+class PartitionWarning:
+    axis: str
+    overlap_count: int
+    gap_count: int
+
+
+@dataclass(slots=True)
+class FactorialCellResult:
+    name: str
+    row_level: str
+    column_level: str
+    count: int
+    mismatch_rate_pct: float
+    risk_ratio: float | None
+    rr_ci_low: float | None
+    rr_ci_high: float | None
+
+
+@dataclass(slots=True)
+class FactorialMarginalResult:
+    level: str
+    count: int
+    mismatch_rate_pct: float
+    risk_ratio: float | None
+    rr_ci_low: float | None
+    rr_ci_high: float | None
+
+
+@dataclass(slots=True)
+class FactorialMatrixResult:
+    rows_axis: str
+    columns_axis: str
+    cells: list[FactorialCellResult] = field(default_factory=list)
+    row_marginals: list[FactorialMarginalResult] = field(default_factory=list)
+    column_marginals: list[FactorialMarginalResult] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class ContrastResult:
+    factorial: str
+    stratum: str
+    level_a: str
+    level_b: str
+    mismatch_rate_a_pct: float
+    mismatch_rate_b_pct: float
+    mismatch_count_a: int
+    total_count_a: int
+    mismatch_count_b: int
+    total_count_b: int
+    risk_ratio: float
+    rr_ci_low: float | None
+    rr_ci_high: float | None
+    odds_ratio: float
+    or_ci_low: float
+    or_ci_high: float
+
+
+@dataclass(slots=True)
 class AssessmentResult:
     hypotheses: list[HypothesisAssessment]
     n_rows: int
     mean_observed_contribution: float
     metadata: dict[str, Any] = field(default_factory=dict)
+    factorial_matrices: list[FactorialMatrixResult] = field(default_factory=list)
+    contrast_results: list[ContrastResult] = field(default_factory=list)
+    partition_warnings: list[PartitionWarning] = field(default_factory=list)
 
     @property
     def mean_observed_error(self) -> float:
@@ -286,6 +356,86 @@ class AssessmentResult:
                     f"(risk ratio {top_risk.risk_ratio:.2f})."
                 )
 
+        if self.partition_warnings:
+            lines.append("")
+            lines.append("## Partition Warnings")
+            lines.append("")
+            lines.append(
+                "Some factorial axes are not strict partitions over the loaded rows. "
+                "Overlaps and gaps are reported below."
+            )
+            lines.append("")
+            lines.append("| Axis | Overlap rows | Gap rows |")
+            lines.append("|---|---:|---:|")
+            for warning in self.partition_warnings:
+                lines.append(f"| {warning.axis} | {warning.overlap_count} | {warning.gap_count} |")
+
+        if self.factorial_matrices:
+            lines.append("")
+            lines.append("## Factorial Matrices")
+            lines.append("")
+            lines.append(
+                "Each matrix cell reports row count, mismatch rate, and mismatch risk ratio versus "
+                "the rest of the dataset. Row/column marginals are computed over unions of member cells."
+            )
+            for matrix in self.factorial_matrices:
+                lines.append("")
+                lines.append(f"### {matrix.rows_axis} x {matrix.columns_axis}")
+                lines.append("")
+                column_levels = [m.level for m in matrix.column_marginals]
+                header = "| Row level | " + " | ".join(column_levels) + " | Row marginal |"
+                lines.append(header)
+                lines.append("|---|" + "|".join(["---" for _ in column_levels]) + "|---|")
+                cell_lookup = {(cell.row_level, cell.column_level): cell for cell in matrix.cells}
+                row_lookup = {marginal.level: marginal for marginal in matrix.row_marginals}
+                for row_marginal in matrix.row_marginals:
+                    row_cells: list[str] = []
+                    for column_level in column_levels:
+                        cell = cell_lookup[(row_marginal.level, column_level)]
+                        row_cells.append(
+                            f"n={cell.count}, mismatch={cell.mismatch_rate_pct:.2f}%, RR={_format_rr(cell.risk_ratio, cell.rr_ci_low, cell.rr_ci_high)}"
+                        )
+                    marginal = row_lookup[row_marginal.level]
+                    marginal_text = (
+                        f"n={marginal.count}, mismatch={marginal.mismatch_rate_pct:.2f}%, "
+                        f"RR={_format_rr(marginal.risk_ratio, marginal.rr_ci_low, marginal.rr_ci_high)}"
+                    )
+                    lines.append(f"| {row_marginal.level} | " + " | ".join(row_cells) + f" | {marginal_text} |")
+                col_cells: list[str] = []
+                for column_marginal in matrix.column_marginals:
+                    col_cells.append(
+                        f"n={column_marginal.count}, mismatch={column_marginal.mismatch_rate_pct:.2f}%, "
+                        f"RR={_format_rr(column_marginal.risk_ratio, column_marginal.rr_ci_low, column_marginal.rr_ci_high)}"
+                    )
+                lines.append("| Column marginal | " + " | ".join(col_cells) + " | n/a |")
+
+        if self.contrast_results:
+            lines.append("")
+            lines.append("## Within-stratum contrasts")
+            lines.append("")
+            lines.append(
+                "Sibling-level contrasts within each stratum reuse Koopman risk-ratio and "
+                "Baptista-Pike odds-ratio intervals."
+            )
+            grouped: dict[str, list[ContrastResult]] = {}
+            for contrast in self.contrast_results:
+                grouped.setdefault(contrast.stratum, []).append(contrast)
+            for stratum in sorted(grouped):
+                lines.append("")
+                lines.append(f"### {stratum}")
+                lines.append("")
+                lines.append("| Comparison | A mismatch rate | B mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |")
+                lines.append("|---|---:|---:|---:|---:|")
+                for contrast in grouped[stratum]:
+                    rr = _format_effect_ci(contrast.risk_ratio, contrast.rr_ci_low, contrast.rr_ci_high)
+                    or_ = _format_effect_ci(contrast.odds_ratio, contrast.or_ci_low, contrast.or_ci_high)
+                    lines.append(
+                        f"| {contrast.level_a} vs {contrast.level_b} | "
+                        f"{contrast.mismatch_rate_a_pct:.2f}% ({_format_mismatch_split(contrast.mismatch_count_a, contrast.total_count_a)}) | "
+                        f"{contrast.mismatch_rate_b_pct:.2f}% ({_format_mismatch_split(contrast.mismatch_count_b, contrast.total_count_b)}) | "
+                        f"{rr} | {or_} |"
+                    )
+
         lines.append("")
         lines.append(f"Rows: {self.n_rows}")
         lines.append(f"Mean observed contribution: {self.mean_observed_contribution:.6f}")
@@ -306,21 +456,23 @@ class AssessmentResult:
     def to_json(self, path: str | Path) -> None:
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
+        payload: dict[str, Any] = {
+            "hypotheses": [asdict(item) for item in self.hypotheses],
+            "feature_attributions": [asdict(row) for row in self.feature_attributions],
+            "regime_summaries": [asdict(row) for row in self.regime_summaries],
+            "binary_results": [asdict(row) for row in self.binary_results],
+            "n_rows": self.n_rows,
+            "mean_observed_contribution": self.mean_observed_contribution,
+            "metadata": self.metadata,
+        }
+        if self.factorial_matrices:
+            payload["factorial_matrices"] = [asdict(row) for row in self.factorial_matrices]
+        if self.contrast_results:
+            payload["contrast_results"] = [asdict(row) for row in self.contrast_results]
+        if self.partition_warnings:
+            payload["partition_warnings"] = [asdict(row) for row in self.partition_warnings]
         with target.open("w", encoding="utf-8") as handle:
-            json.dump(
-                {
-                    "hypotheses": [asdict(item) for item in self.hypotheses],
-                    "feature_attributions": [asdict(row) for row in self.feature_attributions],
-                    "regime_summaries": [asdict(row) for row in self.regime_summaries],
-                    "binary_results": [asdict(row) for row in self.binary_results],
-                    "n_rows": self.n_rows,
-                    "mean_observed_contribution": self.mean_observed_contribution,
-                    "metadata": self.metadata,
-                },
-                handle,
-                indent=2,
-                sort_keys=True,
-            )
+            json.dump(payload, handle, indent=2, sort_keys=True)
 
     def save(self, out_dir: str | Path) -> None:
         target = Path(out_dir)

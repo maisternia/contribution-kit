@@ -6,13 +6,24 @@ import csv
 import itertools
 import math
 import random
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from .expr import CompiledExpression, build_row_context, compile_expression, evaluate_expression, split_equality
 from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis
-from .results import AssessmentResult, RegimeSummary, FeatureAttribution, HypothesisAssessment
+from .results import (
+    AssessmentResult,
+    ContrastResult,
+    FactorialCellResult,
+    FactorialMarginalResult,
+    FactorialMatrixResult,
+    FeatureAttribution,
+    HypothesisAssessment,
+    PartitionWarning,
+    RegimeSummary,
+)
 from .spec import AttributionSpec, Hypothesis
 
 
@@ -48,6 +59,16 @@ class _Feature:
 
 
 @dataclass(slots=True)
+class _FactorialPlan:
+    rows_axis: str
+    columns_axis: str
+    row_levels: list[str]
+    column_levels: list[str]
+    cell_names: dict[tuple[str, str], str]
+    cell_masks: dict[tuple[str, str], list[bool]]
+
+
+@dataclass(slots=True)
 class Estimator:
     rows: list[dict[str, Any]]
     spec: AttributionSpec | None = None
@@ -75,7 +96,10 @@ class Estimator:
         self._validate_spec()
         assert self.spec is not None
 
-        features = self._formula_features()
+        generated_hypotheses, factorial_plans, partition_warnings = self._expand_factorials()
+        effective_hypotheses = [*self.spec.hypotheses, *generated_hypotheses]
+
+        features = self._formula_features(effective_hypotheses)
         feature_names = [feature.name for feature in features]
 
         totals = {name: 0.0 for name in feature_names}
@@ -107,7 +131,7 @@ class Estimator:
 
         mismatch_fn = self._mismatch_fn()
         assessments: list[HypothesisAssessment] = []
-        for hypothesis in self.spec.hypotheses:
+        for hypothesis in effective_hypotheses:
             if hypothesis.name in feature_attr:
                 assessments.append(
                     HypothesisAssessment(
@@ -128,10 +152,16 @@ class Estimator:
                     )
                 )
 
+        factorial_matrices = self._build_factorial_matrices(factorial_plans, mismatch_fn, ci_method=ci_method)
+        contrast_results = self._build_contrast_results(factorial_plans, mismatch_fn, ci_method=ci_method)
+
         return AssessmentResult(
             hypotheses=assessments,
             n_rows=n_rows,
             mean_observed_contribution=observed_contribution_total / n_rows if n_rows else 0.0,
+            factorial_matrices=factorial_matrices,
+            contrast_results=contrast_results,
+            partition_warnings=partition_warnings,
             metadata={
                 "exact": exact,
                 "n_samples": n_samples,
@@ -144,10 +174,10 @@ class Estimator:
             },
         )
 
-    def _formula_features(self) -> list[_Feature]:
+    def _formula_features(self, hypotheses: Sequence[Hypothesis]) -> list[_Feature]:
         assert self.spec is not None
         features: list[_Feature] = []
-        for hypothesis in self.spec.hypotheses:
+        for hypothesis in hypotheses:
             split = split_equality(compile_expression(hypothesis.condition))
             if split is None:
                 continue
@@ -177,15 +207,39 @@ class Estimator:
             return None
         predicate = compile_expression(hypothesis.condition)
         matches = [bool(predicate.evaluate(build_row_context(row))) for row in self.rows]
-        group_a_rows = [row for row, matched in zip(self.rows, matches) if matched]
-        group_b_rows = [row for row, matched in zip(self.rows, matches) if not matched]
+        return self._evaluate_binary_from_masks(
+            test_name=hypothesis.name,
+            group_a_label=hypothesis.label or hypothesis.name,
+            group_b_label="rest",
+            group_a_matches=matches,
+            group_b_matches=None,
+            mismatch_fn=mismatch_fn,
+            ci_method=ci_method,
+        )
+
+    def _evaluate_binary_from_masks(
+        self,
+        *,
+        test_name: str,
+        group_a_label: str,
+        group_b_label: str,
+        group_a_matches: Sequence[bool],
+        group_b_matches: Sequence[bool] | None,
+        mismatch_fn,
+        ci_method: str,
+    ) -> BinaryHypothesisResult | None:
+        assert self.spec is not None
+        if group_b_matches is None:
+            group_b_matches = [not matched for matched in group_a_matches]
+        group_a_rows = [row for row, matched in zip(self.rows, group_a_matches) if matched]
+        group_b_rows = [row for row, matched in zip(self.rows, group_b_matches) if matched]
         if not group_a_rows or not group_b_rows:
             return None
         return evaluate_binary_hypothesis(
             scope=self.spec.scope,
-            test_name=hypothesis.name,
-            group_a_label=hypothesis.label or hypothesis.name,
-            group_b_label="rest",
+            test_name=test_name,
+            group_a_label=group_a_label,
+            group_b_label=group_b_label,
             group_a_rows=group_a_rows,
             group_b_rows=group_b_rows,
             mismatch_fn=mismatch_fn,
@@ -215,6 +269,269 @@ class Estimator:
         names = [hypothesis.name for hypothesis in self.spec.hypotheses]
         if len(names) != len(set(names)):
             raise ValueError("Hypothesis names must be unique")
+        for axis_name, factor in self.spec.factors.items():
+            if not factor.levels:
+                raise ValueError(f"factor '{axis_name}' must declare at least one level")
+        used_axes: set[str] = set()
+        for crossing in self.spec.factorials:
+            for axis_name in (crossing.rows, crossing.columns):
+                used_axes.add(axis_name)
+                if axis_name not in self.spec.factors:
+                    raise ValueError(f"factorial references unknown axis '{axis_name}'")
+        unused_axes = sorted(set(self.spec.factors).difference(used_axes))
+        if unused_axes:
+            warnings.warn(
+                "Declared factors are unused by any factorial crossing: " + ", ".join(unused_axes),
+                stacklevel=2,
+            )
+
+    def _expand_factorials(self) -> tuple[list[Hypothesis], list[_FactorialPlan], list[PartitionWarning]]:
+        assert self.spec is not None
+        if not self.spec.factorials:
+            return [], [], []
+
+        axis_membership: dict[str, dict[str, list[bool]]] = {}
+        partition_warnings: list[PartitionWarning] = []
+        used_axes = {crossing.rows for crossing in self.spec.factorials}.union({crossing.columns for crossing in self.spec.factorials})
+        for axis_name in sorted(used_axes):
+            factor = self.spec.factors[axis_name]
+            level_matches: dict[str, list[bool]] = {}
+            for level_name, condition in factor.levels.items():
+                compiled = compile_expression(condition)
+                level_matches[level_name] = [bool(compiled.evaluate(build_row_context(row))) for row in self.rows]
+            axis_membership[axis_name] = level_matches
+            overlap_count = 0
+            gap_count = 0
+            for row_index in range(len(self.rows)):
+                match_count = sum(1 for matches in level_matches.values() if matches[row_index])
+                if match_count > 1:
+                    overlap_count += 1
+                elif match_count == 0:
+                    gap_count += 1
+            if overlap_count or gap_count:
+                warnings.warn(
+                    f"factor axis '{axis_name}' is not a strict partition: overlap_rows={overlap_count}, gap_rows={gap_count}",
+                    stacklevel=2,
+                )
+                partition_warnings.append(
+                    PartitionWarning(axis=axis_name, overlap_count=overlap_count, gap_count=gap_count)
+                )
+
+        declared_names = {hypothesis.name for hypothesis in self.spec.hypotheses}
+        generated_names: set[str] = set()
+        generated_hypotheses: list[Hypothesis] = []
+        plans: list[_FactorialPlan] = []
+        for crossing in self.spec.factorials:
+            row_factor = self.spec.factors[crossing.rows]
+            col_factor = self.spec.factors[crossing.columns]
+            row_levels = list(row_factor.levels)
+            column_levels = list(col_factor.levels)
+            cell_names: dict[tuple[str, str], str] = {}
+            cell_masks: dict[tuple[str, str], list[bool]] = {}
+            for row_level in row_levels:
+                row_condition = row_factor.levels[row_level]
+                row_matches = axis_membership[crossing.rows][row_level]
+                for column_level in column_levels:
+                    column_condition = col_factor.levels[column_level]
+                    column_matches = axis_membership[crossing.columns][column_level]
+                    name = f"{row_level} & {column_level}"
+                    if name in declared_names or name in generated_names:
+                        raise ValueError(f"Generated factorial cell name collision: '{name}'")
+                    generated_names.add(name)
+                    condition = f"({row_condition}) and ({column_condition})"
+                    generated_hypotheses.append(Hypothesis(name=name, condition=condition))
+                    cell_names[(row_level, column_level)] = name
+                    cell_masks[(row_level, column_level)] = [
+                        row_match and column_match
+                        for row_match, column_match in zip(row_matches, column_matches)
+                    ]
+            plans.append(
+                _FactorialPlan(
+                    rows_axis=crossing.rows,
+                    columns_axis=crossing.columns,
+                    row_levels=row_levels,
+                    column_levels=column_levels,
+                    cell_names=cell_names,
+                    cell_masks=cell_masks,
+                )
+            )
+        return generated_hypotheses, plans, partition_warnings
+
+    def _mask_mismatch_stats(self, mask: Sequence[bool], mismatch_fn) -> tuple[int, float]:
+        rows = [row for row, matched in zip(self.rows, mask) if matched]
+        count = len(rows)
+        mismatch_count = sum(1 for row in rows if mismatch_fn(row))
+        mismatch_rate = (mismatch_count / count * 100.0) if count else 0.0
+        return count, mismatch_rate
+
+    def _union_masks(self, masks: Sequence[Sequence[bool]]) -> list[bool]:
+        if not masks:
+            return [False for _ in self.rows]
+        return [any(values) for values in zip(*masks)]
+
+    def _build_factorial_matrices(
+        self,
+        plans: Sequence[_FactorialPlan],
+        mismatch_fn,
+        *,
+        ci_method: str,
+    ) -> list[FactorialMatrixResult]:
+        matrices: list[FactorialMatrixResult] = []
+        for plan in plans:
+            matrix = FactorialMatrixResult(rows_axis=plan.rows_axis, columns_axis=plan.columns_axis)
+            for row_level in plan.row_levels:
+                for column_level in plan.column_levels:
+                    mask = plan.cell_masks[(row_level, column_level)]
+                    count, mismatch_rate = self._mask_mismatch_stats(mask, mismatch_fn)
+                    risk = self._evaluate_binary_from_masks(
+                        test_name=plan.cell_names[(row_level, column_level)],
+                        group_a_label=plan.cell_names[(row_level, column_level)],
+                        group_b_label="rest",
+                        group_a_matches=mask,
+                        group_b_matches=None,
+                        mismatch_fn=mismatch_fn,
+                        ci_method=ci_method,
+                    )
+                    matrix.cells.append(
+                        FactorialCellResult(
+                            name=plan.cell_names[(row_level, column_level)],
+                            row_level=row_level,
+                            column_level=column_level,
+                            count=count,
+                            mismatch_rate_pct=mismatch_rate,
+                            risk_ratio=risk.risk_ratio if risk is not None else None,
+                            rr_ci_low=risk.rr_ci_low if risk is not None else None,
+                            rr_ci_high=risk.rr_ci_high if risk is not None else None,
+                        )
+                    )
+
+            for row_level in plan.row_levels:
+                union_mask = self._union_masks([plan.cell_masks[(row_level, column_level)] for column_level in plan.column_levels])
+                count, mismatch_rate = self._mask_mismatch_stats(union_mask, mismatch_fn)
+                risk = self._evaluate_binary_from_masks(
+                    test_name=f"{row_level} marginal",
+                    group_a_label=row_level,
+                    group_b_label="rest",
+                    group_a_matches=union_mask,
+                    group_b_matches=None,
+                    mismatch_fn=mismatch_fn,
+                    ci_method=ci_method,
+                )
+                matrix.row_marginals.append(
+                    FactorialMarginalResult(
+                        level=row_level,
+                        count=count,
+                        mismatch_rate_pct=mismatch_rate,
+                        risk_ratio=risk.risk_ratio if risk is not None else None,
+                        rr_ci_low=risk.rr_ci_low if risk is not None else None,
+                        rr_ci_high=risk.rr_ci_high if risk is not None else None,
+                    )
+                )
+
+            for column_level in plan.column_levels:
+                union_mask = self._union_masks([plan.cell_masks[(row_level, column_level)] for row_level in plan.row_levels])
+                count, mismatch_rate = self._mask_mismatch_stats(union_mask, mismatch_fn)
+                risk = self._evaluate_binary_from_masks(
+                    test_name=f"{column_level} marginal",
+                    group_a_label=column_level,
+                    group_b_label="rest",
+                    group_a_matches=union_mask,
+                    group_b_matches=None,
+                    mismatch_fn=mismatch_fn,
+                    ci_method=ci_method,
+                )
+                matrix.column_marginals.append(
+                    FactorialMarginalResult(
+                        level=column_level,
+                        count=count,
+                        mismatch_rate_pct=mismatch_rate,
+                        risk_ratio=risk.risk_ratio if risk is not None else None,
+                        rr_ci_low=risk.rr_ci_low if risk is not None else None,
+                        rr_ci_high=risk.rr_ci_high if risk is not None else None,
+                    )
+                )
+
+            matrices.append(matrix)
+        return matrices
+
+    def _build_contrast_results(
+        self,
+        plans: Sequence[_FactorialPlan],
+        mismatch_fn,
+        *,
+        ci_method: str,
+    ) -> list[ContrastResult]:
+        contrasts: list[ContrastResult] = []
+        for plan in plans:
+            factorial_name = f"{plan.rows_axis} x {plan.columns_axis}"
+            for row_level in plan.row_levels:
+                for level_a, level_b in itertools.combinations(plan.column_levels, 2):
+                    risk = self._evaluate_binary_from_masks(
+                        test_name=f"{factorial_name}: {row_level} [{level_a} vs {level_b}]",
+                        group_a_label=level_a,
+                        group_b_label=level_b,
+                        group_a_matches=plan.cell_masks[(row_level, level_a)],
+                        group_b_matches=plan.cell_masks[(row_level, level_b)],
+                        mismatch_fn=mismatch_fn,
+                        ci_method=ci_method,
+                    )
+                    if risk is None:
+                        continue
+                    contrasts.append(
+                        ContrastResult(
+                            factorial=factorial_name,
+                            stratum=f"{factorial_name} :: {plan.rows_axis}={row_level}",
+                            level_a=level_a,
+                            level_b=level_b,
+                            mismatch_rate_a_pct=risk.mismatch_rate_a_pct,
+                            mismatch_rate_b_pct=risk.mismatch_rate_b_pct,
+                            mismatch_count_a=risk.mismatch_count_a,
+                            total_count_a=risk.total_count_a,
+                            mismatch_count_b=risk.mismatch_count_b,
+                            total_count_b=risk.total_count_b,
+                            risk_ratio=risk.risk_ratio,
+                            rr_ci_low=risk.rr_ci_low,
+                            rr_ci_high=risk.rr_ci_high,
+                            odds_ratio=risk.odds_ratio,
+                            or_ci_low=risk.or_ci_low,
+                            or_ci_high=risk.or_ci_high,
+                        )
+                    )
+
+            for column_level in plan.column_levels:
+                for level_a, level_b in itertools.combinations(plan.row_levels, 2):
+                    risk = self._evaluate_binary_from_masks(
+                        test_name=f"{factorial_name}: {column_level} [{level_a} vs {level_b}]",
+                        group_a_label=level_a,
+                        group_b_label=level_b,
+                        group_a_matches=plan.cell_masks[(level_a, column_level)],
+                        group_b_matches=plan.cell_masks[(level_b, column_level)],
+                        mismatch_fn=mismatch_fn,
+                        ci_method=ci_method,
+                    )
+                    if risk is None:
+                        continue
+                    contrasts.append(
+                        ContrastResult(
+                            factorial=factorial_name,
+                            stratum=f"{factorial_name} :: {plan.columns_axis}={column_level}",
+                            level_a=level_a,
+                            level_b=level_b,
+                            mismatch_rate_a_pct=risk.mismatch_rate_a_pct,
+                            mismatch_rate_b_pct=risk.mismatch_rate_b_pct,
+                            mismatch_count_a=risk.mismatch_count_a,
+                            total_count_a=risk.total_count_a,
+                            mismatch_count_b=risk.mismatch_count_b,
+                            total_count_b=risk.total_count_b,
+                            risk_ratio=risk.risk_ratio,
+                            rr_ci_low=risk.rr_ci_low,
+                            rr_ci_high=risk.rr_ci_high,
+                            odds_ratio=risk.odds_ratio,
+                            or_ci_low=risk.or_ci_low,
+                            or_ci_high=risk.or_ci_high,
+                        )
+                    )
+        return contrasts
 
     def _evaluate_target(self, row: Mapping[str, Any]) -> Any:
         return evaluate_expression(self.spec.target, build_row_context(row))

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 import pytest
 
 from contribution.estimator import _parse_scalar, _score
-from contribution.spec import AttributionSpec, Hypothesis
+from contribution.spec import AttributionSpec, Factor, FactorialCrossing, Hypothesis
 from contribution import Estimator
 
 
@@ -154,3 +155,103 @@ def test_assess_spec_override_on_empty_rows() -> None:
     estimator = Estimator(rows=[], spec=None)
     result = estimator.assess(spec=replacement)
     assert result.n_rows == 0
+
+
+def _factorial_rows() -> list[dict[str, object]]:
+    return [
+        {"target": 0, "prediction": 0, "row": "up", "quality": "ok", "f": 1},
+        {"target": 0, "prediction": 1, "row": "up", "quality": "off", "f": 1},
+        {"target": 0, "prediction": 1, "row": "down", "quality": "ok", "f": 1},
+        {"target": 0, "prediction": 1, "row": "down", "quality": "off", "f": 1},
+    ]
+
+
+def _factorial_spec() -> AttributionSpec:
+    return AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="f",
+        hypotheses=[Hypothesis(name="f", condition="f == f")],
+        factors={
+            "row_axis": Factor(name="row_axis", levels={"up": "row == 'up'", "down": "row == 'down'"}),
+            "col_axis": Factor(name="col_axis", levels={"ok": "quality == 'ok'", "off": "quality == 'off'"}),
+        },
+        factorials=[FactorialCrossing(rows="row_axis", columns="col_axis")],
+    )
+
+
+def test_factorial_expansion_matrix_and_contrasts() -> None:
+    result = Estimator.from_dataframe(_factorial_rows(), _factorial_spec()).assess(exact=True)
+
+    names = [item.name for item in result.hypotheses]
+    assert "up & ok" in names
+    assert "down & off" in names
+    assert len(result.factorial_matrices) == 1
+    matrix = result.factorial_matrices[0]
+    assert matrix.rows_axis == "row_axis"
+    assert matrix.columns_axis == "col_axis"
+    assert len(matrix.cells) == 4
+    assert len(result.contrast_results) == 4
+
+
+def test_factorial_generated_name_collision_error() -> None:
+    spec = _factorial_spec()
+    spec.hypotheses.append(Hypothesis(name="up & ok", condition="row == 'up' and col == 'ok'"))
+    with pytest.raises(ValueError, match="name collision"):
+        Estimator.from_dataframe(_factorial_rows(), spec).assess(exact=True)
+
+
+def test_factorial_partition_warning_and_unused_axis_warning() -> None:
+    spec = AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="f",
+        hypotheses=[Hypothesis(name="f", condition="f == f")],
+        factors={
+            "row_axis": Factor(name="row_axis", levels={"up": "row == 'up'", "also_up": "row == 'up'"}),
+            "col_axis": Factor(name="col_axis", levels={"ok": "quality == 'ok'", "off": "quality == 'off'"}),
+            "unused_axis": Factor(name="unused_axis", levels={"x": "1 == 1"}),
+        },
+        factorials=[FactorialCrossing(rows="row_axis", columns="col_axis")],
+    )
+    with pytest.warns(UserWarning, match="unused"):
+        with pytest.warns(UserWarning, match="not a strict partition"):
+            result = Estimator.from_dataframe(_factorial_rows(), spec).assess(exact=True)
+    assert result.partition_warnings
+    assert result.partition_warnings[0].axis == "row_axis"
+    assert result.partition_warnings[0].overlap_count == 2
+    assert result.partition_warnings[0].gap_count == 2
+
+
+def test_contrast_sparse_case_keeps_positive_odds_ratio() -> None:
+    rows = [
+        {"target": 0, "prediction": 0, "row": "up", "quality": "ok", "f": 1},
+        {"target": 0, "prediction": 0, "row": "up", "quality": "ok", "f": 1},
+        {"target": 0, "prediction": 1, "row": "up", "quality": "off", "f": 1},
+        {"target": 0, "prediction": 1, "row": "up", "quality": "off", "f": 1},
+        {"target": 0, "prediction": 0, "row": "down", "quality": "ok", "f": 1},
+        {"target": 0, "prediction": 1, "row": "down", "quality": "off", "f": 1},
+    ]
+    result = Estimator.from_dataframe(rows, _factorial_spec()).assess(exact=True)
+    up_stratum = [item for item in result.contrast_results if item.stratum.endswith("row_axis=up")]
+    assert up_stratum
+    contrast = up_stratum[0]
+    assert contrast.mismatch_count_a == 0
+    assert contrast.odds_ratio > 0.0
+
+
+def test_factor_free_run_json_keeps_legacy_top_level_keys(tmp_path: Path) -> None:
+    csv_path = _write_csv(tmp_path, _rows())
+    result = Estimator.from_csv(csv_path, _spec()).assess(exact=True)
+    out = tmp_path / "run.json"
+    result.to_json(out)
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert sorted(payload.keys()) == [
+        "binary_results",
+        "feature_attributions",
+        "hypotheses",
+        "mean_observed_contribution",
+        "metadata",
+        "n_rows",
+        "regime_summaries",
+    ]
