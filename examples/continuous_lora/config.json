@@ -23,14 +23,7 @@
   },
   "hypotheses": {
     "class_sf_match": "col('Class SF') == col('GT SF')",
-    "class_bw & sf ok, measured_bw off": {
-      "label": "Class BW and SF correct but measured BW off GT BW (beyond 10%)",
-      "condition": "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10 and col('Class SF') == col('GT SF') and abs(col('Measured BW') - col('GT BW')) / col('GT BW') > 0.10"
-    },
-    "class_bw & sf ok & measured ok (baseline)": {
-      "label": "All inputs correct: class BW, SF, and measured BW within tolerance (sanity check)",
-      "condition": "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10 and col('Class SF') == col('GT SF') and abs(col('Measured BW') - col('GT BW')) / col('GT BW') <= 0.10"
-    }
+    "class_sf_mismatch": "col('Class SF') != col('GT SF')"
   },    
   "factorials": [
     {
@@ -41,8 +34,8 @@
         "downscale": "col('Class BW') > col('GT BW') * (1 + 0.10)"
       },
       "columns": {
-        "measured_ok": "abs(col('Measured BW') - col('GT BW')) / col('GT BW') <= 0.19",
-        "measured_off": "abs(col('Measured BW') - col('GT BW')) / col('GT BW') > 0.19"
+        "measured_ok":  "abs(2 * log2(col('Measured BW') / col('GT BW'))) < 0.5",
+        "measured_off": "abs(2 * log2(col('Measured BW') / col('GT BW'))) >= 0.5"
       }
     }
   ]
