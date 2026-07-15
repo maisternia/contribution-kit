@@ -51,7 +51,7 @@ def _config(path: Path) -> Path:
             "class_bw": {"actual": "col('Detected BW (Hz)')", "baseline": "col('GT BW (Hz)')"},
             "measured_bw": {"actual": "col('Measured BW (Hz)')", "baseline": "col('GT BW (Hz)')"},
         },
-        "hypotheses": {
+        "regimes": {
             "under": "col('Detected BW (Hz)') < col('GT BW (Hz)')",
         },
     }
@@ -72,11 +72,49 @@ def test_load_spec_json_and_yaml(tmp_path: Path) -> None:
 
     yaml_cfg = tmp_path / "cfg.yaml"
     yaml_cfg.write_text(
-        "target: \"1\"\nprediction: \"1\"\nprediction_expr: \"1\"\nprediction_features: {}\nhypotheses:\n  h: \"1 == 1\"\n",
+        "target: \"1\"\nprediction: \"1\"\nprediction_expr: \"1\"\nprediction_features: {}\nregimes:\n  h: \"1 == 1\"\n",
         encoding="utf-8",
     )
     loaded_yaml = cli._load_spec(yaml_cfg)
-    assert loaded_yaml.hypotheses[0].name == "h"
+    assert loaded_yaml.regimes[0].name == "h"
+
+
+def test_load_spec_rejects_legacy_hypotheses_key(tmp_path: Path) -> None:
+    cfg = tmp_path / "legacy.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "1",
+                "prediction": "1",
+                "prediction_expr": "1",
+                "hypotheses": {"h": "1 == 1"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="renamed to 'regimes'"):
+        cli._load_spec(cfg)
+
+
+def test_result_from_run_accepts_legacy_hypotheses_key() -> None:
+    payload = {
+        "hypotheses": [
+            {
+                "name": "h",
+                "label": "H",
+                "analysis": "regime",
+                "regime": {"name": "h", "count": 1, "mean_contribution": 1.0, "total_contribution": 1.0, "contribution_share_pct": 100.0},
+                "risk": None,
+            }
+        ],
+        "n_rows": 1,
+        "mean_observed_contribution": 1.0,
+    }
+
+    result = cli._result_from_run(payload)
+    assert len(result.regimes) == 1
+    assert result.regimes[0].name == "h"
 
 
 def test_load_rows_scalar_parsing(tmp_path: Path) -> None:
@@ -219,7 +257,7 @@ def test_load_spec_parses_inline_factorials(tmp_path: Path) -> None:
                 "prediction": "prediction",
                 "prediction_expr": "f",
                 "prediction_features": {"f": {"actual": "f", "baseline": "0"}},
-                "hypotheses": {"all": "1 == 1"},
+                "regimes": {"all": "1 == 1"},
                 "factorials": [
                     {
                         "rows": {"up": "row == 'up'", "down": "row == 'down'"},
@@ -247,7 +285,7 @@ def test_load_spec_factorial_baseline_unknown_level_error(tmp_path: Path) -> Non
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "1",
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
                 "factorials": [
                     {
                         "rows": {"a": "1 == 1"},
@@ -272,7 +310,7 @@ def test_load_spec_factorial_baseline_unknown_key_error(tmp_path: Path) -> None:
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "1",
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
                 "factorials": [
                     {
                         "rows": {"a": "1 == 1"},
@@ -298,7 +336,7 @@ def test_run_prints_hint_for_unbaselined_crossing(tmp_path: Path, capsys: pytest
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "1",
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
                 "factorials": [
                     {
                         "label": "No Baseline",
@@ -326,7 +364,7 @@ def test_run_hint_absent_when_all_crossings_are_baselined(tmp_path: Path, capsys
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "1",
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
                 "factorials": [
                     {
                         "label": "With Baseline",
@@ -353,7 +391,7 @@ def test_load_spec_factorial_with_fallback_label(tmp_path: Path) -> None:
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "1",
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
                 "factorials": [
                     {
                         "rows": {"a": "1 == 1"},
@@ -377,7 +415,7 @@ def test_load_spec_factorial_empty_axis_error(tmp_path: Path) -> None:
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "1",
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
                 "factorials": [
                     {
                         "rows": {},
@@ -400,7 +438,7 @@ def test_load_spec_factorial_empty_label_error(tmp_path: Path) -> None:
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "1",
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
                 "factorials": [
                     {
                         "rows": {"a": "1 == 1"},
@@ -424,7 +462,7 @@ def test_load_spec_factorial_unknown_key_error(tmp_path: Path) -> None:
                 "target": "1",
                 "prediction": "1",
                 "prediction_expr": "1",
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
                 "factorials": [
                     {
                         "rows": {"a": "1 == 1"},
@@ -449,16 +487,16 @@ def test_load_spec_hypotheses_mapping_string_shorthand(tmp_path: Path) -> None:
                 "prediction": "1",
                 "prediction_expr": "h",
                 "prediction_features": {"h": {"actual": "1", "baseline": "0"}},
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
             }
         ),
         encoding="utf-8",
     )
 
     loaded = cli._load_spec(cfg)
-    assert loaded.hypotheses[0].name == "h"
-    assert loaded.hypotheses[0].condition == "1 == 1"
-    assert loaded.hypotheses[0].label is None
+    assert loaded.regimes[0].name == "h"
+    assert loaded.regimes[0].condition == "1 == 1"
+    assert loaded.regimes[0].label is None
 
 
 def test_load_spec_hypotheses_mapping_object_explicit_label(tmp_path: Path) -> None:
@@ -470,16 +508,16 @@ def test_load_spec_hypotheses_mapping_object_explicit_label(tmp_path: Path) -> N
                 "prediction": "1",
                 "prediction_expr": "h",
                 "prediction_features": {"h": {"actual": "1", "baseline": "0"}},
-                "hypotheses": {"h": {"condition": "1 == 1", "label": "Hypothesis H"}},
+                "regimes": {"h": {"condition": "1 == 1", "label": "Hypothesis H"}},
             }
         ),
         encoding="utf-8",
     )
 
     loaded = cli._load_spec(cfg)
-    assert loaded.hypotheses[0].name == "h"
-    assert loaded.hypotheses[0].condition == "1 == 1"
-    assert loaded.hypotheses[0].label == "Hypothesis H"
+    assert loaded.regimes[0].name == "h"
+    assert loaded.regimes[0].condition == "1 == 1"
+    assert loaded.regimes[0].label == "Hypothesis H"
 
 
 def test_load_spec_hypotheses_object_missing_condition_error(tmp_path: Path) -> None:
@@ -491,13 +529,13 @@ def test_load_spec_hypotheses_object_missing_condition_error(tmp_path: Path) -> 
                 "prediction": "1",
                 "prediction_expr": "h",
                 "prediction_features": {"h": {"actual": "1", "baseline": "0"}},
-                "hypotheses": {"h": {"label": "no condition"}},
+                "regimes": {"h": {"label": "no condition"}},
             }
         ),
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="hypothesis 'h' must declare a 'condition' string"):
+    with pytest.raises(ValueError, match="regime 'h' must declare a 'condition' string"):
         cli._load_spec(cfg)
 
 
@@ -510,13 +548,13 @@ def test_load_spec_hypotheses_object_redundant_name_error(tmp_path: Path) -> Non
                 "prediction": "1",
                 "prediction_expr": "h",
                 "prediction_features": {"h": {"actual": "1", "baseline": "0"}},
-                "hypotheses": {"h": {"name": "other", "condition": "1 == 1"}},
+                "regimes": {"h": {"name": "other", "condition": "1 == 1"}},
             }
         ),
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="hypothesis 'h' must not redeclare 'name'"):
+    with pytest.raises(ValueError, match="regime 'h' must not redeclare 'name'"):
         cli._load_spec(cfg)
 
 
@@ -533,7 +571,7 @@ def test_load_spec_hypotheses_mapping_order_is_preserved(tmp_path: Path) -> None
                     "b": {"actual": "1", "baseline": "0"},
                     "c": {"actual": "1", "baseline": "0"},
                 },
-                "hypotheses": {
+                "regimes": {
                     "first": "1 == 1",
                     "second": {"condition": "2 == 2", "label": "Second"},
                     "third": "3 == 3",
@@ -544,7 +582,7 @@ def test_load_spec_hypotheses_mapping_order_is_preserved(tmp_path: Path) -> None
     )
 
     loaded = cli._load_spec(cfg)
-    assert [hypothesis.name for hypothesis in loaded.hypotheses] == ["first", "second", "third"]
+    assert [regime.name for regime in loaded.regimes] == ["first", "second", "third"]
 
 
 def test_load_spec_migrated_example_matches_legacy_list_hypotheses() -> None:
@@ -553,7 +591,7 @@ def test_load_spec_migrated_example_matches_legacy_list_hypotheses() -> None:
     payload = json.loads(cfg_path.read_text(encoding="utf-8"))
 
     old_style_hypotheses = []
-    for hypothesis_name, hypothesis_value in payload["hypotheses"].items():
+    for hypothesis_name, hypothesis_value in payload["regimes"].items():
         if isinstance(hypothesis_value, str):
             old_style_hypotheses.append({"name": hypothesis_name, "condition": hypothesis_value})
         else:
@@ -569,7 +607,7 @@ def test_load_spec_migrated_example_matches_legacy_list_hypotheses() -> None:
     legacy_tuples = [
         (item["name"], item["condition"], item.get("label")) for item in old_style_hypotheses
     ]
-    assert [(hypothesis.name, hypothesis.condition, hypothesis.label) for hypothesis in migrated.hypotheses] == legacy_tuples
+    assert [(regime.name, regime.condition, regime.label) for regime in migrated.regimes] == legacy_tuples
 
 
 def test_load_spec_prediction_feature_missing_key_error(tmp_path: Path) -> None:
@@ -581,7 +619,7 @@ def test_load_spec_prediction_feature_missing_key_error(tmp_path: Path) -> None:
                 "prediction": "1",
                 "prediction_expr": "f",
                 "prediction_features": {"f": {"actual": "1"}},
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
             }
         ),
         encoding="utf-8",
@@ -599,7 +637,7 @@ def test_load_spec_prediction_feature_unknown_key_error(tmp_path: Path) -> None:
                 "prediction": "1",
                 "prediction_expr": "f",
                 "prediction_features": {"f": {"actual": "1", "baseline": "0", "extra": "x"}},
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
             }
         ),
         encoding="utf-8",
@@ -619,7 +657,7 @@ def test_load_spec_prediction_feature_string_shorthand_accepts_equality(tmp_path
                 "prediction_features": {
                     "class_sf_correct": "col('Class SF') == col('GT SF')",
                 },
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
             }
         ),
         encoding="utf-8",
@@ -654,7 +692,7 @@ def test_load_spec_prediction_feature_string_shorthand_rejects_non_equality(
                 "prediction": "1",
                 "prediction_expr": "f",
                 "prediction_features": {"f": feature_source},
-                "hypotheses": {"h": "1 == 1"},
+                "regimes": {"h": "1 == 1"},
             }
         ),
         encoding="utf-8",
@@ -678,7 +716,7 @@ def test_main_validate_accepts_mixed_prediction_feature_forms(tmp_path: Path) ->
                     "class_sf_correct": "col('Detected SF') == col('GT SF')",
                     "class_bw": {"actual": "col('Detected BW (Hz)')", "baseline": "col('GT BW (Hz)')"},
                 },
-                "hypotheses": {"under": "col('Detected BW (Hz)') < col('GT BW (Hz)')"},
+                "regimes": {"under": "col('Detected BW (Hz)') < col('GT BW (Hz)')"},
             }
         ),
         encoding="utf-8",

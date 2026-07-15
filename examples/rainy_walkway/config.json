@@ -4,7 +4,7 @@
   "prediction": "col('Detected Wetness (%)')",
   "prediction_expr": "detected_wetness + round((measured_wetness - detected_wetness) * 0.5) + round((estimated_rain_rate - 3) * 3) - round(camera_exposure / 20)",
   "scope": "vision",
-  "hypotheses": {
+  "regimes": {
     "detected_wetness": {
       "label": "Wetness detector vs GT wetness",
       "condition": "col('Detected Wetness (%)') == col('GT Wetness (%)')"

@@ -19,6 +19,7 @@ from .results import (
     FeatureAttribution,
     HypothesisAssessment,
     PartitionWarning,
+    RegimeAssessment,
     RegimeSummary,
 )
 from .spec import (
@@ -28,6 +29,7 @@ from .spec import (
     FactorialCrossing,
     Hypothesis,
     PredictionFeature,
+    Regime,
 )
 from .stats import (
     OddsRatioResult,
@@ -60,8 +62,10 @@ __all__ = [
     "FactorialMarginalResult",
     "FactorialMatrixResult",
     "FeatureAttribution",
+    "Regime",
     "Hypothesis",
     "HypothesisAssessment",
+    "RegimeAssessment",
     "OddsRatioResult",
     "RiskDifferenceResult",
     "RiskRatioResult",

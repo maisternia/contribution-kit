@@ -11,7 +11,7 @@ FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 
 
 def _spec(
-    hypotheses: list,
+    regimes: list,
     *,
     prediction_expr: str = "class_sf + round(2 * log2(measured_bw / class_bw))",
     prediction_features: dict[str, PredictionFeature] | None = None,
@@ -27,7 +27,7 @@ def _spec(
         prediction="col('Detected SF')",
         prediction_expr=prediction_expr,
         prediction_features=prediction_features,
-        hypotheses=hypotheses,
+        regimes=regimes,
     )
 
 
@@ -52,7 +52,7 @@ def test_prediction_feature_routes_to_feature() -> None:
     result = Estimator.from_csv(FIXTURES / "synthetic_measurements.csv", spec=spec).assess()
     assert [a.name for a in result.feature_attributions] == ["class_sf"]
     assert [summary.name for summary in result.regime_summaries] == ["sf_regime"]
-    assert result.hypotheses[0].analysis == "feature"
+    assert result.regimes[0].analysis == "feature"
 
 
 def test_nonequality_hypothesis_routes_to_regime() -> None:
@@ -64,4 +64,4 @@ def test_nonequality_hypothesis_routes_to_regime() -> None:
     result = Estimator.from_csv(FIXTURES / "synthetic_measurements.csv", spec=spec).assess()
     assert result.feature_attributions == []
     assert [r.name for r in result.regime_summaries] == ["bw_under"]
-    assert result.hypotheses[0].analysis == "regime"
+    assert result.regimes[0].analysis == "regime"

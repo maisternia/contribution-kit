@@ -4,7 +4,7 @@
   "prediction": "col('Measured Temp (C)')",
   "prediction_expr": "thermostat_temp + round((room_sensor_temp - thermostat_temp) * 0.5) + round((measured_humidity - 50) / 20) - round(window_open * 0.8) + round(occupancy * 0.3)",
   "scope": "home",
-  "hypotheses": {
+  "regimes": {
     "thermostat_temp": {
       "label": "Thermostat reading vs GT temp",
       "condition": "col('Thermostat Temp (C)') == col('GT Temp (C)')"

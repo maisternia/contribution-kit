@@ -7,14 +7,14 @@ from typing import Literal
 
 
 @dataclass(slots=True)
-class Hypothesis:
-    """A single declarative hypothesis about what may contribute to a formula outcome.
+class Regime:
+    """A single declarative regime about what may contribute to a formula outcome.
 
-        ``Hypothesis`` is the one type callers need to construct for regime analysis.
-        Each hypothesis is a ``name`` plus one boolean ``condition`` DSL string.
-        Every hypothesis is treated as a regime: rows where the condition holds form a
-        subset whose observed-contribution share and mismatch risk (versus the
-        remaining rows) are reported.
+        ``Regime`` is the one type callers need to construct for regime analysis.
+        Each regime is a ``name`` plus one boolean ``condition`` DSL string.
+        Every regime is treated as a subset of rows where the condition holds,
+        and the observed-contribution share and mismatch risk versus the rest of
+        the rows are reported.
 
         Shapley features are declared separately through
         ``AttributionSpec.prediction_features``. Equality conditions remain
@@ -27,14 +27,9 @@ class Hypothesis:
     label: str | None = None
 
 
-@dataclass(slots=True)
-class CategoricalHypothesis(Hypothesis):
-    """Backward-compatible alias for category-focused hypothesis declarations."""
-
-
-@dataclass(slots=True)
-class ContinuousHypothesis(Hypothesis):
-    """Backward-compatible alias for continuous-value hypothesis declarations."""
+Hypothesis = Regime
+CategoricalHypothesis = Regime
+ContinuousHypothesis = Regime
 
 
 @dataclass(slots=True)
@@ -79,14 +74,14 @@ class AttributionSpec:
     from JSON/YAML, those entries may also use a config-only top-level
     ``actual == baseline`` shorthand that is normalized to the same canonical
     ``PredictionFeature`` form.
-    ``hypotheses`` is a flat list of regime conditions.
+    ``regimes`` is a flat list of regime conditions.
     """
 
     target: str
     prediction: str
     prediction_expr: str
     prediction_features: dict[str, PredictionFeature] = field(default_factory=dict)
-    hypotheses: list[Hypothesis] = field(default_factory=list)
+    regimes: list[Regime] = field(default_factory=list)
     factorials: list[FactorialCrossing] = field(default_factory=list)
     scope: str = "global"
     score_mode: Literal["absolute", "signed"] = "absolute"

@@ -214,7 +214,7 @@ def _mn_score_z(a: int, b: int, c: int, d: int, risk_difference: float) -> float
     p0 = min(max(p0, 0.0), 1.0)
     p1 = min(max(p1, 0.0), 1.0)
     variance = (p1 * (1.0 - p1) / n1) + (p0 * (1.0 - p0) / n0)
-    if n_total > 1:
+    if n_total > 1:  # pragma: no branch
         variance *= n_total / (n_total - 1.0)
     if variance <= 0.0:
         if observed_difference > risk_difference:

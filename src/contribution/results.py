@@ -87,10 +87,10 @@ class RegimeSummary:
 
 
 @dataclass(slots=True)
-class HypothesisAssessment:
-    """Unified per-hypothesis assessment.
+class RegimeAssessment:
+    """Unified per-regime assessment.
 
-    Each input hypothesis produces exactly one assessment. ``analysis`` is either
+    Each input regime produces exactly one assessment. ``analysis`` is either
     ``"feature"`` (a Shapley contribution to the prediction-formula outcome) or
     ``"regime"`` (a contribution-share plus mismatch-risk view of the rows matching the
     condition). Only the sub-results that apply are populated.
@@ -102,6 +102,9 @@ class HypothesisAssessment:
     feature: FeatureAttribution | None = None
     regime: RegimeSummary | None = None
     risk: BinaryHypothesisResult | None = None
+
+
+HypothesisAssessment = RegimeAssessment
 
 
 @dataclass(slots=True)
@@ -195,7 +198,7 @@ class BurdenRankingResult:
 
 @dataclass(slots=True)
 class AssessmentResult:
-    hypotheses: list[HypothesisAssessment]
+    regimes: list[RegimeAssessment]
     n_rows: int
     mean_observed_contribution: float
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -211,16 +214,16 @@ class AssessmentResult:
 
     @property
     def feature_attributions(self) -> list[FeatureAttribution]:
-        features = [item.feature for item in self.hypotheses if item.feature is not None]
+        features = [item.feature for item in self.regimes if item.feature is not None]
         return sorted(features, key=lambda row: row.net_contribution_share_pct, reverse=True)
 
     @property
     def regime_summaries(self) -> list[RegimeSummary]:
-        return [item.regime for item in self.hypotheses if item.regime is not None]
+        return [item.regime for item in self.regimes if item.regime is not None]
 
     @property
     def binary_results(self) -> list[BinaryHypothesisResult]:
-        return [item.risk for item in self.hypotheses if item.risk is not None]
+        return [item.risk for item in self.regimes if item.risk is not None]
 
     def to_csv(self, path: str | Path) -> None:
         target = Path(path)
@@ -376,7 +379,7 @@ class AssessmentResult:
                     lines.append(f"- Observed prediction (`prediction`): `{prediction}`")
                 lines.append("- Mismatch definition: `prediction != target`")
             lines.append("")
-            lines.append("| Hypothesis | Regime mismatch rate | Rest mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |")
+            lines.append("| Regime | Regime mismatch rate | Rest mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |")
             lines.append("|---|---:|---:|---:|---:|")
             for risk in risks:
                 rr = _format_effect_ci(risk.risk_ratio, risk.rr_ci_low, risk.rr_ci_high)
@@ -548,7 +551,7 @@ class AssessmentResult:
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         payload: dict[str, Any] = {
-            "hypotheses": [asdict(item) for item in self.hypotheses],
+            "regimes": [asdict(item) for item in self.regimes],
             "feature_attributions": [asdict(row) for row in self.feature_attributions],
             "regime_summaries": [asdict(row) for row in self.regime_summaries],
             "binary_results": [asdict(row) for row in self.binary_results],

@@ -22,11 +22,11 @@ from .results import (
     FactorialMarginalResult,
     FactorialMatrixResult,
     FeatureAttribution,
-    HypothesisAssessment,
     PartitionWarning,
+    RegimeAssessment,
     RegimeSummary,
 )
-from .spec import AttributionSpec, Hypothesis
+from .spec import AttributionSpec, Regime
 from .stats import risk_difference_with_guardrail
 
 
@@ -99,8 +99,8 @@ class Estimator:
         self._validate_spec()
         assert self.spec is not None
 
-        generated_hypotheses, factorial_plans, partition_warnings = self._expand_factorials()
-        effective_hypotheses = [*self.spec.hypotheses, *generated_hypotheses]
+        generated_regimes, factorial_plans, partition_warnings = self._expand_factorials()
+        effective_regimes = [*self.spec.regimes, *generated_regimes]
 
         features = self._formula_features()
         feature_names = [feature.name for feature in features]
@@ -133,25 +133,25 @@ class Estimator:
             )
 
         mismatch_fn = self._mismatch_fn()
-        assessments: list[HypothesisAssessment] = []
+        assessments: list[RegimeAssessment] = []
         for feature_name, feature_spec in self.spec.prediction_features.items():
             feature_result = feature_attr[feature_name]
             assessments.append(
-                HypothesisAssessment(
+                RegimeAssessment(
                     name=feature_name,
                     label=feature_spec.label or feature_name,
                     analysis="feature",
                     feature=feature_result,
                 )
             )
-        for hypothesis in effective_hypotheses:
+        for regime in effective_regimes:
             assessments.append(
-                HypothesisAssessment(
-                    name=hypothesis.name,
-                    label=hypothesis.label or hypothesis.name,
+                RegimeAssessment(
+                    name=regime.name,
+                    label=regime.label or regime.name,
                     analysis="regime",
-                    regime=self._regime_summary(hypothesis, observed_contributions, observed_contribution_total),
-                    risk=self._regime_risk(hypothesis, mismatch_fn, ci_method=ci_method),
+                    regime=self._regime_summary(regime, observed_contributions, observed_contribution_total),
+                    risk=self._regime_risk(regime, mismatch_fn, ci_method=ci_method),
                 )
             )
 
@@ -160,7 +160,7 @@ class Estimator:
         burden_rankings = self._build_burden_rankings(factorial_plans, mismatch_fn, partition_warnings)
 
         return AssessmentResult(
-            hypotheses=assessments,
+            regimes=assessments,
             n_rows=n_rows,
             mean_observed_contribution=observed_contribution_total / n_rows if n_rows else 0.0,
             factorial_matrices=factorial_matrices,
@@ -193,8 +193,8 @@ class Estimator:
             )
         return features
 
-    def _regime_summary(self, hypothesis: Hypothesis, observed_contributions: Sequence[float], observed_contribution_total: float) -> RegimeSummary:
-        predicate = compile_expression(hypothesis.condition)
+    def _regime_summary(self, regime: Regime, observed_contributions: Sequence[float], observed_contribution_total: float) -> RegimeSummary:
+        predicate = compile_expression(regime.condition)
         group_total_contribution = 0.0
         count = 0
         for row, observed_contribution in zip(self.rows, observed_contributions):
@@ -202,22 +202,22 @@ class Estimator:
                 group_total_contribution += observed_contribution
                 count += 1
         return RegimeSummary(
-            name=hypothesis.name,
+            name=regime.name,
             count=count,
             mean_contribution=(group_total_contribution / count) if count else 0.0,
             total_contribution=group_total_contribution,
             contribution_share_pct=(group_total_contribution / observed_contribution_total * 100.0) if observed_contribution_total else 0.0,
         )
 
-    def _regime_risk(self, hypothesis: Hypothesis, mismatch_fn, *, ci_method: str) -> BinaryHypothesisResult | None:
+    def _regime_risk(self, regime: Regime, mismatch_fn, *, ci_method: str) -> BinaryHypothesisResult | None:
         assert self.spec is not None
         if mismatch_fn is None:
             return None
-        predicate = compile_expression(hypothesis.condition)
+        predicate = compile_expression(regime.condition)
         matches = [bool(predicate.evaluate(build_row_context(row))) for row in self.rows]
         return self._evaluate_binary_from_masks(
-            test_name=hypothesis.name,
-            group_a_label=hypothesis.label or hypothesis.name,
+            test_name=regime.name,
+            group_a_label=regime.label or regime.name,
             group_b_label="rest",
             group_a_matches=matches,
             group_b_matches=None,
@@ -272,8 +272,8 @@ class Estimator:
     def _validate_spec(self) -> None:
         if self.spec is None:
             raise ValueError("Attribution spec is required for assess()")
-        if not self.spec.hypotheses:
-            raise ValueError("At least one hypothesis is required")
+        if not self.spec.regimes:
+            raise ValueError("At least one regime is required")
         prediction_expression = compile_expression(self.spec.prediction_expr)
         formula_variables = free_variables(prediction_expression)
         declared_features = set(self.spec.prediction_features)
@@ -289,13 +289,13 @@ class Estimator:
                 "prediction_features declared but unused by prediction_expr: "
                 + ", ".join(unused_features)
             )
-        names = [hypothesis.name for hypothesis in self.spec.hypotheses]
+        names = [regime.name for regime in self.spec.regimes]
         if len(names) != len(set(names)):
-            raise ValueError("Hypothesis names must be unique")
+            raise ValueError("Regime names must be unique")
         colliding_names = sorted(set(names).intersection(declared_features))
         if colliding_names:
             raise ValueError(
-                "prediction_features names must not collide with hypothesis names: "
+                "prediction_features names must not collide with regime names: "
                 + ", ".join(colliding_names)
             )
         for crossing in self.spec.factorials:
@@ -316,14 +316,14 @@ class Estimator:
                         f"crossing '{crossing_name}' baseline columns level '{baseline_column}' is not declared on columns axis"
                     )
 
-    def _expand_factorials(self) -> tuple[list[Hypothesis], list[_FactorialPlan], list[PartitionWarning]]:
+    def _expand_factorials(self) -> tuple[list[Regime], list[_FactorialPlan], list[PartitionWarning]]:
         assert self.spec is not None
         if not self.spec.factorials:
             return [], [], []
 
-        declared_names = {hypothesis.name for hypothesis in self.spec.hypotheses}
+        declared_names = {regime.name for regime in self.spec.regimes}
         generated_names: set[str] = set()
-        generated_hypotheses: list[Hypothesis] = []
+        generated_regimes: list[Regime] = []
         plans: list[_FactorialPlan] = []
         partition_warnings: list[PartitionWarning] = []
 
@@ -396,7 +396,7 @@ class Estimator:
                     row_condition = crossing.rows[row_level]
                     column_condition = crossing.columns[column_level]
                     condition = f"({row_condition}) and ({column_condition})"
-                    generated_hypotheses.append(Hypothesis(name=name, condition=condition))
+                    generated_regimes.append(Regime(name=name, condition=condition))
                     cell_names[(row_level, column_level)] = name
                     cell_masks[(row_level, column_level)] = [
                         row_match and column_match
@@ -414,7 +414,7 @@ class Estimator:
                 )
             )
 
-        return generated_hypotheses, plans, partition_warnings
+        return generated_regimes, plans, partition_warnings
 
     def _mask_mismatch_stats(self, mask: Sequence[bool], mismatch_fn) -> tuple[int, float]:
         rows = [row for row, matched in zip(self.rows, mask) if matched]

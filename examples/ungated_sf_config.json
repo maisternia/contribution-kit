@@ -20,7 +20,7 @@
       "baseline": "col('GT BW (Hz)')"
     }
   },
-  "hypotheses": {
+  "regimes": {
     "class_bw < gt_bw (beyond tol)": {
       "label": "Detected BW underestimates GT BW (beyond 10%)",
       "condition": "col('Detected BW (Hz)') < col('GT BW (Hz)') * (1 - 0.10)"

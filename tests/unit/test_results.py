@@ -9,6 +9,7 @@ from contribution.results import (
     BurdenRankingResult,
     FeatureAttribution,
     HypothesisAssessment,
+    RegimeAssessment,
     RegimeSummary,
     _format_effect_ci,
 )
@@ -41,10 +42,10 @@ def _sample_result(include_risk: bool = True) -> AssessmentResult:
         else None
     )
     return AssessmentResult(
-        hypotheses=[
-            HypothesisAssessment(name="a", label="A", analysis="feature", feature=feature_a),
-            HypothesisAssessment(name="b", label="B", analysis="feature", feature=feature_b),
-            HypothesisAssessment(name="reg", label="Reg", analysis="regime", regime=regime, risk=risk),
+        regimes=[
+            RegimeAssessment(name="a", label="A", analysis="feature", feature=feature_a),
+            RegimeAssessment(name="b", label="B", analysis="feature", feature=feature_b),
+            RegimeAssessment(name="reg", label="Reg", analysis="regime", regime=regime, risk=risk),
         ],
         n_rows=2,
         mean_observed_contribution=0.5,
@@ -59,6 +60,7 @@ def test_format_effect_ci() -> None:
 
 def test_properties_and_markdown_sections() -> None:
     result = _sample_result(include_risk=True)
+    assert HypothesisAssessment is RegimeAssessment
     features = result.feature_attributions
     assert [f.name for f in features] == ["b", "a"]
     assert features[0].net_error_share_pct == features[0].net_contribution_share_pct
@@ -71,10 +73,10 @@ def test_properties_and_markdown_sections() -> None:
 
     markdown = result.to_markdown()
     assert "| Regime | Count |" in markdown
-    assert "| Hypothesis | Regime mismatch rate |" in markdown
+    assert "| Regime | Regime mismatch rate |" in markdown
 
     no_risk_markdown = _sample_result(include_risk=False).to_markdown()
-    assert "| Hypothesis | Regime mismatch rate |" not in no_risk_markdown
+    assert "| Regime | Regime mismatch rate |" not in no_risk_markdown
 
 
 def test_csv_json_and_save(tmp_path) -> None:
@@ -98,7 +100,7 @@ def test_csv_json_and_save(tmp_path) -> None:
 
 
 def test_to_csv_empty_records_header_fallback(tmp_path) -> None:
-    result = AssessmentResult(hypotheses=[], n_rows=0, mean_observed_contribution=0.0)
+    result = AssessmentResult(regimes=[], n_rows=0, mean_observed_contribution=0.0)
     target = tmp_path / "empty.csv"
     result.to_csv(target)
     text = target.read_text(encoding="utf-8")
@@ -107,8 +109,8 @@ def test_to_csv_empty_records_header_fallback(tmp_path) -> None:
 
 def test_markdown_without_regimes_section() -> None:
     result = AssessmentResult(
-        hypotheses=[
-            HypothesisAssessment(
+        regimes=[
+            RegimeAssessment(
                 name="f",
                 label="F",
                 analysis="feature",
@@ -161,7 +163,7 @@ def test_markdown_accessible_presentation() -> None:
     assert "`b` (B) carries the largest net contribution share at 75.00%." in markdown
     assert "Risk ratio (95% CI)" in markdown
     assert "Odds ratio (95% CI)" in markdown
-    assert "| Hypothesis | Regime mismatch rate | Rest mismatch rate |" in markdown
+    assert "| Regime | Regime mismatch rate | Rest mismatch rate |" in markdown
     assert "Koopman (1984)" in markdown
 
 
@@ -218,21 +220,21 @@ def test_markdown_omits_zero_mismatch_risk_row() -> None:
         or_ci_high=0.0,
     )
     result = AssessmentResult(
-        hypotheses=[
-            HypothesisAssessment(
+        regimes=[
+            RegimeAssessment(
                 name="f",
                 label="F",
                 analysis="feature",
                 feature=FeatureAttribution("f", "F", 0.1, 0.1, 0.1, 100.0),
             ),
-            HypothesisAssessment(
+            RegimeAssessment(
                 name="visible-risk",
                 label="Visible",
                 analysis="regime",
                 regime=RegimeSummary("visible-risk", 10, 0.2, 2.0, 66.0),
                 risk=visible_risk,
             ),
-            HypothesisAssessment(
+            RegimeAssessment(
                 name="baseline-hidden",
                 label="Hidden",
                 analysis="regime",

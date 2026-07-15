@@ -44,9 +44,7 @@ def _spec() -> AttributionSpec:
             "measured_bw": PredictionFeature(actual="col('Measured BW (Hz)')", baseline="col('GT BW (Hz)')"),
         },
         scope="sobel",
-        hypotheses=[
-            Hypothesis(name="under", condition="col('Detected BW (Hz)') < col('GT BW (Hz)')"),
-        ],
+        regimes=[Hypothesis(name="under", condition="col('Detected BW (Hz)') < col('GT BW (Hz)')")],
     )
 
 
@@ -105,15 +103,15 @@ def test_validate_spec_errors() -> None:
     with pytest.raises(ValueError, match="Attribution spec is required"):
         est.assess()
 
-    est.spec = AttributionSpec(target="1", prediction="1", prediction_expr="1", hypotheses=[])
-    with pytest.raises(ValueError, match="At least one hypothesis"):
+    est.spec = AttributionSpec(target="1", prediction="1", prediction_expr="1", regimes=[])
+    with pytest.raises(ValueError, match="At least one regime"):
         est.assess()
 
     est.spec = AttributionSpec(
         target="1",
         prediction="1",
         prediction_expr="1",
-        hypotheses=[Hypothesis(name="dup", condition="1==1"), Hypothesis(name="dup", condition="1==1")],
+        regimes=[Hypothesis(name="dup", condition="1==1"), Hypothesis(name="dup", condition="1==1")],
     )
     with pytest.raises(ValueError, match="unique"):
         est.assess()
@@ -129,19 +127,19 @@ def test_assess_exact_and_sampled_and_regime_none_paths(tmp_path: Path) -> None:
 
     assert exact.n_rows == 2
     assert sampled.n_rows == 2
-    assert any(item.analysis == "feature" for item in exact.hypotheses)
-    assert any(item.analysis == "regime" for item in exact.hypotheses)
+    assert any(item.analysis == "feature" for item in exact.regimes)
+    assert any(item.analysis == "regime" for item in exact.regimes)
 
     # single-group path => risk is None
     single_group = AttributionSpec(
         target="0",
         prediction="0",
         prediction_expr="0",
-        hypotheses=[Hypothesis(name="all", condition="1 == 1")],
+        regimes=[Hypothesis(name="all", condition="1 == 1")],
     )
     est3 = Estimator(rows=[{}], spec=single_group)
     assessed_single = est3.assess()
-    assert assessed_single.hypotheses[0].risk is None
+    assert assessed_single.regimes[0].risk is None
 
 
 def test_assess_allows_spec_override() -> None:
@@ -151,18 +149,18 @@ def test_assess_allows_spec_override() -> None:
         prediction="x",
         prediction_expr="x",
         prediction_features={"x": PredictionFeature(actual="x", baseline="y")},
-        hypotheses=[Hypothesis(name="h", condition="x == y")],
+        regimes=[Hypothesis(name="h", condition="x == y")],
     )
     replacement = AttributionSpec(
         target="y",
         prediction="x",
         prediction_expr="x",
         prediction_features={"x": PredictionFeature(actual="x", baseline="y")},
-        hypotheses=[Hypothesis(name="h2", condition="x == y")],
+        regimes=[Hypothesis(name="h2", condition="x == y")],
     )
     estimator = Estimator.from_dataframe(rows, base)
     result = estimator.assess(spec=replacement)
-    assert result.hypotheses[1].name == "h2"
+    assert result.regimes[1].name == "h2"
 
 
 def test_regime_risk_none_when_group_b_missing() -> None:
@@ -171,14 +169,14 @@ def test_regime_risk_none_when_group_b_missing() -> None:
         target="0",
         prediction="mismatch",
         prediction_expr="0",
-        hypotheses=[Hypothesis(name="all_a", condition="g != 'B'")],
+        regimes=[Hypothesis(name="all_a", condition="g != 'B'")],
     )
     result = Estimator.from_dataframe(rows, spec).assess(exact=True)
     assert result.binary_results == []
 
 
 def test_assess_spec_override_on_empty_rows() -> None:
-    replacement = AttributionSpec(target="0", prediction="0", prediction_expr="0", hypotheses=[Hypothesis(name="h", condition="1 == 1")])
+    replacement = AttributionSpec(target="0", prediction="0", prediction_expr="0", regimes=[Hypothesis(name="h", condition="1 == 1")])
     estimator = Estimator(rows=[], spec=None)
     result = estimator.assess(spec=replacement)
     assert result.n_rows == 0
@@ -197,7 +195,7 @@ def test_factorial_expansion_matrix_and_contrasts() -> None:
         prediction="prediction",
         prediction_expr="f",
         prediction_features={"f": PredictionFeature(actual="f", baseline="0")},
-        hypotheses=[Hypothesis(name="all_rows", condition="1 == 1")],
+        regimes=[Hypothesis(name="all_rows", condition="1 == 1")],
         factorials=[
             FactorialCrossing(
                 rows={"up": "col('row') == 'up'", "down": "col('row') == 'down'"},
@@ -229,7 +227,7 @@ def test_factorial_generated_name_collision_error() -> None:
         prediction="prediction",
         prediction_expr="f",
         prediction_features={"f": PredictionFeature(actual="f", baseline="0")},
-        hypotheses=[Hypothesis(name="up & ok", condition="col('row') == 'up' and col('quality') == 'ok'")],
+        regimes=[Hypothesis(name="up & ok", condition="col('row') == 'up' and col('quality') == 'ok'")],
         factorials=[
             FactorialCrossing(
                 rows={"up": "col('row') == 'up'", "down": "col('row') == 'down'"},
@@ -237,7 +235,7 @@ def test_factorial_generated_name_collision_error() -> None:
             )
         ],
     )
-    # Cell names generated by factorials should not collide with hypothesis names
+    # Cell names generated by factorials should not collide with regime names
     with pytest.raises(ValueError, match="name collision|already declared"):
         Estimator.from_dataframe(rows, spec).assess(exact=True)
 
@@ -254,7 +252,7 @@ def test_factorial_partition_warning() -> None:
         prediction="prediction",
         prediction_expr="f",
         prediction_features={"f": PredictionFeature(actual="f", baseline="0")},
-        hypotheses=[Hypothesis(name="all_rows", condition="1 == 1")],
+        regimes=[Hypothesis(name="all_rows", condition="1 == 1")],
         factorials=[
             FactorialCrossing(
                 rows={"up": "col('row') == 'up'", "also_up": "col('row') == 'up'"},  # Overlap!
@@ -286,7 +284,7 @@ def test_contrast_sparse_case_keeps_positive_odds_ratio() -> None:
         prediction="prediction",
         prediction_expr="f",
         prediction_features={"f": PredictionFeature(actual="f", baseline="0")},
-        hypotheses=[Hypothesis(name="all_rows", condition="1 == 1")],
+        regimes=[Hypothesis(name="all_rows", condition="1 == 1")],
         factorials=[
             FactorialCrossing(
                 rows={"up": "col('row') == 'up'", "down": "col('row') == 'down'"},
@@ -313,11 +311,11 @@ def test_factor_free_run_json_keeps_legacy_top_level_keys(tmp_path: Path) -> Non
     assert sorted(payload.keys()) == [
         "binary_results",
         "feature_attributions",
-        "hypotheses",
         "mean_observed_contribution",
         "metadata",
         "n_rows",
         "regime_summaries",
+        "regimes",
     ]
 
 
@@ -326,7 +324,7 @@ def test_validate_spec_errors_for_undeclared_prediction_expr_variable() -> None:
         target="1",
         prediction="1",
         prediction_expr="missing_feature",
-        hypotheses=[Hypothesis(name="h", condition="1 == 1")],
+        regimes=[Hypothesis(name="h", condition="1 == 1")],
     )
     with pytest.raises(ValueError, match=r"undeclared prediction feature\(s\): missing_feature"):
         Estimator.from_dataframe([{}], spec).assess(exact=True)
@@ -338,7 +336,7 @@ def test_validate_spec_errors_for_unused_prediction_feature() -> None:
         prediction="1",
         prediction_expr="1",
         prediction_features={"unused": PredictionFeature(actual="1", baseline="0")},
-        hypotheses=[Hypothesis(name="h", condition="1 == 1")],
+        regimes=[Hypothesis(name="h", condition="1 == 1")],
     )
     with pytest.raises(ValueError, match="unused by prediction_expr: unused"):
         Estimator.from_dataframe([{}], spec).assess(exact=True)
@@ -350,9 +348,9 @@ def test_validate_spec_errors_for_prediction_feature_hypothesis_name_collision()
         prediction="1",
         prediction_expr="dup",
         prediction_features={"dup": PredictionFeature(actual="1", baseline="0")},
-        hypotheses=[Hypothesis(name="dup", condition="1 == 1")],
+        regimes=[Hypothesis(name="dup", condition="1 == 1")],
     )
-    with pytest.raises(ValueError, match="must not collide with hypothesis names: dup"):
+    with pytest.raises(ValueError, match="must not collide with regime names: dup"):
         Estimator.from_dataframe([{}], spec).assess(exact=True)
 
 
@@ -370,7 +368,7 @@ def test_factorial_expansion_with_inline_axes_and_explicit_label(tmp_path: Path)
         target="col('gt')",
         prediction="col('pred')",
         prediction_expr="1",
-        hypotheses=[Hypothesis(name="h", condition="1 == 1")],
+        regimes=[Hypothesis(name="h", condition="1 == 1")],
         factorials=[
             FactorialCrossing(
                 rows={"A": "col('row') == 'A'", "B": "col('row') == 'B'"},
@@ -402,7 +400,7 @@ def test_factorial_expansion_with_inline_axes_and_fallback_label(tmp_path: Path)
         target="col('gt')",
         prediction="col('pred')",
         prediction_expr="1",
-        hypotheses=[Hypothesis(name="h", condition="1 == 1")],
+        regimes=[Hypothesis(name="h", condition="1 == 1")],
         factorials=[
             FactorialCrossing(
                 rows={"A": "col('row') == 'A'", "B": "col('row') == 'B'"},
@@ -436,7 +434,7 @@ def test_factorial_contrast_results_use_label_and_stratum_format() -> None:
         target="col('gt')",
         prediction="col('pred')",
         prediction_expr="1",
-        hypotheses=[Hypothesis(name="h", condition="1 == 1")],
+        regimes=[Hypothesis(name="h", condition="1 == 1")],
         factorials=[
             FactorialCrossing(
                 rows={"low": "col('idx') < 3", "high": "col('idx') >= 3"},
@@ -471,7 +469,7 @@ def test_multiple_factorials_each_with_fallback_labels(tmp_path: Path) -> None:
         target="col('gt')",
         prediction="col('pred')",
         prediction_expr="1",
-        hypotheses=[Hypothesis(name="h", condition="1 == 1")],
+        regimes=[Hypothesis(name="h", condition="1 == 1")],
         factorials=[
             FactorialCrossing(
                 rows={"A": "col('x1') == 'A'", "B": "col('x1') == 'B'"},
@@ -516,7 +514,7 @@ def test_burden_ranking_excess_share_and_cumulative_ordering() -> None:
         target="target",
         prediction="prediction",
         prediction_expr="1",
-        hypotheses=[Hypothesis(name="all", condition="1 == 1")],
+        regimes=[Hypothesis(name="all", condition="1 == 1")],
         factorials=[
             FactorialCrossing(
                 rows={"a": "col('row') == 'a'", "b": "col('row') == 'b'"},
@@ -552,7 +550,7 @@ def test_burden_tie_breaks_by_declaration_order() -> None:
         target="target",
         prediction="prediction",
         prediction_expr="1",
-        hypotheses=[Hypothesis(name="all", condition="1 == 1")],
+        regimes=[Hypothesis(name="all", condition="1 == 1")],
         factorials=[
             FactorialCrossing(
                 rows={"r1": "col('row') == 'r1'", "r2": "col('row') == 'r2'"},
@@ -578,7 +576,7 @@ def test_burden_guards_overlap_gap_and_baseline_sanity() -> None:
         target="target",
         prediction="prediction",
         prediction_expr="1",
-        hypotheses=[Hypothesis(name="all", condition="1 == 1")],
+        regimes=[Hypothesis(name="all", condition="1 == 1")],
         factorials=[
             FactorialCrossing(
                 rows={"up": "col('row') == 'up'", "also_up": "col('row') == 'up'"},
@@ -606,7 +604,7 @@ def test_burden_raises_on_empty_baseline_cell() -> None:
         target="target",
         prediction="prediction",
         prediction_expr="1",
-        hypotheses=[Hypothesis(name="all", condition="1 == 1")],
+        regimes=[Hypothesis(name="all", condition="1 == 1")],
         factorials=[
             FactorialCrossing(
                 rows={"a": "col('row') == 'a'", "b": "col('row') == 'b'"},
@@ -629,7 +627,7 @@ def test_baseline_free_outputs_do_not_add_burden_fields(tmp_path: Path) -> None:
         target="target",
         prediction="prediction",
         prediction_expr="1",
-        hypotheses=[Hypothesis(name="all", condition="1 == 1")],
+        regimes=[Hypothesis(name="all", condition="1 == 1")],
         factorials=[
             FactorialCrossing(
                 rows={"a": "col('row') == 'a'"},

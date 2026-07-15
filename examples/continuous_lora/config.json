@@ -21,7 +21,7 @@
       "baseline": "col('GT BW')"
     }
   },
-  "hypotheses": {
+  "regimes": {
     "class_sf_match": "col('Class SF') == col('GT SF')",
     "class_bw within tol & sf wrong": {
       "label": "Class BW within 10% of GT BW but class SF wrong",

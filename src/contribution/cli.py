@@ -24,15 +24,15 @@ from .results import (
     FactorialMarginalResult,
     FactorialMatrixResult,
     FeatureAttribution,
-    HypothesisAssessment,
     PartitionWarning,
+    RegimeAssessment,
     RegimeSummary,
 )
 from .spec import (
     AttributionSpec,
     FactorialCrossing,
-    Hypothesis,
     PredictionFeature,
+    Regime,
 )
 
 
@@ -42,13 +42,14 @@ def _result_from_run(payload: dict[str, Any]) -> AssessmentResult:
     Lets ``contrib report`` regenerate the same accessible markdown layout that
     ``AssessmentResult.to_markdown()`` produces during ``run``.
     """
-    hypotheses: list[HypothesisAssessment] = []
-    for item in payload.get("hypotheses", []):
+    regimes_payload = payload.get("regimes", payload.get("hypotheses", []))
+    regimes: list[RegimeAssessment] = []
+    for item in regimes_payload:
         feature = FeatureAttribution(**item["feature"]) if item.get("feature") else None
         regime = RegimeSummary(**item["regime"]) if item.get("regime") else None
         risk = BinaryHypothesisResult(**item["risk"]) if item.get("risk") else None
-        hypotheses.append(
-            HypothesisAssessment(
+        regimes.append(
+            RegimeAssessment(
                 name=item["name"],
                 label=item["label"],
                 analysis=item["analysis"],
@@ -87,7 +88,7 @@ def _result_from_run(payload: dict[str, Any]) -> AssessmentResult:
         )
 
     return AssessmentResult(
-        hypotheses=hypotheses,
+        regimes=regimes,
         n_rows=payload["n_rows"],
         mean_observed_contribution=payload["mean_observed_contribution"],
         metadata=payload.get("metadata", {}),
@@ -107,28 +108,31 @@ def _load_spec(path: str | Path) -> AttributionSpec:
         payload = yaml.safe_load(raw_text)
     else:
         payload = json.loads(raw_text)
-    hypotheses_payload = payload.get("hypotheses", {})
-    if not isinstance(hypotheses_payload, dict):
-        raise ValueError("'hypotheses' must be an object mapping hypothesis names to condition strings or objects")
+    if "hypotheses" in payload:
+        raise ValueError("'hypotheses' was renamed to 'regimes'; update the config key")
 
-    hypotheses: list[Hypothesis] = []
-    for hypothesis_name, hypothesis_value in hypotheses_payload.items():
-        if isinstance(hypothesis_value, str):
-            hypotheses.append(Hypothesis(name=hypothesis_name, condition=hypothesis_value))
+    regimes_payload = payload.get("regimes", {})
+    if not isinstance(regimes_payload, dict):
+        raise ValueError("'regimes' must be an object mapping regime names to condition strings or objects")
+
+    regimes: list[Regime] = []
+    for regime_name, regime_value in regimes_payload.items():
+        if isinstance(regime_value, str):
+            regimes.append(Regime(name=regime_name, condition=regime_value))
             continue
 
-        if isinstance(hypothesis_value, dict):
-            if "condition" not in hypothesis_value:
-                raise ValueError(f"hypothesis '{hypothesis_name}' must declare a 'condition' string")
-            if "name" in hypothesis_value:
+        if isinstance(regime_value, dict):
+            if "condition" not in regime_value:
+                raise ValueError(f"regime '{regime_name}' must declare a 'condition' string")
+            if "name" in regime_value:
                 raise ValueError(
-                    f"hypothesis '{hypothesis_name}' must not redeclare 'name'; the mapping key is the name"
+                    f"regime '{regime_name}' must not redeclare 'name'; the mapping key is the name"
                 )
-            hypotheses.append(Hypothesis(name=hypothesis_name, **hypothesis_value))
+            regimes.append(Regime(name=regime_name, **regime_value))
             continue
 
         raise ValueError(
-            f"hypothesis '{hypothesis_name}' must be a condition string or an object with 'condition' and optional 'label'"
+            f"regime '{regime_name}' must be a condition string or an object with 'condition' and optional 'label'"
         )
 
     prediction_features_payload = payload.get("prediction_features", {})
@@ -261,7 +265,7 @@ def _load_spec(path: str | Path) -> AttributionSpec:
         prediction=payload["prediction"],
         prediction_expr=payload["prediction_expr"],
         prediction_features=prediction_features,
-        hypotheses=hypotheses,
+        regimes=regimes,
         factorials=factorials,
         scope=payload.get("scope", "global"),
         score_mode=payload.get("score_mode", "absolute"),
