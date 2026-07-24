@@ -272,8 +272,8 @@ class Estimator:
     def _validate_spec(self) -> None:
         if self.spec is None:
             raise ValueError("Attribution spec is required for assess()")
-        if not self.spec.regimes:
-            raise ValueError("At least one regime is required")
+        if not self.spec.regimes and not self.spec.factorials:
+            raise ValueError("At least one regime or factorial crossing is required")
         prediction_expression = compile_expression(self.spec.prediction_expr)
         formula_variables = free_variables(prediction_expression)
         declared_features = set(self.spec.prediction_features)

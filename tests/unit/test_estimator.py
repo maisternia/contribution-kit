@@ -104,7 +104,7 @@ def test_validate_spec_errors() -> None:
         est.assess()
 
     est.spec = AttributionSpec(target="1", prediction="1", prediction_expr="1", regimes=[])
-    with pytest.raises(ValueError, match="At least one regime"):
+    with pytest.raises(ValueError, match="At least one regime or factorial crossing"):
         est.assess()
 
     est.spec = AttributionSpec(
@@ -115,6 +115,39 @@ def test_validate_spec_errors() -> None:
     )
     with pytest.raises(ValueError, match="unique"):
         est.assess()
+
+
+def test_assess_factorial_only_spec_without_regime_rows() -> None:
+    rows = [
+        {"target": 1, "prediction": 1, "row": "up", "quality": "ok", "f": 0},
+        {"target": 1, "prediction": 1, "row": "up", "quality": "off", "f": 1},
+        {"target": 1, "prediction": 0, "row": "down", "quality": "ok", "f": 1},
+        {"target": 1, "prediction": 0, "row": "down", "quality": "off", "f": 1},
+    ]
+    spec = AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="f",
+        prediction_features={"f": PredictionFeature(actual="f", baseline="0")},
+        factorials=[
+            FactorialCrossing(
+                rows={"up": "col('row') == 'up'", "down": "col('row') == 'down'"},
+                columns={"ok": "col('quality') == 'ok'", "off": "col('quality') == 'off'"},
+                label="Row x Quality",
+                baseline={"rows": "up", "columns": "ok"},
+            )
+        ],
+    )
+
+    result = Estimator.from_dataframe(rows, spec).assess(exact=True)
+
+    assert len(result.factorial_matrices) == 1
+    assert len(result.contrast_results) > 0
+    assert len(result.burden_rankings) == 1
+    regime_names = {summary.name for summary in result.regime_summaries}
+    assert regime_names == {"up & ok", "up & off", "down & ok", "down & off"}
+    risk_names = {risk.test_name for risk in result.binary_results}
+    assert risk_names.issubset(regime_names)
 
 
 def test_assess_exact_and_sampled_and_regime_none_paths(tmp_path: Path) -> None:

@@ -277,6 +277,46 @@ def test_load_spec_parses_inline_factorials(tmp_path: Path) -> None:
     assert loaded.factorials[0].baseline == {"rows": "up", "columns": "ok"}
 
 
+def test_main_validate_and_run_accept_factorial_only_config(tmp_path: Path) -> None:
+    data = tmp_path / "factorial_only.csv"
+    _write_csv(
+        data,
+        [
+            {"target": "1", "prediction": "1", "f": "0", "row": "up", "quality": "ok"},
+            {"target": "1", "prediction": "1", "f": "1", "row": "up", "quality": "off"},
+            {"target": "1", "prediction": "0", "f": "1", "row": "down", "quality": "ok"},
+            {"target": "1", "prediction": "0", "f": "1", "row": "down", "quality": "off"},
+        ],
+    )
+
+    cfg = tmp_path / "factorial_only.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "target": "target",
+                "prediction": "prediction",
+                "prediction_expr": "f",
+                "prediction_features": {"f": {"actual": "f", "baseline": "0"}},
+                "factorials": [
+                    {
+                        "rows": {"up": "col('row') == 'up'", "down": "col('row') == 'down'"},
+                        "columns": {"ok": "col('quality') == 'ok'", "off": "col('quality') == 'off'"},
+                        "label": "Row x Quality",
+                        "baseline": {"rows": "up", "columns": "ok"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert cli.main(["validate", "--config", str(cfg), "--input", str(data)]) == 0
+
+    out_dir = tmp_path / "factorial_only_out"
+    assert cli.main(["run", "--config", str(cfg), "--input", str(data), "--out", str(out_dir)]) == 0
+    assert (out_dir / "run.json").exists()
+
+
 def test_load_spec_factorial_baseline_unknown_level_error(tmp_path: Path) -> None:
     cfg = tmp_path / "baseline_bad_level.json"
     cfg.write_text(
