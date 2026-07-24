@@ -496,7 +496,7 @@ class AssessmentResult:
                 else:
                     lines.append("")
                     lines.append(
-                        "| Rank | Cell | n | Mismatch rate | Baseline rate | Recoverable mismatches | Share of all mismatches | Risk difference (95% CI) | Accuracy if eliminated |"
+                        "| Rank | Cell | n | Mismatch rate | Baseline rate | Recoverable mismatches | Share of all mismatches | Risk difference (95% CI) | Accuracy if eliminated (accumulating) |"
                     )
                     lines.append("|---:|---|---:|---:|---:|---:|---:|---:|---:|")
                     for entry in ranking.entries:

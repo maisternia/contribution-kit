@@ -18,7 +18,7 @@ writes `contribution.csv`, `run.json`, and `report.md`. The centerpiece of the r
 
 **BW quality × scaling direction** — baseline cell: `class_ok & measured_ok`
 
-| Rank | Cell | n | Mismatch rate | Baseline rate | Recoverable mismatches | Share of all mismatches | Risk difference (95% CI) | Accuracy if eliminated |
+| Rank | Cell | n | Mismatch rate | Baseline rate | Recoverable mismatches | Share of all mismatches | Risk difference (95% CI) | Accuracy if eliminated (accumulating) |
 |---:|---|---:|---:|---:|---:|---:|---:|---:|
 | 1 | class_ok & measured_off | 170 | 97.06% | 0.20% | 164.66 | 52.61% | 0.969 (0.931 to 0.985) | 98.88% |
 | 2 | upscale & measured_ok | 464 | 17.03% | 0.20% | 78.06 | 24.94% | 0.168 (0.137 to 0.205) | 99.47% |
