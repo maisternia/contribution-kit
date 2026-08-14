@@ -1,0 +1,24 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+context: |
+  OpenSpec git behavior: Use the default branch-neutral OpenSpec flow. Do not
+  create, switch, merge, rename, or delete git branches for OpenSpec changes
+  unless the user explicitly asks for branch management.
+  Archive finalization (MANDATORY): after an archive move, commit and push the
+  archive result on the current branch:
+  - `git add -A`
+  - `git commit -m "openspec(<name>): archive change"`
+  - `git push`
+
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
