@@ -15,6 +15,7 @@ from .expr import CompiledExpression, build_row_context, compile_expression, eva
 from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis
 from .results import (
     AssessmentResult,
+    AttributionWarning,
     BurdenRankingEntry,
     BurdenRankingResult,
     ContrastResult,
@@ -28,6 +29,11 @@ from .results import (
 )
 from .spec import AttributionSpec, Regime
 from .stats import risk_difference_with_guardrail
+
+
+# Coalition scores are float comparisons against an exact-zero invariant;
+# tolerate accumulated rounding without masking a real gap.
+_ZERO_TOLERANCE = 1e-9
 
 
 def _parse_scalar(value: str) -> Any:
@@ -53,12 +59,19 @@ def _score(prediction: float, target: float, score_mode: str) -> float:
 
 @dataclass(slots=True)
 class _Feature:
-    """A compiled formula feature defined by explicit actual/baseline expressions."""
+    """A compiled formula feature defined by explicit actual/baseline expressions.
+
+    ``baseline_deps`` holds the declared feature names referenced by the
+    baseline expression. Features are ordered so that every dependency is
+    resolved before the feature referencing it.
+    """
 
     name: str
     label: str
     actual: CompiledExpression
     baseline: CompiledExpression
+    independent: bool = False
+    baseline_deps: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)
@@ -109,15 +122,40 @@ class Estimator:
         abs_totals = {name: 0.0 for name in feature_names}
         observed_contributions: list[float] = []
         observed_contribution_total = 0.0
-        for row in self.rows:
+        full_coalition = frozenset(feature_names)
+        baseline_target_gap_rows = 0
+        baseline_target_gap_example: int | None = None
+        # Only a baseline that references siblings can absorb the formula; a
+        # plain column baseline scoring zero everywhere is small-sample luck.
+        absorbing_features = {feature.name: bool(feature.baseline_deps) for feature in features}
+        for row_index, row in enumerate(self.rows):
             if feature_names:
-                row_result = self._assess_row(row, features, exact=exact, max_exact_features=max_exact_features, n_samples=n_samples, seed=seed)
+                score = self._row_scorer(row, features)
+                row_result = self._assess_row(score, feature_names, exact=exact, max_exact_features=max_exact_features, n_samples=n_samples, seed=seed)
                 for name, value in row_result.items():
                     totals[name] += value
                     abs_totals[name] += abs(value)
+                # The empty coalition must reproduce `target`; otherwise the
+                # per-feature contributions do not sum to the observed one.
+                if abs(score(frozenset())) > _ZERO_TOLERANCE:
+                    baseline_target_gap_rows += 1
+                    if baseline_target_gap_example is None:
+                        baseline_target_gap_example = row_index
+                # A baseline that inverts the formula leaves every coalition
+                # excluding its own feature scoring zero.
+                for name, still_absorbing in absorbing_features.items():
+                    if still_absorbing and abs(score(full_coalition - {name})) > _ZERO_TOLERANCE:
+                        absorbing_features[name] = False
             observed_contribution = self._observed_contribution(row, features)
             observed_contributions.append(observed_contribution)
             observed_contribution_total += observed_contribution
+
+        attribution_warnings = self._attribution_warnings(
+            features=features,
+            baseline_target_gap_rows=baseline_target_gap_rows,
+            baseline_target_gap_example=baseline_target_gap_example,
+            absorbing_features=absorbing_features,
+        )
 
         n_rows = len(self.rows)
         feature_attr: dict[str, FeatureAttribution] = {}
@@ -167,6 +205,7 @@ class Estimator:
             contrast_results=contrast_results,
             partition_warnings=partition_warnings,
             burden_rankings=burden_rankings,
+            attribution_warnings=attribution_warnings,
             metadata={
                 "exact": exact,
                 "n_samples": n_samples,
@@ -179,19 +218,182 @@ class Estimator:
             },
         )
 
+    def _attribution_warnings(
+        self,
+        *,
+        features: Sequence[_Feature],
+        baseline_target_gap_rows: int,
+        baseline_target_gap_example: int | None,
+        absorbing_features: Mapping[str, bool],
+    ) -> list[AttributionWarning]:
+        warnings_out: list[AttributionWarning] = []
+
+        column_names = self._column_names()
+        shadowed = sorted({
+            dependency
+            for feature in features
+            for dependency in feature.baseline_deps
+            if dependency in column_names
+        })
+        if shadowed:
+            message = (
+                f"baseline reference(s) {', '.join(shadowed)} name both a prediction feature and "
+                "an input column; the feature binding wins"
+            )
+            warnings.warn(message, stacklevel=3)
+            warnings_out.append(AttributionWarning(kind="feature_shadows_column", message=message))
+
+        if baseline_target_gap_rows:
+            message = (
+                f"baselines do not reproduce the target on {baseline_target_gap_rows} row(s) "
+                f"(first at index {baseline_target_gap_example}); per-feature contributions do "
+                "not sum to the observed contribution, so the reported shares are unsound"
+            )
+            warnings.warn(message, stacklevel=3)
+            warnings_out.append(AttributionWarning(kind="baseline_target_mismatch", message=message))
+
+        for feature in features:
+            if not absorbing_features.get(feature.name):
+                continue
+            others = [other.name for other in features if other.name != feature.name]
+            if not others:
+                continue
+            message = (
+                f"every coalition excluding '{feature.name}' scores zero on all rows, so its "
+                f"baseline absorbs the prediction formula; {', '.join(others)} can only be "
+                f"attributed in interaction with '{feature.name}'. Check whether its baseline "
+                "references more features than it conditions on."
+            )
+            warnings.warn(message, stacklevel=3)
+            warnings_out.append(AttributionWarning(kind="formula_absorption", message=message))
+
+        return warnings_out
+
+    def _column_names(self) -> set[str]:
+        names: set[str] = set()
+        for row in self.rows:
+            names.update(row)
+        return names
+
+    def _classify_variables(
+        self,
+        expression: CompiledExpression,
+        feature_names: Sequence[str],
+        column_names: set[str],
+        owner: str,
+    ) -> tuple[set[str], set[str]]:
+        """Split free variables into declared-feature references and unknown names.
+
+        A bare identifier is a legal column reference in the DSL, so a name is
+        only a feature reference when it matches a *different* declared
+        feature. A feature commonly carries the name of the column it reads
+        (``PredictionFeature(actual="x", ...)`` for a feature named ``x``), so
+        the owner's own name resolves to a column whenever one exists; a
+        feature can never usefully reference itself. Among other names,
+        features win over columns, matching how ``prediction_expr`` bindings
+        already shadow row values.
+        """
+        variables = free_variables(expression)
+        references = {
+            name
+            for name in variables
+            if name in feature_names and not (name == owner and name in column_names)
+        }
+        unknown = {name for name in variables if name not in references and name not in column_names}
+        return references, unknown
+
     def _formula_features(self) -> list[_Feature]:
         assert self.spec is not None
-        features: list[_Feature] = []
+        feature_names = list(self.spec.prediction_features)
+        column_names = self._column_names()
+
+        features: dict[str, _Feature] = {}
         for feature_name, feature_spec in self.spec.prediction_features.items():
-            features.append(
-                _Feature(
-                    name=feature_name,
-                    label=feature_spec.label or feature_name,
-                    actual=compile_expression(feature_spec.actual),
-                    baseline=compile_expression(feature_spec.baseline),
+            actual = compile_expression(feature_spec.actual)
+            baseline = compile_expression(feature_spec.baseline)
+
+            actual_refs, actual_unknown = self._classify_variables(actual, feature_names, column_names, feature_name)
+            if actual_refs:
+                raise ValueError(
+                    f"prediction feature '{feature_name}' actual expression references "
+                    f"prediction feature(s): {', '.join(sorted(actual_refs))}. An actual "
+                    "expression may reference only input columns."
                 )
+            if actual_unknown:
+                raise ValueError(
+                    f"prediction feature '{feature_name}' actual expression references unknown "
+                    f"name(s): {', '.join(sorted(actual_unknown))}"
+                )
+
+            baseline_refs, baseline_unknown = self._classify_variables(baseline, feature_names, column_names, feature_name)
+            if baseline_unknown:
+                raise ValueError(
+                    f"prediction feature '{feature_name}' baseline expression references unknown "
+                    f"name(s): {', '.join(sorted(baseline_unknown))}"
+                )
+
+            features[feature_name] = _Feature(
+                name=feature_name,
+                label=feature_spec.label or feature_name,
+                actual=actual,
+                baseline=baseline,
+                independent=feature_spec.independent,
+                baseline_deps=tuple(name for name in feature_names if name in baseline_refs),
             )
-        return features
+
+        self._validate_independence(features)
+        return self._ordered_features(features)
+
+    def _validate_independence(self, features: Mapping[str, _Feature]) -> None:
+        """Enforce that an independent feature sits in no dependency edge.
+
+        The flag name does not carry direction, so each error states which
+        direction was violated and names both features.
+        """
+        for feature in features.values():
+            if feature.independent and feature.baseline_deps:
+                raise ValueError(
+                    f"prediction feature '{feature.name}' is declared independent but its own "
+                    f"baseline references prediction feature(s): "
+                    f"{', '.join(feature.baseline_deps)}. An independent feature may not depend "
+                    "on another feature."
+                )
+            for dependency in feature.baseline_deps:
+                if features[dependency].independent:
+                    raise ValueError(
+                        f"prediction feature '{feature.name}' baseline references "
+                        f"'{dependency}', which is declared independent and may not be "
+                        "referenced by another feature's baseline."
+                    )
+
+    def _ordered_features(self, features: Mapping[str, _Feature]) -> list[_Feature]:
+        """Return features in dependency order, rejecting cycles.
+
+        Declaration order is preserved among independent siblings so that
+        report ordering stays stable.
+        """
+        ordered: list[_Feature] = []
+        placed: set[str] = set()
+        visiting: list[str] = []
+
+        def visit(name: str) -> None:
+            if name in placed:
+                return
+            if name in visiting:
+                cycle = visiting[visiting.index(name):] + [name]
+                raise ValueError(
+                    "prediction feature baseline references form a cycle: " + " -> ".join(cycle)
+                )
+            visiting.append(name)
+            for dependency in features[name].baseline_deps:
+                visit(dependency)
+            visiting.pop()
+            placed.add(name)
+            ordered.append(features[name])
+
+        for name in features:
+            visit(name)
+        return ordered
 
     def _regime_summary(self, regime: Regime, observed_contributions: Sequence[float], observed_contribution_total: float) -> RegimeSummary:
         predicate = compile_expression(regime.condition)
@@ -758,28 +960,68 @@ class Estimator:
     def _evaluate_prediction_observed(self, row: Mapping[str, Any]) -> Any:
         return evaluate_expression(self.spec.prediction, build_row_context(row))
 
-    def _feature_values(self, row: Mapping[str, Any], features: Sequence[_Feature], *, actual: bool) -> dict[str, Any]:
+    def _actual_values(self, row: Mapping[str, Any], features: Sequence[_Feature]) -> dict[str, Any]:
+        """Evaluate every feature's actual expression once for this row.
+
+        Actual expressions may not reference sibling features, so these values
+        are the same for every coalition.
+        """
         context = build_row_context(row)
-        return {feature.name: (feature.actual if actual else feature.baseline).evaluate(context) for feature in features}
+        return {feature.name: feature.actual.evaluate(context) for feature in features}
+
+    def _resolve_coalition_values(
+        self,
+        row: Mapping[str, Any],
+        features: Sequence[_Feature],
+        subset: frozenset[str],
+        actual_values: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Resolve every feature for one coalition, walking dependency order.
+
+        A feature in the coalition takes its actual value. Otherwise its
+        baseline is evaluated against the row plus the already-resolved values
+        of the features it references, so a dependent baseline sees the
+        coalition-resolved sibling rather than the raw observed column.
+        """
+        resolved: dict[str, Any] = {}
+        for feature in features:
+            if feature.name in subset:
+                resolved[feature.name] = actual_values[feature.name]
+                continue
+            context = build_row_context(row, resolved) if feature.baseline_deps else build_row_context(row)
+            resolved[feature.name] = feature.baseline.evaluate(context)
+        return resolved
 
     def _evaluate_prediction_formula(self, row: Mapping[str, Any], values: Mapping[str, Any]) -> float:
         return float(evaluate_expression(self.spec.prediction_expr, build_row_context(row, values)))
 
-    def _coalition_score(self, row: Mapping[str, Any], features: Sequence[_Feature], subset: frozenset[str]) -> float:
-        actual = self._feature_values(row, features, actual=True)
-        baseline = self._feature_values(row, features, actual=False)
-        mixed = {name: actual[name] if name in subset else baseline[name] for name in actual}
-        prediction = self._evaluate_prediction_formula(row, mixed)
+    def _row_scorer(self, row: Mapping[str, Any], features: Sequence[_Feature]):
+        """Build a memoized coalition scorer for one row.
+
+        The exact Shapley pass visits most coalitions many times, so caching by
+        coalition keeps dependency-ordered resolution off the hot path.
+        """
+        actual_values = self._actual_values(row, features)
         target = float(self._evaluate_target(row))
-        return _score(prediction, target, self.spec.score_mode)
+        cache: dict[frozenset[str], float] = {}
 
-    def _assess_row(self, row: Mapping[str, Any], features: Sequence[_Feature], *, exact: bool, max_exact_features: int, n_samples: int, seed: int) -> dict[str, float]:
-        names = [feature.name for feature in features]
+        def score(subset: frozenset[str]) -> float:
+            cached = cache.get(subset)
+            if cached is None:
+                values = self._resolve_coalition_values(row, features, subset, actual_values)
+                prediction = self._evaluate_prediction_formula(row, values)
+                cached = _score(prediction, target, self.spec.score_mode)
+                cache[subset] = cached
+            return cached
+
+        return score
+
+    def _assess_row(self, score, names: list[str], *, exact: bool, max_exact_features: int, n_samples: int, seed: int) -> dict[str, float]:
         if exact and len(names) <= max_exact_features:
-            return self._exact_shapley(row, features, names)
-        return self._sample_shapley(row, features, names, n_samples=n_samples, seed=seed)
+            return self._exact_shapley(score, names)
+        return self._sample_shapley(score, names, n_samples=n_samples, seed=seed)
 
-    def _exact_shapley(self, row: Mapping[str, Any], features: Sequence[_Feature], names: list[str]) -> dict[str, float]:
+    def _exact_shapley(self, score, names: list[str]) -> dict[str, float]:
         # Closed-form Shapley value computation @cite: Shapley, 1953
         # For each feature, sum weighted marginal contributions over all
         # coalitions — exact for small feature sets @cite: Lundberg & Lee, 2017
@@ -793,10 +1035,10 @@ class Estimator:
                 weight = math.factorial(subset_size) * math.factorial(n - subset_size - 1) / factorial_n
                 for subset in itertools.combinations(others, subset_size):
                     coalition = frozenset(subset)
-                    values[name] += weight * (self._coalition_score(row, features, coalition | {name}) - self._coalition_score(row, features, coalition))
+                    values[name] += weight * (score(coalition | {name}) - score(coalition))
         return values
 
-    def _sample_shapley(self, row: Mapping[str, Any], features: Sequence[_Feature], names: list[str], *, n_samples: int, seed: int) -> dict[str, float]:
+    def _sample_shapley(self, score, names: list[str], *, n_samples: int, seed: int) -> dict[str, float]:
         # Monte-Carlo permutation sampling approximation of Shapley values
         # @cite: Lundberg & Lee, 2017 — used when the feature count exceeds
         # max_exact_features.
@@ -806,10 +1048,10 @@ class Estimator:
             order = names[:]
             rng.shuffle(order)
             coalition: set[str] = set()
-            previous = self._coalition_score(row, features, frozenset())
+            previous = score(frozenset())
             for name in order:
                 coalition.add(name)
-                current = self._coalition_score(row, features, frozenset(coalition))
+                current = score(frozenset(coalition))
                 values[name] += current - previous
                 previous = current
         scale = 1.0 / max(1, n_samples)

@@ -763,3 +763,65 @@ def test_main_validate_accepts_mixed_prediction_feature_forms(tmp_path: Path) ->
     )
 
     assert cli.main(["validate", "--config", str(cfg), "--input", str(data)]) == 0
+
+
+# --- Dependent prediction-feature baselines -------------------------------
+
+
+def _feature_config(tmp_path: Path, features: dict) -> Path:
+    path = tmp_path / "features.json"
+    path.write_text(
+        json.dumps(
+            {
+                "target": "col('GT SF')",
+                "prediction": "col('Measured SF')",
+                "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
+                "prediction_features": features,
+                "regimes": {"all": "1 == 1"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+_PLAIN_FEATURES = {
+    "class_sf": {"actual": "col('Class SF')", "baseline": "col('GT SF')"},
+    "class_bw": {"actual": "col('Class BW')", "baseline": "col('GT BW')"},
+    "measured_bw": {"actual": "col('Measured BW')", "baseline": "col('GT BW')"},
+}
+
+
+def test_load_spec_accepts_independent_flag(tmp_path: Path) -> None:
+    features = json.loads(json.dumps(_PLAIN_FEATURES))
+    features["measured_bw"]["independent"] = True
+    loaded = cli._load_spec(_feature_config(tmp_path, features))
+    assert loaded.prediction_features["measured_bw"].independent is True
+    assert loaded.prediction_features["class_bw"].independent is False
+
+
+def test_load_spec_rejects_non_boolean_independent(tmp_path: Path) -> None:
+    features = json.loads(json.dumps(_PLAIN_FEATURES))
+    features["measured_bw"]["independent"] = "yes"
+    with pytest.raises(ValueError, match="'independent' must be a boolean"):
+        cli._load_spec(_feature_config(tmp_path, features))
+
+
+def test_load_spec_shorthand_right_hand_side_may_reference_a_sibling(tmp_path: Path) -> None:
+    features = json.loads(json.dumps(_PLAIN_FEATURES))
+    features["class_sf"] = "col('Class SF') == col('GT SF') - round(2 * log2(col('GT BW') / class_bw))"
+    loaded = cli._load_spec(_feature_config(tmp_path, features))
+    feature = loaded.prediction_features["class_sf"]
+    assert feature.actual == "col('Class SF')"
+    assert "class_bw" in feature.baseline
+
+
+def test_load_spec_shorthand_cannot_declare_independent(tmp_path: Path) -> None:
+    features = json.loads(json.dumps(_PLAIN_FEATURES))
+    features["measured_bw"] = {
+        "actual": "col('Measured BW')",
+        "baseline": "col('GT BW')",
+        "independant": True,  # misspelled key stays an unknown-key error
+    }
+    with pytest.raises(ValueError, match="unknown key"):
+        cli._load_spec(_feature_config(tmp_path, features))

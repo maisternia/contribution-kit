@@ -115,6 +115,20 @@ class PartitionWarning:
 
 
 @dataclass(slots=True)
+class AttributionWarning:
+    """A diagnostic about the soundness of the Shapley decomposition itself.
+
+    ``kind`` is a stable machine-readable tag; ``message`` is the rendered
+    explanation. Unlike a validation error these do not stop an assessment,
+    because the affected numbers are still computable -- they are just not
+    safe to read as contribution shares.
+    """
+
+    kind: str
+    message: str
+
+
+@dataclass(slots=True)
 class FactorialCellResult:
     name: str
     row_level: str
@@ -206,6 +220,7 @@ class AssessmentResult:
     contrast_results: list[ContrastResult] = field(default_factory=list)
     partition_warnings: list[PartitionWarning] = field(default_factory=list)
     burden_rankings: list[BurdenRankingResult] = field(default_factory=list)
+    attribution_warnings: list[AttributionWarning] = field(default_factory=list)
 
     @property
     def mean_observed_error(self) -> float:
@@ -397,6 +412,18 @@ class AssessmentResult:
                     f"(risk ratio {top_risk.risk_ratio:.2f})."
                 )
 
+        if self.attribution_warnings:
+            lines.append("")
+            lines.append("## Attribution Warnings")
+            lines.append("")
+            lines.append(
+                "The Shapley decomposition below rests on assumptions this run could not "
+                "confirm. Read the feature contributions with the caveats noted here."
+            )
+            lines.append("")
+            for warning in self.attribution_warnings:
+                lines.append(f"- **{warning.kind}** — {warning.message}")
+
         if self.partition_warnings:
             lines.append("")
             lines.append("## Partition Warnings")
@@ -565,6 +592,8 @@ class AssessmentResult:
             payload["contrast_results"] = [asdict(row) for row in self.contrast_results]
         if self.partition_warnings:
             payload["partition_warnings"] = [asdict(row) for row in self.partition_warnings]
+        if self.attribution_warnings:
+            payload["attribution_warnings"] = [asdict(row) for row in self.attribution_warnings]
         if self.burden_rankings:
             payload["burden_rankings"] = [asdict(row) for row in self.burden_rankings]
         with target.open("w", encoding="utf-8") as handle:

@@ -677,3 +677,230 @@ def test_baseline_free_outputs_do_not_add_burden_fields(tmp_path: Path) -> None:
     payload = json.loads(out.read_text(encoding="utf-8"))
     assert "burden_rankings" not in payload
     assert "## Attributable burden" not in result.to_markdown()
+
+
+# --- Dependent prediction-feature baselines -------------------------------
+
+
+_GEOMETRIC_REGRESSION_FORMULA = "class_sf + round(2 * log2(measured_bw / class_bw))"
+
+
+def _dependent_rows() -> list[dict[str, object]]:
+    """The manuscript's geometric-regression worked example.
+
+    True signal is (812 kHz, SF 8). Each row is one nominal class the detector
+    could assign, with the bandwidth measured perfectly. Applying the formula
+    gives SF 7, 8, 8 -- so only the first row is actually wrong, even though it
+    is the only one whose class SF equals the ground-truth SF.
+    """
+    return [
+        {"GT SF": 8, "GT BW": 812.0, "Class SF": 8, "Class BW": 1000.0, "Measured BW": 812.0, "Measured SF": 7},
+        {"GT SF": 8, "GT BW": 812.0, "Class SF": 9, "Class BW": 1000.0, "Measured BW": 812.0, "Measured SF": 8},
+        {"GT SF": 8, "GT BW": 812.0, "Class SF": 7, "Class BW": 500.0, "Measured BW": 812.0, "Measured SF": 8},
+    ]
+
+
+def _dependent_rows_with_measurement_error() -> list[dict[str, object]]:
+    """Manuscript rows plus one where the bandwidth measurement itself is off.
+
+    Absorption detection compares coalitions, so it needs at least one row
+    where the features other than the dependent one actually deviate from
+    their baselines; every manuscript row measures bandwidth perfectly.
+    """
+    return _dependent_rows() + [
+        {"GT SF": 8, "GT BW": 812.0, "Class SF": 8, "Class BW": 812.0, "Measured BW": 1150.0, "Measured SF": 9},
+    ]
+
+
+def _dependent_spec(class_sf_baseline: str, *, independent_measured: bool = False) -> AttributionSpec:
+    return AttributionSpec(
+        target="col('GT SF')",
+        prediction="col('Measured SF')",
+        prediction_expr=_GEOMETRIC_REGRESSION_FORMULA,
+        prediction_features={
+            "class_sf": PredictionFeature(actual="col('Class SF')", baseline=class_sf_baseline),
+            "class_bw": PredictionFeature(actual="col('Class BW')", baseline="col('GT BW')"),
+            "measured_bw": PredictionFeature(
+                actual="col('Measured BW')",
+                baseline="col('GT BW')",
+                independent=independent_measured,
+            ),
+        },
+        regimes=[Hypothesis(name="all", condition="1 == 1")],
+    )
+
+
+_DEPENDENT_BASELINE = "col('GT SF') - round(2 * log2(col('GT BW') / class_bw))"
+_ABSORBING_BASELINE = "col('GT SF') - round(2 * log2(measured_bw / class_bw))"
+
+
+def _coalition_scores(spec: AttributionSpec, rows: list[dict[str, object]]) -> list[dict[frozenset, float]]:
+    estimator = Estimator.from_dataframe(rows, spec)
+    estimator._validate_spec()
+    features = estimator._formula_features()
+    names = [feature.name for feature in features]
+    scores = []
+    for row in estimator.rows:
+        score = estimator._row_scorer(row, features)
+        scores.append(
+            {
+                frozenset(): score(frozenset()),
+                frozenset({"class_bw"}): score(frozenset({"class_bw"})),
+                frozenset({"measured_bw"}): score(frozenset({"measured_bw"})),
+                frozenset(names): score(frozenset(names)),
+            }
+        )
+    return scores
+
+
+def test_dependent_baseline_scores_the_manuscript_example() -> None:
+    """Only the (1000, 8) row is a real class-SF error; the other two are correct."""
+    rows = _dependent_rows()
+    estimator = Estimator.from_dataframe(rows, _dependent_spec(_DEPENDENT_BASELINE))
+    estimator._validate_spec()
+    features = estimator._formula_features()
+
+    ideals = []
+    for row in estimator.rows:
+        values = estimator._resolve_coalition_values(
+            row, features, frozenset({"class_bw"}), estimator._actual_values(row, features)
+        )
+        ideals.append(values["class_sf"])
+
+    assert ideals == [9, 9, 7]
+    assert [row["Class SF"] for row in rows] == [8, 9, 7]
+    # Row 0 deviates from its ideal; rows 1 and 2 match theirs.
+    assert [row["Class SF"] != ideal for row, ideal in zip(rows, ideals)] == [True, False, False]
+
+
+def test_dependent_baseline_keeps_empty_and_compensated_coalitions_at_zero() -> None:
+    scores = _coalition_scores(_dependent_spec(_DEPENDENT_BASELINE), _dependent_rows())
+    for row_scores in scores:
+        assert row_scores[frozenset()] == 0.0
+        # A scaled class assignment is fully compensated by the formula.
+        assert row_scores[frozenset({"class_bw"})] == 0.0
+
+
+def test_sibling_free_baseline_blames_class_sf_on_the_correct_rows() -> None:
+    """The plain `col('GT SF')` baseline inverts the manuscript's verdicts."""
+    rows = _dependent_rows()
+    verdicts = [row["Class SF"] != row["GT SF"] for row in rows]
+    assert verdicts == [False, True, True]
+
+
+def test_baseline_reference_resolves_to_actual_inside_the_coalition() -> None:
+    rows = _dependent_rows()
+    estimator = Estimator.from_dataframe(rows, _dependent_spec(_DEPENDENT_BASELINE))
+    estimator._validate_spec()
+    features = estimator._formula_features()
+    row = estimator.rows[2]  # Class BW 500 vs GT BW 812
+    actual_values = estimator._actual_values(row, features)
+
+    inside = estimator._resolve_coalition_values(row, features, frozenset({"class_bw"}), actual_values)
+    outside = estimator._resolve_coalition_values(row, features, frozenset(), actual_values)
+
+    # class_bw actual (500) implies ideal class SF 7; class_bw baseline (812) implies 8.
+    assert inside["class_sf"] == 7
+    assert outside["class_sf"] == 8
+
+
+def test_features_are_ordered_so_dependencies_resolve_first() -> None:
+    estimator = Estimator.from_dataframe(_dependent_rows(), _dependent_spec(_DEPENDENT_BASELINE))
+    estimator._validate_spec()
+    features = estimator._formula_features()
+    names = [feature.name for feature in features]
+    assert names.index("class_bw") < names.index("class_sf")
+    by_name = {feature.name: feature for feature in features}
+    assert by_name["class_sf"].baseline_deps == ("class_bw",)
+    assert by_name["class_bw"].baseline_deps == ()
+
+
+def test_column_references_do_not_create_dependency_edges() -> None:
+    estimator = Estimator.from_dataframe(_dependent_rows(), _dependent_spec("col('GT SF')"))
+    estimator._validate_spec()
+    by_name = {feature.name: feature for feature in estimator._formula_features()}
+    assert all(feature.baseline_deps == () for feature in by_name.values())
+
+
+def test_actual_expression_may_not_reference_a_sibling_feature() -> None:
+    spec = _dependent_spec("col('GT SF')")
+    spec.prediction_features["class_sf"] = PredictionFeature(actual="class_bw + 1", baseline="col('GT SF')")
+    with pytest.raises(ValueError, match="actual expression references prediction feature"):
+        Estimator.from_dataframe(_dependent_rows(), spec).assess()
+
+
+def test_unknown_free_variable_is_rejected() -> None:
+    with pytest.raises(ValueError, match="unknown name"):
+        Estimator.from_dataframe(_dependent_rows(), _dependent_spec("nominal_bw")).assess()
+
+
+def test_cyclic_baseline_references_are_rejected() -> None:
+    spec = _dependent_spec(_DEPENDENT_BASELINE)
+    spec.prediction_features["class_bw"] = PredictionFeature(actual="col('Class BW')", baseline="class_sf")
+    with pytest.raises(ValueError, match="cycle"):
+        Estimator.from_dataframe(_dependent_rows(), spec).assess()
+
+
+def test_feature_named_after_its_column_is_not_a_self_reference() -> None:
+    """`PredictionFeature(actual="x", ...)` for a feature named `x` reads the column."""
+    rows = [{"x": 2.0, "y": 1.0, "target": 1.0, "prediction": 2.0}]
+    spec = AttributionSpec(
+        target="col('target')",
+        prediction="col('prediction')",
+        prediction_expr="x",
+        prediction_features={"x": PredictionFeature(actual="x", baseline="y")},
+        regimes=[Hypothesis(name="all", condition="1 == 1")],
+    )
+    estimator = Estimator.from_dataframe(rows, spec)
+    estimator._validate_spec()
+    assert estimator._formula_features()[0].baseline_deps == ()
+
+
+def test_independent_feature_may_not_be_referenced() -> None:
+    spec = _dependent_spec(_ABSORBING_BASELINE, independent_measured=True)
+    with pytest.raises(ValueError, match="declared independent and may not be referenced"):
+        Estimator.from_dataframe(_dependent_rows(), spec).assess()
+
+
+def test_independent_feature_may_not_depend_on_others() -> None:
+    spec = _dependent_spec("col('GT SF')")
+    spec.prediction_features["measured_bw"] = PredictionFeature(
+        actual="col('Measured BW')", baseline="class_bw", independent=True
+    )
+    with pytest.raises(ValueError, match="independent but its own baseline references"):
+        Estimator.from_dataframe(_dependent_rows(), spec).assess()
+
+
+def test_independent_feature_allows_an_unrelated_dependency() -> None:
+    spec = _dependent_spec(_DEPENDENT_BASELINE, independent_measured=True)
+    result = Estimator.from_dataframe(_dependent_rows_with_measurement_error(), spec).assess()
+    assert [warning.kind for warning in result.attribution_warnings] == []
+
+
+def test_over_referenced_baseline_warns_that_it_absorbs_the_formula() -> None:
+    spec = _dependent_spec(_ABSORBING_BASELINE)
+    result = Estimator.from_dataframe(_dependent_rows_with_measurement_error(), spec).assess()
+    kinds = [warning.kind for warning in result.attribution_warnings]
+    assert kinds == ["formula_absorption"]
+    assert "class_sf" in result.attribution_warnings[0].message
+
+
+def test_correct_dependent_baseline_does_not_warn_despite_a_compensated_feature() -> None:
+    """`v({class_bw}) == 0` is the intended finding, not an absorption signal."""
+    spec = _dependent_spec(_DEPENDENT_BASELINE)
+    result = Estimator.from_dataframe(_dependent_rows_with_measurement_error(), spec).assess()
+    assert [warning.kind for warning in result.attribution_warnings] == []
+
+
+def test_baseline_pinned_to_an_observed_column_warns_that_shares_are_unsound() -> None:
+    literal = "col('GT SF') - round(2 * log2(col('GT BW') / col('Class BW')))"
+    spec = _dependent_spec(literal)
+    result = Estimator.from_dataframe(_dependent_rows_with_measurement_error(), spec).assess()
+    kinds = [warning.kind for warning in result.attribution_warnings]
+    assert "baseline_target_mismatch" in kinds
+
+
+def test_sibling_free_spec_emits_no_attribution_warnings() -> None:
+    spec = _dependent_spec("col('GT SF')")
+    result = Estimator.from_dataframe(_dependent_rows_with_measurement_error(), spec).assess()
+    assert [warning.kind for warning in result.attribution_warnings] == []

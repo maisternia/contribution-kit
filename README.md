@@ -42,6 +42,7 @@ The same report also contains the supporting analyses that explain *why* each ce
 
 - `target`, `prediction`, and `score_mode` (`"absolute"` or `"signed"`) define the modeled quantity; `prediction_expr` defines the formula that Shapley decomposition explains.
 - `prediction_features` is the only source of Shapley features: each entry pairs an explicit `actual` expression with a `baseline` expression.
+- A `baseline` may reference other declared features by name, to state a *conditional* ideal — "what this feature should have been, given what the features it depends on actually did". Each reference resolves to the referenced feature's **coalition-resolved** value: its `actual` when that feature is in the coalition being scored, its own baseline otherwise. `actual` expressions may reference only input columns. See [Dependent baselines](#dependent-baselines).
 - Every entry in `regimes` declares a regime: the rows matching its boolean `condition` form a subset whose observed-contribution share and mismatch risk (versus the rest, using `prediction != target`) are reported. Equality conditions are legal and analyzed only as regimes.
 - `factorials` declares two-axis crossings; every `(row level, column level)` cell becomes a regime automatically. A crossing that also names a `baseline` cell gets the attributable burden ranking.
 - All expressions use a safe DSL — `col('Column Name')`, arithmetic, comparisons, `and`/`or`/`not`, ternary `a if cond else b`, and the functions `abs`, `bool`, `ceil`, `floor`, `float`, `int`, `log2`, `max`, `min`, `round`, `str` — with no arbitrary code execution.
@@ -53,6 +54,33 @@ Validation rules:
 - Every free variable in `prediction_expr` must have a matching `prediction_features` entry, and every declared feature must be used by `prediction_expr`.
 - Prediction feature names must not collide with regime names.
 - The `actual == baseline` string shorthand is accepted only inside `prediction_features` (config files only); labeled features should use the explicit object form.
+- Inside a feature's expressions, its own name binds to an input column when one exists, so naming a feature after the column it reads (`"x": {"actual": "x", ...}`) stays valid. Other names bind to a declared feature first, then an input column, then fail as unknown.
+- Baseline references must form an acyclic graph, and an `actual` expression may not reference another feature.
+
+### Dependent baselines
+
+A plain `baseline` asserts what a feature should have been in isolation. When two features are two halves of one decision, that is the wrong question. In the bundled continuous-LoRa example the detector emits a single nominal `(BW, SF)` class from a scale-augmented lattice, and the prediction formula deliberately corrects the class SF using the measured bandwidth — so when the detector picks a *scaled* class, the correct `class_sf` is **not** `GT SF`:
+
+```json
+"class_sf": {
+  "actual": "col('Class SF')",
+  "baseline": "col('GT SF') - round(2 * log2(col('GT BW') / class_bw))"
+},
+"measured_bw": {
+  "actual": "col('Measured BW')",
+  "baseline": "col('GT BW')",
+  "independent": true
+}
+```
+
+`class_bw` inside that baseline is the coalition-resolved sibling, not the raw observed column. Writing `col('Class BW')` there instead pins it to the observed value in every coalition, so the empty coalition stops reproducing `target` and the reported shares stop summing to 100%.
+
+Two things to know when reading the output:
+
+- **A negative share is meaningful.** It means the feature *compensates* for others rather than contributing error. In the example `class_bw` lands at −19.76%, because the detector's coherent `(BW, SF)` pairing partially cancels its own SF offset — which is exactly what the geometric-regression correction is for.
+- **Do not over-reference.** A baseline should reference only the features whose state it conditions on, and use ground-truth columns for the rest. Had `class_sf.baseline` used `measured_bw` in place of `col('GT BW')`, it would become the algebraic inverse of `prediction_expr`, and every coalition leaving `class_sf` at baseline would score zero — burying the bandwidth-measurement error inside the baseline. The kit warns when it detects this (`formula_absorption`).
+
+`independent: true` turns that warning into a fail-fast error. It declares that a feature sits in no dependency edge in **either** direction: nothing may reference it, and its own baseline may not reference another feature. Use it for features determined independently of the rest — here, `measured_bw` comes from bounding-box geometry and cannot inform what the detector's class SF should have been. Omitting it leaves a feature referenceable.
 
 ## Install
 
@@ -80,9 +108,17 @@ spec = AttributionSpec(
     score_mode="absolute",  # interpret contributions as absolute amounts ("signed" keeps direction)
     prediction_expr="class_sf + round(2 * log2(measured_bw / class_bw))",  # formula decomposed into Shapley contributions
     prediction_features={
-        "class_sf": PredictionFeature(actual="col('Class SF')", baseline="col('GT SF')"),
+        # class_sf's baseline references class_bw, so it resolves per coalition:
+        # "the SF the detector should have emitted, given the class BW it chose".
+        "class_sf": PredictionFeature(
+            actual="col('Class SF')",
+            baseline="col('GT SF') - round(2 * log2(col('GT BW') / class_bw))",
+        ),
         "class_bw": PredictionFeature(actual="col('Class BW')", baseline="col('GT BW')"),
-        "measured_bw": PredictionFeature(actual="col('Measured BW')", baseline="col('GT BW')"),
+        # Derived from box geometry, so nothing may condition its ideal on it.
+        "measured_bw": PredictionFeature(
+            actual="col('Measured BW')", baseline="col('GT BW')", independent=True
+        ),
     },
     regimes=[  # at least one regime is required; add any ad-hoc conditions you want reported
         Regime(name="class_sf_match", condition="col('Class SF') == col('GT SF')"),
@@ -108,7 +144,7 @@ result = Estimator.from_csv("examples/continuous_lora/measurements.csv", spec=sp
 result.save("outputs/run_001")  # writes contribution.csv, run.json, report.md
 ```
 
-Ad-hoc regimes are declared through `regimes` (at least one is required). `assess()` accepts `exact=True`, `max_exact_features=12`, `n_samples=512`, and `seed=0` to control the Shapley computation. `AssessmentResult` exposes `feature_attributions`, `regime_summaries`, `binary_results`, `factorial_matrices`, `contrast_results`, and `burden_rankings`, plus `to_csv`, `to_markdown`, `to_json`, and `save`.
+Ad-hoc regimes are declared through `regimes` (at least one is required). `assess()` accepts `exact=True`, `max_exact_features=12`, `n_samples=512`, and `seed=0` to control the Shapley computation. `AssessmentResult` exposes `feature_attributions`, `regime_summaries`, `binary_results`, `factorial_matrices`, `contrast_results`, `burden_rankings`, and `attribution_warnings`, plus `to_csv`, `to_markdown`, `to_json`, and `save`.
 
 ## CLI
 
@@ -163,7 +199,7 @@ Config files are JSON or YAML with `target`, `prediction`, `prediction_expr`, re
 Config validation:
 
 - Object-valued regimes must include `condition` and must not include `name` (the mapping key provides it).
-- Feature objects must include `actual` and `baseline`; a string entry must parse to exactly one top-level `actual == baseline` equality (no label, no other operators). Unknown keys are rejected.
+- Feature objects must include `actual` and `baseline`, and may carry `label` and `independent`; a string entry must parse to exactly one top-level `actual == baseline` equality (no label, no other operators, though its right-hand side may reference sibling features). Unknown keys are rejected, so `independent` needs the object form.
 - The old list form of `regimes` is not accepted.
 
 Optional factorial regime declarations:

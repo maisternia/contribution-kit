@@ -137,9 +137,9 @@ def _load_spec(path: str | Path) -> AttributionSpec:
 
     prediction_features_payload = payload.get("prediction_features", {})
     if not isinstance(prediction_features_payload, dict):
-        raise ValueError("'prediction_features' must be an object mapping feature names to {actual, baseline, label?}")
+        raise ValueError("'prediction_features' must be an object mapping feature names to {actual, baseline, label?, independent?}")
     prediction_features: dict[str, PredictionFeature] = {}
-    allowed_feature_keys = {"actual", "baseline", "label"}
+    allowed_feature_keys = {"actual", "baseline", "label", "independent"}
     for feature_name, feature_payload in prediction_features_payload.items():
         if isinstance(feature_payload, str):
             shorthand = feature_payload.strip()
@@ -177,13 +177,18 @@ def _load_spec(path: str | Path) -> AttributionSpec:
         actual = feature_payload["actual"]
         baseline = feature_payload["baseline"]
         label = feature_payload.get("label")
+        independent = feature_payload.get("independent", False)
         if not isinstance(actual, str) or not actual.strip():
             raise ValueError(f"prediction feature '{feature_name}' key 'actual' must be a non-empty string")
         if not isinstance(baseline, str) or not baseline.strip():
             raise ValueError(f"prediction feature '{feature_name}' key 'baseline' must be a non-empty string")
         if label is not None and not isinstance(label, str):
             raise ValueError(f"prediction feature '{feature_name}' key 'label' must be a string when provided")
-        prediction_features[feature_name] = PredictionFeature(actual=actual, baseline=baseline, label=label)
+        if not isinstance(independent, bool):
+            raise ValueError(f"prediction feature '{feature_name}' key 'independent' must be a boolean when provided")
+        prediction_features[feature_name] = PredictionFeature(
+            actual=actual, baseline=baseline, label=label, independent=independent
+        )
 
     factorials_payload = payload.get("factorials", [])
     if not isinstance(factorials_payload, list):

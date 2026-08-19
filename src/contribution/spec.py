@@ -54,11 +54,31 @@ class PredictionFeature:
     also use a string shorthand whose top-level expression is exactly
     ``actual == baseline``; the CLI loader normalizes that shorthand into this
     dataclass before estimator code runs.
+
+    ``baseline`` may reference other declared feature names as free variables.
+    Each reference resolves to the coalition-resolved value of that feature:
+    its ``actual`` value when the referenced feature is in the coalition being
+    scored, and its own resolved ``baseline`` value otherwise. This lets a
+    baseline state a conditional ideal ("what this feature should have been,
+    given what the features it depends on actually did"). The reference graph
+    must be acyclic.
+
+    ``actual`` may reference only input columns, never another feature: an
+    ``actual`` that depended on a sibling would stop the full coalition from
+    reproducing the observed prediction.
+
+    ``independent`` forbids dependency edges on this feature in **both**
+    directions -- no other feature's ``baseline`` may reference it, and its own
+    ``baseline`` may not reference another feature. Use it to declare that a
+    feature is determined independently of the others, so that an
+    over-referencing baseline fails validation instead of silently absorbing
+    the prediction formula.
     """
 
     actual: str
     baseline: str
     label: str | None = None
+    independent: bool = False
 
 
 @dataclass(slots=True)
