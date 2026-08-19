@@ -7,6 +7,16 @@ import math
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
+#: Name of the coalition-score function in the DSL. It is not in
+#: ``_ALLOWED_FUNCTIONS`` because it is not a pure function of its arguments:
+#: it reads a per-row table bound into the evaluation context by the caller.
+COALITION_SCORE = "coalition_score"
+
+#: Private context key holding the bound coalition scorer. Using a key that
+#: cannot collide with a CSV header keeps an input column literally named
+#: ``coalition_score`` from being mistaken for the function.
+_COALITION_SCORE_KEY = "__coalition_score__"
+
 _ALLOWED_FUNCTIONS: dict[str, Callable[..., Any]] = {
     "abs": abs,
     "bool": bool,
@@ -56,15 +66,52 @@ def parse_feature_equality_shorthand(source: str) -> tuple[str, str] | None:
 
 def free_variables(expression: CompiledExpression) -> set[str]:
     names = {node.id for node in ast.walk(expression.tree) if isinstance(node, ast.Name)}
-    return names.difference(_ALLOWED_FUNCTIONS).difference({"col"})
+    return names.difference(_ALLOWED_FUNCTIONS).difference({"col", COALITION_SCORE})
 
 
-def build_row_context(row: Mapping[str, Any], extra: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def coalition_score_arguments(expression: CompiledExpression) -> list[tuple[str, ...]]:
+    """Return the argument tuple of every ``coalition_score`` call, in source order.
+
+    Arguments are string literals by construction (``_validate_node`` rejects
+    anything else), so every referenced coalition is known before a single row
+    is read. Callers use this both to validate player names up front and to
+    size the per-row score table.
+    """
+    return [tuple(arg.value for arg in call.args) for call in _iter_coalition_calls(expression.tree)]
+
+
+def build_row_context(
+    row: Mapping[str, Any],
+    extra: Mapping[str, Any] | None = None,
+    *,
+    coalition_score: Callable[[tuple[str, ...]], float] | None = None,
+) -> dict[str, Any]:
     context = dict(row)
     if extra:
         context.update(extra)
     context["col"] = lambda name: context[name]
+    if coalition_score is not None:
+        context[_COALITION_SCORE_KEY] = coalition_score
     return context
+
+
+def _iter_coalition_calls(node: ast.AST):
+    """Yield ``coalition_score`` call nodes depth-first in child order."""
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == COALITION_SCORE:
+        yield node
+    for child in ast.iter_child_nodes(node):
+        yield from _iter_coalition_calls(child)
+
+
+def _validate_coalition_score_call(node: ast.Call) -> None:
+    if node.keywords:
+        raise ValueError(f"{COALITION_SCORE}() takes no keyword arguments")
+    for arg in node.args:
+        if not isinstance(arg, ast.Constant) or not isinstance(arg.value, str):
+            raise ValueError(
+                f"{COALITION_SCORE}() arguments must be string literals naming players, got: "
+                f"{ast.unparse(arg)}"
+            )
 
 
 def _validate_node(node: ast.AST) -> None:
@@ -94,6 +141,9 @@ def _validate_node(node: ast.AST) -> None:
     if isinstance(node, ast.Call):
         if not isinstance(node.func, ast.Name):
             raise ValueError("Only direct function calls are allowed")
+        if node.func.id == COALITION_SCORE:
+            _validate_coalition_score_call(node)
+            return
         if node.func.id not in _ALLOWED_FUNCTIONS and node.func.id != "col":
             raise ValueError(f"Unsupported function: {node.func.id}")
         for arg in node.args:
@@ -178,6 +228,17 @@ def _eval_node(node: ast.AST, context: Mapping[str, Any]) -> Any:
     if isinstance(node, ast.Call):
         if not isinstance(node.func, ast.Name):
             raise ValueError("Only direct function calls are allowed")
+        if node.func.id == COALITION_SCORE:
+            scorer = context.get(_COALITION_SCORE_KEY)
+            if scorer is None:
+                raise ValueError(
+                    f"{COALITION_SCORE}() is not available in this expression. It reads the "
+                    "Shapley game's coalition scores, so it is available only in regime "
+                    "conditions and factorial axis level conditions of a spec that declares "
+                    "prediction_features -- not in the expressions that define the game "
+                    "(a feature's actual or baseline, prediction_expr, target, or prediction)."
+                )
+            return scorer(tuple(arg.value for arg in node.args))
         if node.func.id == "col":
             if len(node.args) != 1:
                 raise ValueError("col() requires one argument")

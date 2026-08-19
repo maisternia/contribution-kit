@@ -33,12 +33,8 @@
     "class_bw within tol & sf wrong": {
       "label": "Class BW within 10% of GT BW but class SF wrong",
       "condition": "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10 and col('Class SF') != col('GT SF')"
-    },
-    "class_unworkable": {
-      "label": "Class decision the geometric regression cannot rescue",
-      "condition": "coalition_score('class') != 0"
     }
-  },
+  },    
   "factorials": [
     {
       "label": "BW quality × scaling direction",
@@ -54,21 +50,6 @@
       "columns": {
         "measured_ok":  "abs(2 * log2(col('Measured BW') / col('GT BW'))) < 0.5",
         "measured_off": "abs(2 * log2(col('Measured BW') / col('GT BW'))) >= 0.5"
-      }
-    },
-    {
-      "label": "Class decision × BW measurement",
-      "baseline": {
-        "rows": "class_workable",
-        "columns": "bw_neutral"
-      },
-      "rows": {
-        "class_workable":   "coalition_score('class') == 0",
-        "class_unworkable": "coalition_score('class') != 0"
-      },
-      "columns": {
-        "bw_neutral": "coalition_score('measured_bw') == 0",
-        "bw_shifts":  "coalition_score('measured_bw') != 0"
       }
     }
   ]

@@ -1,0 +1,52 @@
+{
+  "baseline_cell": "class_workable & bw_neutral",
+  "ceiling_accuracy_pct": 99.59164804684491,
+  "cells": {
+    "class_unworkable & bw_neutral": {
+      "count": 81,
+      "mismatch_rate_pct": 77.77777777777779,
+      "risk_ratio": 41.05422222222223
+    },
+    "class_unworkable & bw_shifts": {
+      "count": 14,
+      "mismatch_rate_pct": 14.285714285714285,
+      "risk_ratio": 6.09232889297198
+    },
+    "class_workable & bw_neutral": {
+      "count": 12979,
+      "mismatch_rate_pct": 0.4083519531550967,
+      "risk_ratio": 0.004680341616931493
+    },
+    "class_workable & bw_shifts": {
+      "count": 203,
+      "mismatch_rate_pct": 96.05911330049261,
+      "risk_ratio": 106.43024129581698
+    }
+  },
+  "ranking": [
+    {
+      "cell": "class_workable & bw_shifts",
+      "count": 203,
+      "cumulative_accuracy_if_eliminated_pct": 99.10500147273552,
+      "mismatch_rate_pct": 96.05911330049261,
+      "rank": 1,
+      "recoverable_mismatches": 194.17104553509517
+    },
+    {
+      "cell": "class_unworkable & bw_neutral",
+      "count": 81,
+      "cumulative_accuracy_if_eliminated_pct": 99.57701499173788,
+      "mismatch_rate_pct": 77.77777777777779,
+      "rank": 2,
+      "recoverable_mismatches": 62.66923491794437
+    },
+    {
+      "cell": "class_unworkable & bw_shifts",
+      "count": 14,
+      "cumulative_accuracy_if_eliminated_pct": 99.59164804684491,
+      "mismatch_rate_pct": 14.285714285714285,
+      "rank": 3,
+      "recoverable_mismatches": 1.9428307265582863
+    }
+  ]
+}

@@ -116,3 +116,49 @@ def test_eval_unsupported_boolop_operator_raises() -> None:
     bad_bool = ast.BoolOp(op=ast.BitAnd(), values=[ast.Constant(True), ast.Constant(False)])
     with pytest.raises(ValueError, match="Unsupported expression node"):
         expr_module._eval_node(bad_bool, {})
+
+
+def test_coalition_score_requires_string_literal_arguments() -> None:
+    compile_expression("coalition_score('class') != 0")
+    with pytest.raises(ValueError, match="must be string literals"):
+        compile_expression("coalition_score(col('Player')) != 0")
+    with pytest.raises(ValueError, match="must be string literals"):
+        compile_expression("coalition_score(1) != 0")
+
+
+def test_coalition_score_rejects_keyword_arguments() -> None:
+    with pytest.raises(ValueError, match="no keyword arguments"):
+        compile_expression("coalition_score(player='class') != 0")
+
+
+def test_coalition_score_is_not_mistaken_for_a_column() -> None:
+    assert free_variables(compile_expression("coalition_score('class') != Height")) == {"Height"}
+
+
+def test_coalition_score_arguments_extracts_every_call_in_source_order() -> None:
+    from contribution.expr import coalition_score_arguments
+
+    expression = compile_expression(
+        "coalition_score('a') != 0 and coalition_score('b', 'c') == 0 or coalition_score() > 1"
+    )
+    assert coalition_score_arguments(expression) == [("a",), ("b", "c"), ()]
+    assert coalition_score_arguments(compile_expression("col('x') > 1")) == []
+
+
+def test_coalition_score_without_a_bound_scorer_explains_where_it_is_available() -> None:
+    expression = compile_expression("coalition_score('class') != 0")
+    with pytest.raises(ValueError, match="only in regime conditions and factorial axis level"):
+        expression.evaluate(build_row_context({"Height": 1}))
+
+
+def test_coalition_score_reads_the_bound_scorer() -> None:
+    context = build_row_context({"Height": 1}, coalition_score=lambda names: float(len(names)))
+    assert compile_expression("coalition_score('a', 'b')").evaluate(context) == 2.0
+    assert compile_expression("coalition_score()").evaluate(context) == 0.0
+
+
+def test_a_column_named_coalition_score_does_not_shadow_the_function() -> None:
+    """The scorer is bound under a private key, so a CSV header cannot collide."""
+    context = build_row_context({"coalition_score": 7}, coalition_score=lambda names: 42.0)
+    assert compile_expression("coalition_score('a')").evaluate(context) == 42.0
+    assert compile_expression("col('coalition_score')").evaluate(context) == 7

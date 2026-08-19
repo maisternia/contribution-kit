@@ -46,6 +46,7 @@ The same report also contains the supporting analyses that explain *why* each ce
 - Every entry in `regimes` declares a regime: the rows matching its boolean `condition` form a subset whose observed-contribution share and mismatch risk (versus the rest, using `prediction != target`) are reported. Equality conditions are legal and analyzed only as regimes.
 - `factorials` declares two-axis crossings; every `(row level, column level)` cell becomes a regime automatically. A crossing that also names a `baseline` cell gets the attributable burden ranking.
 - All expressions use a safe DSL — `col('Column Name')`, arithmetic, comparisons, `and`/`or`/`not`, ternary `a if cond else b`, and the functions `abs`, `bool`, `ceil`, `floor`, `float`, `int`, `log2`, `max`, `min`, `round`, `str` — with no arbitrary code execution.
+- Conditions may additionally call `coalition_score('<player>', ...)`, which returns the error a row would still carry if only the named players were as observed and everything else were ideal. It is available **only** in `regimes` conditions and `factorials` axis level conditions; it is rejected in `target`, `prediction`, `prediction_expr`, and any `prediction_features` expression, because those define the quantity it measures. See [Conditioning on coalition scores](#conditioning-on-coalition-scores).
 
 A condition only selects rows; severity is not weighted implicitly. To encode "how far off", declare separate bands (for example 10-20%, 20-40%, >40%).
 
@@ -140,6 +141,88 @@ are separable silently destroys per-feature signal, and unlike over-referencing
 there is **no** numeric signature for it. Only group what is genuinely one
 decision.
 
+### Conditioning on coalition scores
+
+Grouping and dependent baselines both fix how *features* are scored. Conditions
+have the same problem one level up: a condition written over raw columns asks
+about a column, and a column is often not something you can act on.
+
+`coalition_score('<player>', ...)` lets a condition ask the question the Shapley
+game already answers. It sets the named players to their observed values, leaves
+every other player at its baseline, evaluates `prediction_expr`, and scores the
+result against `target`:
+
+```json
+"regimes": {
+  "class_unworkable": {
+    "label": "Class decision the geometric regression cannot rescue",
+    "condition": "coalition_score('class') != 0"
+  }
+}
+```
+
+Arguments are string literals naming **players**, so a grouped feature is
+reachable only through its group — `coalition_score('class_sf')` is an error
+naming `class`, because a coalition holding one member of a group while its
+siblings sit at baseline is not a state the detector can produce. Names are
+checked before the first row is read, so a typo fails once with the valid
+players listed rather than once per row. Quoting also sidesteps Python's
+grammar: `class` is a reserved word, and a bare identifier could never carry it.
+
+`coalition_score()` with no arguments is the empty coalition. It must be zero on
+every row; if it is not, your baselines do not reproduce `target`, every other
+coalition score is measured from a shifted origin, and the `baseline_target_mismatch`
+warning is already telling you so.
+
+Under `score_mode: "absolute"` a coalition score is never negative, so `!= 0`
+asks only *whether* a player caused error. Under `"signed"` the sign is kept, so
+`> 0` and `< 0` split rows by the direction the player moves the estimate.
+
+**This is not a Shapley value.** `coalition_score(S)` is the characteristic
+function `v(S)` — one evaluation of the formula under one held state. A Shapley
+value is an average of *differences* of `v` across the whole coalition lattice,
+and is defined per row only as a decomposition of the observed error. Conditions
+read `v`; the attribution table reports `φ`. A cell's mismatch rate and a
+player's contribution share are separate quantities.
+
+#### Two crossings, two questions
+
+The bundled example declares both, since `factorials` is a list:
+
+```json
+{
+  "label": "BW quality × scaling direction",
+  "rows": { "class_ok": "...", "upscale": "...", "downscale": "..." },
+  "columns": { "measured_ok": "...", "measured_off": "..." }
+},
+{
+  "label": "Class decision × BW measurement",
+  "baseline": { "rows": "class_workable", "columns": "bw_neutral" },
+  "rows": {
+    "class_workable":   "coalition_score('class') == 0",
+    "class_unworkable": "coalition_score('class') != 0"
+  },
+  "columns": {
+    "bw_neutral": "coalition_score('measured_bw') == 0",
+    "bw_shifts":  "coalition_score('measured_bw') != 0"
+  }
+}
+```
+
+The first asks *which way* the detector misses — a real diagnostic question. The
+second asks *which decision to fix*, and only the second ranks actions. Its
+axes also partition by construction, so they cannot raise a partition warning.
+
+The difference shows up in the burden ranking. The direction axis scatters the
+95 rows whose class is genuinely unrecoverable across all three of its levels
+(23/42/30), so no level isolates them; its 10% tolerance is also a hand-picked
+number that disagrees with the formula's real flip point, which sits at a 41%
+bandwidth ratio. The decision crossing separates them: 203 rows at 96.06%
+mismatch where only the measurement is at fault (194.2 recoverable), 81 rows at
+77.78% where only the class is (62.7 recoverable), and 14 rows at just 14.29%
+where both are — because a bad measurement often *rescues* a bad class, the same
+cancellation that gives `class_bw` its negative share above.
+
 ## Install
 
 ```bash
@@ -179,6 +262,8 @@ spec = AttributionSpec(
     },
     regimes=[  # at least one regime is required; add any ad-hoc conditions you want reported
         Regime(name="class_sf_match", condition="col('Class SF') == col('GT SF')"),
+        # Rows the geometric regression cannot rescue, asked of the game itself.
+        Regime(name="class_unworkable", condition="coalition_score('class') != 0"),
     ],
     factorials=[
         FactorialCrossing(
@@ -193,7 +278,20 @@ spec = AttributionSpec(
                 "measured_off": "abs(2 * log2(col('Measured BW') / col('GT BW'))) >= 0.5",
             },
             baseline={"rows": "class_ok", "columns": "measured_ok"},
-        )
+        ),
+        # Which way the detector misses (above) versus which decision to fix (below).
+        FactorialCrossing(
+            label="Class decision × BW measurement",
+            rows={
+                "class_workable": "coalition_score('class') == 0",
+                "class_unworkable": "coalition_score('class') != 0",
+            },
+            columns={
+                "bw_neutral": "coalition_score('measured_bw') == 0",
+                "bw_shifts": "coalition_score('measured_bw') != 0",
+            },
+            baseline={"rows": "class_workable", "columns": "bw_neutral"},
+        ),
     ],
 )
 

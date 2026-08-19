@@ -161,3 +161,98 @@ def test_ungrouped_dependent_baseline_burden_is_unchanged(assessed_live, golden_
         for ranking in assessed_live.burden_rankings
     ]
     assert actual == golden_dependent["burden"]
+
+
+# --- Coalition-scored conditions are additive ----------------------------
+#
+# The live example now declares a second, coalition-scored crossing beside its
+# original direction crossing. Adding it must not disturb the direction
+# crossing, the feature attributions, or any regime that existed before.
+
+# A frozen copy of the bundled config as it stood before coalition scores,
+# carrying the direction crossing alone.
+DIRECTION_ONLY_CONFIG = ROOT / "tests" / "fixtures" / "continuous_lora_direction_only_config.json"
+LIVE_CONFIG = ROOT / "examples" / "continuous_lora" / "config.json"
+
+_DIRECTION_CROSSING = "BW quality"
+
+
+@pytest.fixture(scope="module")
+def assessed_direction_only():
+    return Estimator.from_csv(MEASUREMENTS, cli._load_spec(DIRECTION_ONLY_CONFIG)).assess()
+
+
+@pytest.fixture(scope="module")
+def assessed_both_crossings():
+    return Estimator.from_csv(MEASUREMENTS, cli._load_spec(LIVE_CONFIG)).assess()
+
+
+def _matrix(result, crossing: str) -> dict:
+    matrix = next(m for m in result.factorial_matrices if crossing in m.label)
+    return {
+        cell.name: (cell.count, cell.mismatch_rate_pct, cell.risk_ratio)
+        for cell in matrix.cells
+    }
+
+
+def _burden(result, crossing: str) -> list[tuple]:
+    ranking = next(r for r in result.burden_rankings if crossing in r.crossing_label)
+    return [
+        (entry.rank, entry.cell, entry.count, entry.mismatch_rate_pct, entry.recoverable_mismatches)
+        for entry in ranking.entries
+    ]
+
+
+def test_direction_crossing_is_unchanged_by_the_added_decision_crossing(
+    assessed_direction_only, assessed_both_crossings
+) -> None:
+    assert _matrix(assessed_both_crossings, _DIRECTION_CROSSING) == _matrix(
+        assessed_direction_only, _DIRECTION_CROSSING
+    )
+    assert _burden(assessed_both_crossings, _DIRECTION_CROSSING) == _burden(
+        assessed_direction_only, _DIRECTION_CROSSING
+    )
+
+
+def test_direction_only_contrasts_are_unchanged(
+    assessed_direction_only, assessed_both_crossings
+) -> None:
+    def contrasts(result):
+        return [
+            (c.factorial, c.stratum, c.level_a, c.level_b, c.risk_ratio)
+            for c in result.contrast_results
+            if _DIRECTION_CROSSING in c.factorial
+        ]
+
+    assert contrasts(assessed_both_crossings) == contrasts(assessed_direction_only)
+
+
+def test_feature_attributions_survive_the_added_crossing(
+    assessed_direction_only, assessed_both_crossings
+) -> None:
+    def features(result):
+        return {
+            item.name: item.feature.net_contribution_share_pct
+            for item in result.regimes
+            if item.analysis == "feature"
+        }
+
+    assert features(assessed_both_crossings) == features(assessed_direction_only)
+
+
+def test_pre_existing_regimes_and_cells_survive_the_added_crossing(
+    assessed_direction_only, assessed_both_crossings
+) -> None:
+    def regimes(result):
+        return {
+            item.name: (item.regime.count, item.regime.contribution_share_pct)
+            for item in result.regimes
+            if item.analysis == "regime" and item.regime is not None
+        }
+
+    before, after = regimes(assessed_direction_only), regimes(assessed_both_crossings)
+    assert all(after[name] == value for name, value in before.items())
+
+
+def test_no_partition_warning_from_either_crossing(assessed_both_crossings) -> None:
+    assert assessed_both_crossings.partition_warnings == []

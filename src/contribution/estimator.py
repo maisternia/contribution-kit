@@ -9,9 +9,17 @@ import random
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
-from .expr import CompiledExpression, build_row_context, compile_expression, evaluate_expression, free_variables
+from .expr import (
+    COALITION_SCORE,
+    CompiledExpression,
+    build_row_context,
+    coalition_score_arguments,
+    compile_expression,
+    evaluate_expression,
+    free_variables,
+)
 from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis
 from .results import (
     AssessmentResult,
@@ -128,15 +136,23 @@ class Estimator:
         self._validate_spec()
         assert self.spec is not None
 
-        generated_regimes, factorial_plans, partition_warnings = self._expand_factorials()
-        effective_regimes = [*self.spec.regimes, *generated_regimes]
-
+        # Players are built before factorials expand: axis level conditions may
+        # call coalition_score(), and expansion already evaluates them per row
+        # for partition checking.
         features = self._formula_features()
         players = self._build_players(features)
         player_names = [player.name for player in players]
         feature_player = {
             feature_name: player.name for player in players for feature_name in player.feature_names
         }
+
+        coalition_scores = self._coalition_score_table(
+            features, feature_player, self._referenced_coalitions(players)
+        )
+        binders = self._coalition_binders(coalition_scores)
+
+        generated_regimes, factorial_plans, partition_warnings = self._expand_factorials(binders)
+        effective_regimes = [*self.spec.regimes, *generated_regimes]
 
         totals = {name: 0.0 for name in player_names}
         abs_totals = {name: 0.0 for name in player_names}
@@ -219,8 +235,8 @@ class Estimator:
                     name=regime.name,
                     label=regime.label or regime.name,
                     analysis="regime",
-                    regime=self._regime_summary(regime, observed_contributions, observed_contribution_total),
-                    risk=self._regime_risk(regime, mismatch_fn, ci_method=ci_method),
+                    regime=self._regime_summary(regime, observed_contributions, observed_contribution_total, binders),
+                    risk=self._regime_risk(regime, mismatch_fn, ci_method=ci_method, binders=binders),
                 )
             )
 
@@ -366,6 +382,132 @@ class Estimator:
             )
         return players
 
+    def _condition_sources(self) -> list[tuple[str, str]]:
+        """Every expression a coalition score may legally appear in.
+
+        Returns ``(description, source)`` pairs, where the description names
+        the condition well enough for a validation error to point at it.
+        """
+        assert self.spec is not None
+        sources = [(f"regime '{regime.name}'", regime.condition) for regime in self.spec.regimes]
+        for index, crossing in enumerate(self.spec.factorials):
+            label = crossing.label or f"Factorial {index + 1}"
+            for axis, levels in (("rows", crossing.rows), ("columns", crossing.columns)):
+                for level_name, condition in levels.items():
+                    sources.append((f"factorial '{label}' {axis} level '{level_name}'", condition))
+        return sources
+
+    def _referenced_coalitions(self, players: Sequence[_Player]) -> set[frozenset[str]]:
+        """Collect and validate every coalition named by a condition.
+
+        Runs before any row is read, so a misspelled player fails once with the
+        valid names rather than once per row. Arguments name *players*: a
+        grouped feature is reachable only through its group, because a coalition
+        holding one member without its siblings is a state the modelled system
+        cannot produce.
+        """
+        player_names = [player.name for player in players]
+        valid = set(player_names)
+        member_owner = {
+            member: player.name
+            for player in players
+            if player.is_group
+            for member in player.feature_names
+        }
+
+        referenced: set[frozenset[str]] = set()
+        for description, source in self._condition_sources():
+            for arguments in coalition_score_arguments(compile_expression(source)):
+                seen: set[str] = set()
+                for name in arguments:
+                    if name in seen:
+                        raise ValueError(
+                            f"{description} names player '{name}' more than once in one "
+                            f"{COALITION_SCORE}() call"
+                        )
+                    seen.add(name)
+                    if name in valid:
+                        continue
+                    if name in member_owner:
+                        raise ValueError(
+                            f"{description} names '{name}' in {COALITION_SCORE}(), which is a "
+                            f"member of feature group '{member_owner[name]}'. Name the group "
+                            "instead: a coalition holding one member of a group while its "
+                            "siblings sit at baseline is not a state the modelled system can "
+                            "produce."
+                        )
+                    raise ValueError(
+                        f"{description} names unknown player '{name}' in {COALITION_SCORE}(). "
+                        f"Valid players: {', '.join(player_names)}"
+                    )
+                referenced.add(frozenset(arguments))
+        return referenced
+
+    def _coalition_score_table(
+        self,
+        features: Sequence[_Feature],
+        feature_player: Mapping[str, str],
+        coalitions: set[frozenset[str]],
+    ) -> dict[frozenset[str], list[float]]:
+        """Score each referenced coalition once per row.
+
+        Work is bounded by the number of *referenced* coalitions, not by the
+        size of the lattice, so repeating ``coalition_score('class')`` across a
+        declared regime, an axis level, and every generated cell derived from
+        it costs one resolution per row in total.
+        """
+        assert self.spec is not None
+        table: dict[frozenset[str], list[float]] = {coalition: [] for coalition in coalitions}
+        if not coalitions:
+            return table
+        for row in self.rows:
+            actual_values = self._actual_values(row, features)
+            target = float(self._evaluate_target(row))
+            for coalition in coalitions:
+                values = self._resolve_coalition_values(
+                    row, features, coalition, actual_values, feature_player
+                )
+                prediction = self._evaluate_prediction_formula(row, values)
+                table[coalition].append(_score(prediction, target, self.spec.score_mode))
+        return table
+
+    @staticmethod
+    def _coalition_binders(
+        table: Mapping[frozenset[str], Sequence[float]],
+    ) -> list[Callable[[tuple[str, ...]], float]] | None:
+        """One lookup closure per row, or ``None`` when no condition asked."""
+        if not table:
+            return None
+        n_rows = len(next(iter(table.values())))
+
+        def binder(row_index: int) -> Callable[[tuple[str, ...]], float]:
+            # Every referenced coalition is in the table by construction, so a
+            # missing key would be an internal error, not an author error.
+            return lambda names: table[frozenset(names)][row_index]
+
+        return [binder(row_index) for row_index in range(n_rows)]
+
+    @staticmethod
+    def _condition_context(
+        row_index: int,
+        row: Mapping[str, Any],
+        binders: Sequence[Callable[[tuple[str, ...]], float]] | None,
+    ) -> dict[str, Any]:
+        if binders is None:
+            return build_row_context(row)
+        return build_row_context(row, coalition_score=binders[row_index])
+
+    def _reject_coalition_score(self, description: str, source: str) -> None:
+        """Forbid coalition scores in the expressions that define the game."""
+        if not coalition_score_arguments(compile_expression(source)):
+            return
+        raise ValueError(
+            f"{description} uses {COALITION_SCORE}(), which is not permitted there: a "
+            "coalition score is computed by evaluating that very expression. "
+            f"{COALITION_SCORE}() is available only in regime conditions and factorial axis "
+            "level conditions."
+        )
+
     def _column_names(self) -> set[str]:
         names: set[str] = set()
         for row in self.rows:
@@ -406,6 +548,12 @@ class Estimator:
 
         features: dict[str, _Feature] = {}
         for feature_name, feature_spec in self.spec.prediction_features.items():
+            self._reject_coalition_score(
+                f"prediction feature '{feature_name}' actual expression", feature_spec.actual
+            )
+            self._reject_coalition_score(
+                f"prediction feature '{feature_name}' baseline expression", feature_spec.baseline
+            )
             actual = compile_expression(feature_spec.actual)
             baseline = compile_expression(feature_spec.baseline)
 
@@ -492,12 +640,18 @@ class Estimator:
             visit(name)
         return ordered
 
-    def _regime_summary(self, regime: Regime, observed_contributions: Sequence[float], observed_contribution_total: float) -> RegimeSummary:
+    def _regime_summary(
+        self,
+        regime: Regime,
+        observed_contributions: Sequence[float],
+        observed_contribution_total: float,
+        binders: Sequence[Callable[[tuple[str, ...]], float]] | None = None,
+    ) -> RegimeSummary:
         predicate = compile_expression(regime.condition)
         group_total_contribution = 0.0
         count = 0
-        for row, observed_contribution in zip(self.rows, observed_contributions):
-            if bool(predicate.evaluate(build_row_context(row))):
+        for row_index, (row, observed_contribution) in enumerate(zip(self.rows, observed_contributions)):
+            if bool(predicate.evaluate(self._condition_context(row_index, row, binders))):
                 group_total_contribution += observed_contribution
                 count += 1
         return RegimeSummary(
@@ -508,12 +662,22 @@ class Estimator:
             contribution_share_pct=(group_total_contribution / observed_contribution_total * 100.0) if observed_contribution_total else 0.0,
         )
 
-    def _regime_risk(self, regime: Regime, mismatch_fn, *, ci_method: str) -> BinaryHypothesisResult | None:
+    def _regime_risk(
+        self,
+        regime: Regime,
+        mismatch_fn,
+        *,
+        ci_method: str,
+        binders: Sequence[Callable[[tuple[str, ...]], float]] | None = None,
+    ) -> BinaryHypothesisResult | None:
         assert self.spec is not None
         if mismatch_fn is None:
             return None
         predicate = compile_expression(regime.condition)
-        matches = [bool(predicate.evaluate(build_row_context(row))) for row in self.rows]
+        matches = [
+            bool(predicate.evaluate(self._condition_context(row_index, row, binders)))
+            for row_index, row in enumerate(self.rows)
+        ]
         return self._evaluate_binary_from_masks(
             test_name=regime.name,
             group_a_label=regime.label or regime.name,
@@ -573,6 +737,11 @@ class Estimator:
             raise ValueError("Attribution spec is required for assess()")
         if not self.spec.regimes and not self.spec.factorials:
             raise ValueError("At least one regime or factorial crossing is required")
+        # The observed mismatch predicate is `prediction != target`, so guarding
+        # these three guards it too.
+        self._reject_coalition_score("target expression", self.spec.target)
+        self._reject_coalition_score("prediction expression", self.spec.prediction)
+        self._reject_coalition_score("prediction_expr", self.spec.prediction_expr)
         prediction_expression = compile_expression(self.spec.prediction_expr)
         formula_variables = free_variables(prediction_expression)
         declared_features = set(self.spec.prediction_features)
@@ -615,7 +784,10 @@ class Estimator:
                         f"crossing '{crossing_name}' baseline columns level '{baseline_column}' is not declared on columns axis"
                     )
 
-    def _expand_factorials(self) -> tuple[list[Regime], list[_FactorialPlan], list[PartitionWarning]]:
+    def _expand_factorials(
+        self,
+        binders: Sequence[Callable[[tuple[str, ...]], float]] | None = None,
+    ) -> tuple[list[Regime], list[_FactorialPlan], list[PartitionWarning]]:
         assert self.spec is not None
         if not self.spec.factorials:
             return [], [], []
@@ -635,7 +807,10 @@ class Estimator:
             row_level_matches: dict[str, list[bool]] = {}
             for level_name, condition in crossing.rows.items():
                 compiled = compile_expression(condition)
-                row_level_matches[level_name] = [bool(compiled.evaluate(build_row_context(row))) for row in self.rows]
+                row_level_matches[level_name] = [
+                    bool(compiled.evaluate(self._condition_context(row_index, row, binders)))
+                    for row_index, row in enumerate(self.rows)
+                ]
 
             # Check for partition violations in rows
             rows_overlap_count = 0
@@ -660,7 +835,10 @@ class Estimator:
             column_level_matches: dict[str, list[bool]] = {}
             for level_name, condition in crossing.columns.items():
                 compiled = compile_expression(condition)
-                column_level_matches[level_name] = [bool(compiled.evaluate(build_row_context(row))) for row in self.rows]
+                column_level_matches[level_name] = [
+                    bool(compiled.evaluate(self._condition_context(row_index, row, binders)))
+                    for row_index, row in enumerate(self.rows)
+                ]
 
             # Check for partition violations in columns
             columns_overlap_count = 0
