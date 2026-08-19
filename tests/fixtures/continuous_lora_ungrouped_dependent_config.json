@@ -6,9 +6,9 @@
   "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
   "prediction_features": {
     "class_sf": {
-      "label": "Nominal class SF (detected vs GT SF)",
+      "label": "Nominal class SF (detected vs SF implied by the class BW)",
       "actual": "col('Class SF')",
-      "baseline": "col('GT SF')"
+      "baseline": "col('GT SF') - round(2 * log2(col('GT BW') / class_bw))"
     },
     "class_bw": {
       "label": "Nominal class BW (detected vs GT BW)",
@@ -20,12 +20,6 @@
       "actual": "col('Measured BW')",
       "baseline": "col('GT BW')",
       "independent": true
-    }
-  },
-  "feature_groups": {
-    "class": {
-      "label": "Nominal class decision (BW and SF chosen together)",
-      "members": ["class_sf", "class_bw"]
     }
   },
   "regimes": {

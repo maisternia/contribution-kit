@@ -40,6 +40,21 @@ def _format_rr(value: float | None, ci_low: float | None, ci_high: float | None)
     return f"{point} ({ci_low:.2f} to {ci_high:.2f})"
 
 
+def _attribution_record(row: "FeatureAttribution") -> dict[str, Any]:
+    """Serialize one player, omitting ``members`` unless it is a group.
+
+    Keeps the payload of an ungrouped spec byte-identical to what it was
+    before feature grouping existed.
+    """
+
+    record = asdict(row)
+    if not record.get("members"):
+        record.pop("members", None)
+    else:
+        record["members"] = list(record["members"])
+    return record
+
+
 def _format_rd(value: float, ci_low: float | None, ci_high: float | None) -> str:
     if ci_low is None or ci_high is None:
         return f"{value:.3f} (n/a)"
@@ -49,12 +64,19 @@ def _format_rd(value: float, ci_low: float | None, ci_high: float | None) -> str
 
 @dataclass(slots=True)
 class FeatureAttribution:
+    """One Shapley player's contribution.
+
+    ``members`` names the grouped prediction features when this player is a
+    declared feature group, and is empty for a lone feature.
+    """
+
     name: str
     label: str
     mean_abs_shapley: float
     mean_signed_shapley: float
     total_signed_shapley: float
     net_contribution_share_pct: float
+    members: tuple[str, ...] = ()
 
     @property
     def net_error_share_pct(self) -> float:
@@ -243,9 +265,16 @@ class AssessmentResult:
     def to_csv(self, path: str | Path) -> None:
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        records = [asdict(row) for row in self.feature_attributions]
+        records = [_attribution_record(row) for row in self.feature_attributions]
+        # `members` is present only on grouped players, so the header is the
+        # union across records rather than the keys of whichever sorted first.
+        fieldnames = ["name", "label", "mean_abs_shapley", "mean_signed_shapley", "total_signed_shapley", "net_contribution_share_pct"]
+        for record in records:
+            for key in record:
+                if key not in fieldnames:
+                    fieldnames.append(key)
         with target.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=list(records[0].keys()) if records else ["name", "label", "mean_abs_shapley", "mean_signed_shapley", "total_signed_shapley", "net_contribution_share_pct"])
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(records)
 
@@ -324,8 +353,9 @@ class AssessmentResult:
         lines.append("| Feature | Description | Mean absolute | Mean signed | Total signed | Net share (%) |")
         lines.append("|---|---|---:|---:|---:|---:|")
         for row in features:
+            name = f"{row.name} ({', '.join(row.members)})" if row.members else row.name
             lines.append(
-                f"| {row.name} | {row.label} | {row.mean_abs_shapley:.6f} | {row.mean_signed_shapley:.6f} | {row.total_signed_shapley:.6f} | {row.net_contribution_share_pct:.2f} |"
+                f"| {name} | {row.label} | {row.mean_abs_shapley:.6f} | {row.mean_signed_shapley:.6f} | {row.total_signed_shapley:.6f} | {row.net_contribution_share_pct:.2f} |"
             )
         if features:
             top = features[0]
@@ -579,7 +609,7 @@ class AssessmentResult:
         target.parent.mkdir(parents=True, exist_ok=True)
         payload: dict[str, Any] = {
             "regimes": [asdict(item) for item in self.regimes],
-            "feature_attributions": [asdict(row) for row in self.feature_attributions],
+            "feature_attributions": [_attribution_record(row) for row in self.feature_attributions],
             "regime_summaries": [asdict(row) for row in self.regime_summaries],
             "binary_results": [asdict(row) for row in self.binary_results],
             "n_rows": self.n_rows,

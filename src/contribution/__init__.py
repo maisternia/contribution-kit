@@ -28,6 +28,7 @@ from .spec import (
     ContinuousHypothesis,
     FactorialCrossing,
     Hypothesis,
+    FeatureGroup,
     PredictionFeature,
     Regime,
 )
@@ -79,6 +80,7 @@ __all__ = [
     "koopman_risk_ratio",
     "miettinen_nurminen_risk_difference",
     "PartitionWarning",
+    "FeatureGroup",
     "PredictionFeature",
     "rank_contributors",
     "risk_difference_with_guardrail",

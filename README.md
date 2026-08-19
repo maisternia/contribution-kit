@@ -82,6 +82,64 @@ Two things to know when reading the output:
 
 `independent: true` turns that warning into a fail-fast error. It declares that a feature sits in no dependency edge in **either** direction: nothing may reference it, and its own baseline may not reference another feature. Use it for features determined independently of the rest — here, `measured_bw` comes from bounding-box geometry and cannot inform what the detector's class SF should have been. Omitting it leaves a feature referenceable.
 
+### Feature groups
+
+A dependent baseline fixes a feature's *reference point*. It does not change the
+fact that each feature is a separately togglable Shapley player — and that is
+wrong when several features are one decision. The LoRa detector emits a single
+nominal `(BW, SF)` class off a lattice, so a coalition holding the detector's SF
+alongside a ground-truth BW class describes a class that does not exist.
+
+`feature_groups` makes a set of features one **atomic** player. Members enter
+and leave every coalition together, so no such state is ever scored:
+
+```json
+"feature_groups": {
+  "class": {
+    "label": "Nominal class decision (BW and SF chosen together)",
+    "members": ["class_sf", "class_bw"]
+  }
+}
+```
+
+Members keep their own `actual` and `baseline`. The group is reported as one
+contribution, listing its members; there is deliberately **no per-member split**,
+because splitting a group would have to score exactly the states grouping
+removes. Features left out of every group stay players in their own right.
+
+Group rules: members must be declared features, a feature may belong to at most
+one group, `members` may not be empty, and a group name may not collide with a
+feature or regime name. A single-member group is allowed and is equivalent to
+leaving the feature ungrouped. `max_exact_features` counts *players*, so
+grouping can bring a large spec back within the exact Shapley path.
+
+### Grouping or a dependent baseline?
+
+They answer different questions, and reaching for both out of habit will
+mis-state your analysis:
+
+| | Use a dependent baseline | Use a feature group |
+|---|---|---|
+| Question | "How wrong was this feature, given what its dependencies did?" | "How wrong was this decision?" |
+| When | Features are separately controllable, but one's ideal depends on another's state | Features cannot be manipulated independently; they are one choice |
+| Reports | One contribution per feature | One contribution for the whole group |
+
+On the bundled example the two give different, individually correct answers:
+ungrouped with a dependent baseline splits the class into `class_sf` 44.11% and
+`class_bw` −19.76%; grouping reports the class decision as a single 26.44%.
+Neither corrects the other. The shipped config groups, because "fix `class_bw`
+alone" is not an available action — you cannot change the bandwidth class
+without changing the class that was picked.
+
+Note that grouping made the dependent baseline unnecessary here: the grouped
+class player's baseline is the ground-truth class, so `class_sf` reverts to a
+plain `col('GT SF')`.
+
+The mirror of the over-referencing trap applies: grouping features that really
+are separable silently destroys per-feature signal, and unlike over-referencing
+there is **no** numeric signature for it. Only group what is genuinely one
+decision.
+
 ## Install
 
 ```bash
@@ -100,7 +158,7 @@ git submodule update --init path/to/contribution-kit
 ## Quick start (Python)
 
 ```python
-from contribution import AttributionSpec, Estimator, FactorialCrossing, Regime, PredictionFeature
+from contribution import AttributionSpec, Estimator, FactorialCrossing, FeatureGroup, Regime, PredictionFeature
 
 spec = AttributionSpec(
     target="col('GT SF')",
@@ -108,17 +166,16 @@ spec = AttributionSpec(
     score_mode="absolute",  # interpret contributions as absolute amounts ("signed" keeps direction)
     prediction_expr="class_sf + round(2 * log2(measured_bw / class_bw))",  # formula decomposed into Shapley contributions
     prediction_features={
-        # class_sf's baseline references class_bw, so it resolves per coalition:
-        # "the SF the detector should have emitted, given the class BW it chose".
-        "class_sf": PredictionFeature(
-            actual="col('Class SF')",
-            baseline="col('GT SF') - round(2 * log2(col('GT BW') / class_bw))",
-        ),
+        "class_sf": PredictionFeature(actual="col('Class SF')", baseline="col('GT SF')"),
         "class_bw": PredictionFeature(actual="col('Class BW')", baseline="col('GT BW')"),
         # Derived from box geometry, so nothing may condition its ideal on it.
         "measured_bw": PredictionFeature(
             actual="col('Measured BW')", baseline="col('GT BW')", independent=True
         ),
+    },
+    # The detector emits one (BW, SF) class, so the two are one Shapley player.
+    feature_groups={
+        "class": FeatureGroup(members=("class_sf", "class_bw"), label="Nominal class decision"),
     },
     regimes=[  # at least one regime is required; add any ad-hoc conditions you want reported
         Regime(name="class_sf_match", condition="col('Class SF') == col('GT SF')"),
@@ -174,7 +231,7 @@ contrib contributor --input examples/continuous_lora/measurements.csv --mismatch
 contrib hypothesis --input examples/continuous_lora/measurements.csv --mismatch-expr "col('Measured SF') != col('GT SF')" --name "Class BW Underestimation" --group-a "col('Class BW') < col('GT BW')" --group-b "col('Class BW') >= col('GT BW')" --group-a-label "class_bw < gt_bw" --group-b-label "class_bw >= gt_bw" --out outputs/hypothesis.json
 ```
 
-Config files are JSON or YAML with `target`, `prediction`, `prediction_expr`, required `prediction_features` (when `prediction_expr` uses variables), optional `scope` and `score_mode`, and a `regimes` mapping. Mapping keys are regime names and values are either a condition string shorthand or an object with `condition` and optional `label`.
+Config files are JSON or YAML with `target`, `prediction`, `prediction_expr`, required `prediction_features` (when `prediction_expr` uses variables), optional `feature_groups`, optional `scope` and `score_mode`, and a `regimes` mapping. Mapping keys are regime names and values are either a condition string shorthand or an object with `condition` and optional `label`.
 
 ```json
 {
@@ -201,6 +258,7 @@ Config validation:
 - Object-valued regimes must include `condition` and must not include `name` (the mapping key provides it).
 - Feature objects must include `actual` and `baseline`, and may carry `label` and `independent`; a string entry must parse to exactly one top-level `actual == baseline` equality (no label, no other operators, though its right-hand side may reference sibling features). Unknown keys are rejected, so `independent` needs the object form.
 - The old list form of `regimes` is not accepted.
+- `feature_groups` entries must include a `members` list of declared feature names and may include a `label`. Unknown keys are rejected.
 
 Optional factorial regime declarations:
 

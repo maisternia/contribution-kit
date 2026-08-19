@@ -82,6 +82,26 @@ class PredictionFeature:
 
 
 @dataclass(slots=True)
+class FeatureGroup:
+    """A set of prediction features that form a single decision.
+
+    A group is one **atomic** Shapley player: its members enter and leave every
+    coalition together, so no coalition ever holds one member at its actual
+    value while another sits at its baseline. Declare a group when the members
+    cannot be manipulated independently -- for example a detector that emits a
+    nominal ``(bandwidth, spreading factor)`` class as one choice, reported in
+    two columns.
+
+    The group's contribution is reported as a single number. No per-member
+    split is computed: an internal decomposition would have to score exactly
+    the split states the grouping exists to exclude.
+    """
+
+    members: tuple[str, ...]
+    label: str | None = None
+
+
+@dataclass(slots=True)
 class AttributionSpec:
     """Single declarative entry point for an attribution analysis.
 
@@ -94,6 +114,10 @@ class AttributionSpec:
     from JSON/YAML, those entries may also use a config-only top-level
     ``actual == baseline`` shorthand that is normalized to the same canonical
     ``PredictionFeature`` form.
+    ``feature_groups`` optionally partitions those features into named groups,
+    each of which acts as one atomic Shapley player. Features left out of every
+    group remain players in their own right; a spec declaring no groups has one
+    player per feature.
     ``regimes`` is a flat list of regime conditions.
     """
 
@@ -101,6 +125,7 @@ class AttributionSpec:
     prediction: str
     prediction_expr: str
     prediction_features: dict[str, PredictionFeature] = field(default_factory=dict)
+    feature_groups: dict[str, FeatureGroup] = field(default_factory=dict)
     regimes: list[Regime] = field(default_factory=list)
     factorials: list[FactorialCrossing] = field(default_factory=list)
     scope: str = "global"

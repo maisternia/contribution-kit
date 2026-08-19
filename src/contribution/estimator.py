@@ -75,6 +75,22 @@ class _Feature:
 
 
 @dataclass(slots=True)
+class _Player:
+    """One atomic unit of the Shapley game.
+
+    A player is either a lone prediction feature or a declared group of them.
+    Its ``feature_names`` all take their actual values when the player is in a
+    coalition, and all resolve their baselines when it is not, so a group's
+    members never separate.
+    """
+
+    name: str
+    label: str
+    feature_names: tuple[str, ...]
+    is_group: bool
+
+
+@dataclass(slots=True)
 class _FactorialPlan:
     label: str
     row_levels: list[str]
@@ -116,22 +132,36 @@ class Estimator:
         effective_regimes = [*self.spec.regimes, *generated_regimes]
 
         features = self._formula_features()
-        feature_names = [feature.name for feature in features]
+        players = self._build_players(features)
+        player_names = [player.name for player in players]
+        feature_player = {
+            feature_name: player.name for player in players for feature_name in player.feature_names
+        }
 
-        totals = {name: 0.0 for name in feature_names}
-        abs_totals = {name: 0.0 for name in feature_names}
+        totals = {name: 0.0 for name in player_names}
+        abs_totals = {name: 0.0 for name in player_names}
         observed_contributions: list[float] = []
         observed_contribution_total = 0.0
-        full_coalition = frozenset(feature_names)
+        full_coalition = frozenset(player_names)
         baseline_target_gap_rows = 0
         baseline_target_gap_example: int | None = None
-        # Only a baseline that references siblings can absorb the formula; a
-        # plain column baseline scoring zero everywhere is small-sample luck.
-        absorbing_features = {feature.name: bool(feature.baseline_deps) for feature in features}
+        # Only a baseline reaching outside its own player can absorb the
+        # formula; a plain column baseline scoring zero everywhere is
+        # small-sample luck, and an intra-player reference never crosses a
+        # coalition boundary.
+        absorbing_players = {
+            player.name: any(
+                dependency not in player.feature_names
+                for feature in features
+                if feature.name in player.feature_names
+                for dependency in feature.baseline_deps
+            )
+            for player in players
+        }
         for row_index, row in enumerate(self.rows):
-            if feature_names:
-                score = self._row_scorer(row, features)
-                row_result = self._assess_row(score, feature_names, exact=exact, max_exact_features=max_exact_features, n_samples=n_samples, seed=seed)
+            if player_names:
+                score = self._row_scorer(row, features, feature_player)
+                row_result = self._assess_row(score, player_names, exact=exact, max_exact_features=max_exact_features, n_samples=n_samples, seed=seed)
                 for name, value in row_result.items():
                     totals[name] += value
                     abs_totals[name] += abs(value)
@@ -143,43 +173,44 @@ class Estimator:
                         baseline_target_gap_example = row_index
                 # A baseline that inverts the formula leaves every coalition
                 # excluding its own feature scoring zero.
-                for name, still_absorbing in absorbing_features.items():
+                for name, still_absorbing in absorbing_players.items():
                     if still_absorbing and abs(score(full_coalition - {name})) > _ZERO_TOLERANCE:
-                        absorbing_features[name] = False
+                        absorbing_players[name] = False
             observed_contribution = self._observed_contribution(row, features)
             observed_contributions.append(observed_contribution)
             observed_contribution_total += observed_contribution
 
         attribution_warnings = self._attribution_warnings(
             features=features,
+            players=players,
             baseline_target_gap_rows=baseline_target_gap_rows,
             baseline_target_gap_example=baseline_target_gap_example,
-            absorbing_features=absorbing_features,
+            absorbing_players=absorbing_players,
         )
 
         n_rows = len(self.rows)
-        feature_attr: dict[str, FeatureAttribution] = {}
-        for feature in features:
-            signed_total = totals[feature.name]
-            feature_attr[feature.name] = FeatureAttribution(
-                name=feature.name,
-                label=feature.label,
-                mean_abs_shapley=abs_totals[feature.name] / n_rows if n_rows else 0.0,
+        player_attr: dict[str, FeatureAttribution] = {}
+        for player in players:
+            signed_total = totals[player.name]
+            player_attr[player.name] = FeatureAttribution(
+                name=player.name,
+                label=player.label,
+                mean_abs_shapley=abs_totals[player.name] / n_rows if n_rows else 0.0,
                 mean_signed_shapley=signed_total / n_rows if n_rows else 0.0,
                 total_signed_shapley=signed_total,
                 net_contribution_share_pct=(signed_total / observed_contribution_total * 100.0) if observed_contribution_total else 0.0,
+                members=player.feature_names if player.is_group else (),
             )
 
         mismatch_fn = self._mismatch_fn()
         assessments: list[RegimeAssessment] = []
-        for feature_name, feature_spec in self.spec.prediction_features.items():
-            feature_result = feature_attr[feature_name]
+        for player in players:
             assessments.append(
                 RegimeAssessment(
-                    name=feature_name,
-                    label=feature_spec.label or feature_name,
+                    name=player.name,
+                    label=player.label,
                     analysis="feature",
-                    feature=feature_result,
+                    feature=player_attr[player.name],
                 )
             )
         for regime in effective_regimes:
@@ -222,9 +253,10 @@ class Estimator:
         self,
         *,
         features: Sequence[_Feature],
+        players: Sequence[_Player],
         baseline_target_gap_rows: int,
         baseline_target_gap_example: int | None,
-        absorbing_features: Mapping[str, bool],
+        absorbing_players: Mapping[str, bool],
     ) -> list[AttributionWarning]:
         warnings_out: list[AttributionWarning] = []
 
@@ -252,22 +284,87 @@ class Estimator:
             warnings.warn(message, stacklevel=3)
             warnings_out.append(AttributionWarning(kind="baseline_target_mismatch", message=message))
 
-        for feature in features:
-            if not absorbing_features.get(feature.name):
+        for player in players:
+            if not absorbing_players.get(player.name):
                 continue
-            others = [other.name for other in features if other.name != feature.name]
+            others = [
+                name
+                for other in players
+                if other.name != player.name
+                for name in other.feature_names
+            ]
             if not others:
                 continue
             message = (
-                f"every coalition excluding '{feature.name}' scores zero on all rows, so its "
+                f"every coalition excluding '{player.name}' scores zero on all rows, so its "
                 f"baseline absorbs the prediction formula; {', '.join(others)} can only be "
-                f"attributed in interaction with '{feature.name}'. Check whether its baseline "
+                f"attributed in interaction with '{player.name}'. Check whether its baseline "
                 "references more features than it conditions on."
             )
             warnings.warn(message, stacklevel=3)
             warnings_out.append(AttributionWarning(kind="formula_absorption", message=message))
 
         return warnings_out
+
+    def _build_players(self, features: Sequence[_Feature]) -> list[_Player]:
+        """Partition features into Shapley players, validating the grouping.
+
+        A group takes the declaration position of its first member, so player
+        order still tracks ``prediction_features`` order.
+        """
+        assert self.spec is not None
+        feature_names = [feature.name for feature in features]
+        labels = {feature.name: feature.label for feature in features}
+        groups = self.spec.feature_groups
+
+        owner: dict[str, str] = {}
+        for group_name, group in groups.items():
+            if not group.members:
+                raise ValueError(f"feature group '{group_name}' declares no members")
+            if group_name in labels:
+                raise ValueError(
+                    f"feature group '{group_name}' collides with a prediction feature of the same name"
+                )
+            if any(regime.name == group_name for regime in self.spec.regimes):
+                raise ValueError(
+                    f"feature group '{group_name}' collides with a regime of the same name"
+                )
+            for member in group.members:
+                if member not in labels:
+                    raise ValueError(
+                        f"feature group '{group_name}' lists member '{member}', which is not a "
+                        "declared prediction feature"
+                    )
+                if member in owner:
+                    raise ValueError(
+                        f"prediction feature '{member}' is listed in more than one feature group: "
+                        f"{owner[member]}, {group_name}"
+                    )
+                owner[member] = group_name
+
+        players: list[_Player] = []
+        seen_groups: set[str] = set()
+        for name in feature_names:
+            group_name = owner.get(name)
+            if group_name is None:
+                players.append(
+                    _Player(name=name, label=labels[name], feature_names=(name,), is_group=False)
+                )
+                continue
+            if group_name in seen_groups:
+                continue
+            seen_groups.add(group_name)
+            group = groups[group_name]
+            members = tuple(member for member in feature_names if owner.get(member) == group_name)
+            players.append(
+                _Player(
+                    name=group_name,
+                    label=group.label or group_name,
+                    feature_names=members,
+                    is_group=True,
+                )
+            )
+        return players
 
     def _column_names(self) -> set[str]:
         names: set[str] = set()
@@ -975,17 +1072,21 @@ class Estimator:
         features: Sequence[_Feature],
         subset: frozenset[str],
         actual_values: Mapping[str, Any],
+        feature_player: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
         """Resolve every feature for one coalition, walking dependency order.
 
-        A feature in the coalition takes its actual value. Otherwise its
-        baseline is evaluated against the row plus the already-resolved values
-        of the features it references, so a dependent baseline sees the
-        coalition-resolved sibling rather than the raw observed column.
+        ``subset`` names the *players* in the coalition. A feature whose player
+        is present takes its actual value; otherwise its baseline is evaluated
+        against the row plus the already-resolved values of the features it
+        references, so a dependent baseline sees the coalition-resolved sibling
+        rather than the raw observed column. Grouped features share a player, so
+        they enter and leave together.
         """
         resolved: dict[str, Any] = {}
         for feature in features:
-            if feature.name in subset:
+            player = feature_player[feature.name] if feature_player else feature.name
+            if player in subset:
                 resolved[feature.name] = actual_values[feature.name]
                 continue
             context = build_row_context(row, resolved) if feature.baseline_deps else build_row_context(row)
@@ -995,11 +1096,17 @@ class Estimator:
     def _evaluate_prediction_formula(self, row: Mapping[str, Any], values: Mapping[str, Any]) -> float:
         return float(evaluate_expression(self.spec.prediction_expr, build_row_context(row, values)))
 
-    def _row_scorer(self, row: Mapping[str, Any], features: Sequence[_Feature]):
+    def _row_scorer(
+        self,
+        row: Mapping[str, Any],
+        features: Sequence[_Feature],
+        feature_player: Mapping[str, str] | None = None,
+    ):
         """Build a memoized coalition scorer for one row.
 
-        The exact Shapley pass visits most coalitions many times, so caching by
-        coalition keeps dependency-ordered resolution off the hot path.
+        Coalitions are subsets of the *player* names. The exact Shapley pass
+        visits most coalitions many times, so caching by coalition keeps
+        dependency-ordered resolution off the hot path.
         """
         actual_values = self._actual_values(row, features)
         target = float(self._evaluate_target(row))
@@ -1008,7 +1115,7 @@ class Estimator:
         def score(subset: frozenset[str]) -> float:
             cached = cache.get(subset)
             if cached is None:
-                values = self._resolve_coalition_values(row, features, subset, actual_values)
+                values = self._resolve_coalition_values(row, features, subset, actual_values, feature_player)
                 prediction = self._evaluate_prediction_formula(row, values)
                 cached = _score(prediction, target, self.spec.score_mode)
                 cache[subset] = cached
@@ -1017,6 +1124,8 @@ class Estimator:
         return score
 
     def _assess_row(self, score, names: list[str], *, exact: bool, max_exact_features: int, n_samples: int, seed: int) -> dict[str, float]:
+        # `names` are players, so the exact-path cap is compared against the
+        # player count: grouping shrinks it and can restore the exact path.
         if exact and len(names) <= max_exact_features:
             return self._exact_shapley(score, names)
         return self._sample_shapley(score, names, n_samples=n_samples, seed=seed)

@@ -825,3 +825,54 @@ def test_load_spec_shorthand_cannot_declare_independent(tmp_path: Path) -> None:
     }
     with pytest.raises(ValueError, match="unknown key"):
         cli._load_spec(_feature_config(tmp_path, features))
+
+
+# --- Feature groups --------------------------------------------------------
+
+
+def _group_config(tmp_path: Path, groups) -> Path:
+    path = tmp_path / "groups.json"
+    payload = {
+        "target": "col('GT SF')",
+        "prediction": "col('Measured SF')",
+        "prediction_expr": "class_sf + round(2 * log2(measured_bw / class_bw))",
+        "prediction_features": _PLAIN_FEATURES,
+        "regimes": {"all": "1 == 1"},
+    }
+    if groups is not None:
+        payload["feature_groups"] = groups
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def test_load_spec_parses_feature_groups(tmp_path: Path) -> None:
+    loaded = cli._load_spec(_group_config(tmp_path, {
+        "class": {"label": "Nominal class decision", "members": ["class_sf", "class_bw"]}
+    }))
+    group = loaded.feature_groups["class"]
+    assert group.members == ("class_sf", "class_bw")
+    assert group.label == "Nominal class decision"
+
+
+def test_load_spec_feature_groups_default_to_empty(tmp_path: Path) -> None:
+    assert cli._load_spec(_group_config(tmp_path, None)).feature_groups == {}
+
+
+def test_load_spec_feature_group_requires_members(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="missing required key: members"):
+        cli._load_spec(_group_config(tmp_path, {"class": {"label": "no members"}}))
+
+
+def test_load_spec_feature_group_members_must_be_a_string_list(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="must be a list of strings"):
+        cli._load_spec(_group_config(tmp_path, {"class": {"members": "class_sf"}}))
+
+
+def test_load_spec_feature_group_rejects_unknown_keys(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="unknown key"):
+        cli._load_spec(_group_config(tmp_path, {"class": {"members": ["class_sf"], "atomic": True}}))
+
+
+def test_load_spec_feature_groups_must_be_an_object(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="'feature_groups' must be an object"):
+        cli._load_spec(_group_config(tmp_path, ["class"]))

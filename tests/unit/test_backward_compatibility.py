@@ -1,9 +1,14 @@
-"""Pins the bundled example's attributions against a pre-change snapshot.
+"""Pins the bundled example's attributions against pre-change snapshots.
 
-The dependent-baseline capability is additive: a spec whose baselines
-reference no sibling feature must resolve exactly as it did before
-dependency-ordered resolution existed. The golden file was captured from the
-bundled config before any resolution code changed.
+Two capabilities are pinned here, both additive:
+
+- Dependent baselines: a spec whose baselines reference no sibling feature
+  must resolve exactly as it did before dependency-ordered resolution.
+- Feature grouping: a spec declaring no groups must have one player per
+  feature and resolve exactly as it did before grouping existed.
+
+Each golden file was captured from the bundled config before the
+corresponding code changed.
 """
 
 from __future__ import annotations
@@ -18,6 +23,11 @@ from contribution import cli
 
 ROOT = Path(__file__).resolve().parents[2]
 GOLDEN = ROOT / "tests" / "fixtures" / "golden_continuous_lora_pre_dependent_baselines.json"
+GOLDEN_DEPENDENT = ROOT / "tests" / "fixtures" / "golden_continuous_lora_dependent_baseline.json"
+# A frozen copy of the bundled config as it stood before feature grouping:
+# a dependent baseline, but one player per feature. The live example has since
+# grouped the class decision.
+UNGROUPED_DEPENDENT_CONFIG = ROOT / "tests" / "fixtures" / "continuous_lora_ungrouped_dependent_config.json"
 # A frozen copy of the bundled config as it stood before dependent baselines;
 # the live example has since migrated to one, so it is no longer sibling-free.
 CONFIG = ROOT / "tests" / "fixtures" / "continuous_lora_sibling_free_config.json"
@@ -95,3 +105,59 @@ def test_regime_summaries_match(assessed, golden) -> None:
 
 def test_sibling_free_config_emits_no_attribution_warnings(assessed) -> None:
     assert assessed.attribution_warnings == []
+
+
+# --- Ungrouped specs are unaffected by feature grouping -------------------
+#
+# A spec with a dependent baseline but no feature_groups must keep one player
+# per feature and resolve exactly as it did before grouping existed.
+
+
+@pytest.fixture(scope="module")
+def assessed_live():
+    return Estimator.from_csv(MEASUREMENTS, cli._load_spec(UNGROUPED_DEPENDENT_CONFIG)).assess()
+
+
+@pytest.fixture(scope="module")
+def golden_dependent() -> dict:
+    return json.loads(GOLDEN_DEPENDENT.read_text(encoding="utf-8"))
+
+
+def test_ungrouped_dependent_baseline_attributions_are_unchanged(assessed_live, golden_dependent) -> None:
+    actual = {
+        item.name: {
+            "mean_abs_shapley": item.feature.mean_abs_shapley,
+            "mean_signed_shapley": item.feature.mean_signed_shapley,
+            "total_signed_shapley": item.feature.total_signed_shapley,
+            "net_contribution_share_pct": item.feature.net_contribution_share_pct,
+        }
+        for item in assessed_live.regimes
+        if item.analysis == "feature"
+    }
+    assert actual == golden_dependent["features"]
+
+
+def test_ungrouped_dependent_baseline_burden_is_unchanged(assessed_live, golden_dependent) -> None:
+    actual = [
+        {
+            "crossing": ranking.crossing_label,
+            "baseline_cell": ranking.baseline_cell,
+            "observed_accuracy_pct": ranking.observed_accuracy_pct,
+            "ceiling_accuracy_pct": ranking.ceiling_accuracy_pct,
+            "total_mismatches": ranking.total_mismatches,
+            "entries": [
+                {
+                    "rank": entry.rank,
+                    "cell": entry.cell,
+                    "count": entry.count,
+                    "mismatch_count": entry.mismatch_count,
+                    "mismatch_rate_pct": entry.mismatch_rate_pct,
+                    "recoverable_mismatches": entry.recoverable_mismatches,
+                    "cumulative_accuracy_if_eliminated_pct": entry.cumulative_accuracy_if_eliminated_pct,
+                }
+                for entry in ranking.entries
+            ],
+        }
+        for ranking in assessed_live.burden_rankings
+    ]
+    assert actual == golden_dependent["burden"]

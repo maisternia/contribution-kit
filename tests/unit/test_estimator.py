@@ -904,3 +904,171 @@ def test_sibling_free_spec_emits_no_attribution_warnings() -> None:
     spec = _dependent_spec("col('GT SF')")
     result = Estimator.from_dataframe(_dependent_rows_with_measurement_error(), spec).assess()
     assert [warning.kind for warning in result.attribution_warnings] == []
+
+
+# --- Grouped prediction features ------------------------------------------
+
+
+def _grouped_spec(*, groups: dict | None = None, class_sf_baseline: str = "col('GT SF')") -> AttributionSpec:
+    from contribution.spec import FeatureGroup
+
+    spec = AttributionSpec(
+        target="col('GT SF')",
+        prediction="col('Measured SF')",
+        prediction_expr=_GEOMETRIC_REGRESSION_FORMULA,
+        prediction_features={
+            "class_sf": PredictionFeature(actual="col('Class SF')", baseline=class_sf_baseline),
+            "class_bw": PredictionFeature(actual="col('Class BW')", baseline="col('GT BW')"),
+            "measured_bw": PredictionFeature(actual="col('Measured BW')", baseline="col('GT BW')"),
+        },
+        regimes=[Hypothesis(name="all", condition="1 == 1")],
+    )
+    spec.feature_groups = groups if groups is not None else {
+        "class": FeatureGroup(members=("class_sf", "class_bw"), label="Nominal class decision")
+    }
+    return spec
+
+
+def _players(spec: AttributionSpec, rows: list[dict[str, object]]):
+    estimator = Estimator.from_dataframe(rows, spec)
+    estimator._validate_spec()
+    return estimator, estimator._build_players(estimator._formula_features())
+
+
+def test_group_members_share_one_player() -> None:
+    estimator, players = _players(_grouped_spec(), _dependent_rows_with_measurement_error())
+    by_name = {player.name: player for player in players}
+    assert [player.name for player in players] == ["class", "measured_bw"]
+    assert by_name["class"].feature_names == ("class_sf", "class_bw")
+    assert by_name["class"].is_group is True
+    assert by_name["measured_bw"].feature_names == ("measured_bw",)
+    assert by_name["measured_bw"].is_group is False
+
+
+def test_group_members_enter_and_leave_a_coalition_together() -> None:
+    rows = _dependent_rows_with_measurement_error()
+    spec = _grouped_spec()
+    estimator, players = _players(spec, rows)
+    features = estimator._formula_features()
+    feature_player = {name: p.name for p in players for name in p.feature_names}
+    row = estimator.rows[2]
+    actual_values = estimator._actual_values(row, features)
+
+    inside = estimator._resolve_coalition_values(row, features, frozenset({"class"}), actual_values, feature_player)
+    outside = estimator._resolve_coalition_values(row, features, frozenset(), actual_values, feature_player)
+
+    assert inside["class_sf"] == row["Class SF"] and inside["class_bw"] == row["Class BW"]
+    assert outside["class_sf"] == row["GT SF"] and outside["class_bw"] == row["GT BW"]
+
+
+def test_ungrouped_spec_has_one_player_per_feature() -> None:
+    _, players = _players(_grouped_spec(groups={}), _dependent_rows_with_measurement_error())
+    assert [player.name for player in players] == ["class_sf", "class_bw", "measured_bw"]
+    assert all(player.is_group is False for player in players)
+    assert all(len(player.feature_names) == 1 for player in players)
+
+
+def test_grouped_spec_reports_one_entry_per_player() -> None:
+    result = Estimator.from_dataframe(_dependent_rows_with_measurement_error(), _grouped_spec()).assess()
+    features = [item for item in result.regimes if item.analysis == "feature"]
+    assert [item.name for item in features] == ["class", "measured_bw"]
+    by_name = {item.name: item.feature for item in features}
+    assert by_name["class"].members == ("class_sf", "class_bw")
+    assert by_name["measured_bw"].members == ()
+    assert by_name["class"].label == "Nominal class decision"
+
+
+def test_grouped_spec_keeps_the_empty_coalition_at_zero() -> None:
+    rows = _dependent_rows_with_measurement_error()
+    spec = _grouped_spec()
+    estimator, players = _players(spec, rows)
+    features = estimator._formula_features()
+    feature_player = {name: p.name for p in players for name in p.feature_names}
+    for row in estimator.rows:
+        assert estimator._row_scorer(row, features, feature_player)(frozenset()) == 0.0
+
+
+def test_grouped_spec_shares_sum_to_one_hundred_percent() -> None:
+    result = Estimator.from_dataframe(_dependent_rows_with_measurement_error(), _grouped_spec()).assess()
+    shares = [item.feature.net_contribution_share_pct for item in result.regimes if item.analysis == "feature"]
+    assert abs(sum(shares) - 100.0) < 1e-9
+
+
+def test_single_member_group_matches_the_ungrouped_attribution() -> None:
+    from contribution.spec import FeatureGroup
+
+    rows = _dependent_rows_with_measurement_error()
+    grouped = Estimator.from_dataframe(
+        rows, _grouped_spec(groups={"solo": FeatureGroup(members=("measured_bw",))})
+    ).assess()
+    plain = Estimator.from_dataframe(rows, _grouped_spec(groups={})).assess()
+    grouped_by = {i.name: i.feature.total_signed_shapley for i in grouped.regimes if i.analysis == "feature"}
+    plain_by = {i.name: i.feature.total_signed_shapley for i in plain.regimes if i.analysis == "feature"}
+    assert grouped_by["solo"] == plain_by["measured_bw"]
+    assert grouped_by["class_sf"] == plain_by["class_sf"]
+
+
+def test_group_with_unknown_member_is_rejected() -> None:
+    from contribution.spec import FeatureGroup
+
+    spec = _grouped_spec(groups={"class": FeatureGroup(members=("class_sf", "nope"))})
+    with pytest.raises(ValueError, match="not a declared prediction feature"):
+        Estimator.from_dataframe(_dependent_rows(), spec).assess()
+
+
+def test_feature_in_two_groups_is_rejected() -> None:
+    from contribution.spec import FeatureGroup
+
+    spec = _grouped_spec(groups={
+        "a": FeatureGroup(members=("class_sf",)),
+        "b": FeatureGroup(members=("class_sf", "class_bw")),
+    })
+    with pytest.raises(ValueError, match="listed in more than one feature group"):
+        Estimator.from_dataframe(_dependent_rows(), spec).assess()
+
+
+def test_empty_group_is_rejected() -> None:
+    from contribution.spec import FeatureGroup
+
+    spec = _grouped_spec(groups={"class": FeatureGroup(members=())})
+    with pytest.raises(ValueError, match="declares no members"):
+        Estimator.from_dataframe(_dependent_rows(), spec).assess()
+
+
+def test_group_name_colliding_with_a_feature_is_rejected() -> None:
+    from contribution.spec import FeatureGroup
+
+    spec = _grouped_spec(groups={"class_sf": FeatureGroup(members=("class_bw",))})
+    with pytest.raises(ValueError, match="collides with a prediction feature"):
+        Estimator.from_dataframe(_dependent_rows(), spec).assess()
+
+
+def test_group_name_colliding_with_a_regime_is_rejected() -> None:
+    from contribution.spec import FeatureGroup
+
+    spec = _grouped_spec(groups={"all": FeatureGroup(members=("class_sf", "class_bw"))})
+    with pytest.raises(ValueError, match="collides with a regime"):
+        Estimator.from_dataframe(_dependent_rows(), spec).assess()
+
+
+def test_intra_group_baseline_reference_does_not_trigger_absorption() -> None:
+    """A reference that never crosses a player boundary cannot absorb the formula."""
+    spec = _grouped_spec(class_sf_baseline=_DEPENDENT_BASELINE)
+    result = Estimator.from_dataframe(_dependent_rows_with_measurement_error(), spec).assess()
+    assert [warning.kind for warning in result.attribution_warnings] == []
+
+
+def test_cross_player_over_reference_still_triggers_absorption() -> None:
+    spec = _grouped_spec(class_sf_baseline=_ABSORBING_BASELINE)
+    result = Estimator.from_dataframe(_dependent_rows_with_measurement_error(), spec).assess()
+    assert [warning.kind for warning in result.attribution_warnings] == ["formula_absorption"]
+    assert "class" in result.attribution_warnings[0].message
+
+
+def test_grouping_reduces_the_player_count_for_the_exact_path() -> None:
+    """`max_exact_features` counts players, so grouping can restore exact Shapley."""
+    rows = _dependent_rows_with_measurement_error()
+    # Two players (class, measured_bw) fits a cap of 2; three features would not.
+    result = Estimator.from_dataframe(rows, _grouped_spec()).assess(exact=True, max_exact_features=2)
+    shares = [i.feature.net_contribution_share_pct for i in result.regimes if i.analysis == "feature"]
+    assert abs(sum(shares) - 100.0) < 1e-9

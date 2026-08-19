@@ -31,6 +31,7 @@ from .results import (
 from .spec import (
     AttributionSpec,
     FactorialCrossing,
+    FeatureGroup,
     PredictionFeature,
     Regime,
 )
@@ -190,6 +191,31 @@ def _load_spec(path: str | Path) -> AttributionSpec:
             actual=actual, baseline=baseline, label=label, independent=independent
         )
 
+    feature_groups_payload = payload.get("feature_groups", {})
+    if not isinstance(feature_groups_payload, dict):
+        raise ValueError("'feature_groups' must be an object mapping group names to {members, label?}")
+    feature_groups: dict[str, FeatureGroup] = {}
+    allowed_group_keys = {"members", "label"}
+    for group_name, group_payload in feature_groups_payload.items():
+        if not isinstance(group_payload, dict):
+            raise ValueError(
+                f"feature group '{group_name}' must be an object with a required 'members' list"
+            )
+        unknown_group_keys = sorted(set(group_payload).difference(allowed_group_keys))
+        if unknown_group_keys:
+            raise ValueError(
+                f"feature group '{group_name}' has unknown key(s): {', '.join(unknown_group_keys)}"
+            )
+        if "members" not in group_payload:
+            raise ValueError(f"feature group '{group_name}' is missing required key: members")
+        members = group_payload["members"]
+        if not isinstance(members, list) or not all(isinstance(member, str) for member in members):
+            raise ValueError(f"feature group '{group_name}' key 'members' must be a list of strings")
+        group_label = group_payload.get("label")
+        if group_label is not None and not isinstance(group_label, str):
+            raise ValueError(f"feature group '{group_name}' key 'label' must be a string when provided")
+        feature_groups[group_name] = FeatureGroup(members=tuple(members), label=group_label)
+
     factorials_payload = payload.get("factorials", [])
     if not isinstance(factorials_payload, list):
         raise ValueError("'factorials' must be a list of crossing objects")
@@ -270,6 +296,7 @@ def _load_spec(path: str | Path) -> AttributionSpec:
         prediction=payload["prediction"],
         prediction_expr=payload["prediction_expr"],
         prediction_features=prediction_features,
+        feature_groups=feature_groups,
         regimes=regimes,
         factorials=factorials,
         scope=payload.get("scope", "global"),

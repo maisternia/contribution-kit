@@ -1,0 +1,122 @@
+{
+  "burden": [
+    {
+      "baseline_cell": "class_ok & measured_ok",
+      "ceiling_accuracy_pct": 99.79711085862685,
+      "crossing": "BW quality \u00d7 scaling direction",
+      "entries": [
+        {
+          "cell": "class_ok & measured_off",
+          "count": 170,
+          "cumulative_accuracy_if_eliminated_pct": 98.88269253942656,
+          "mismatch_count": 165,
+          "mismatch_rate_pct": 97.05882352941177,
+          "rank": 1,
+          "recoverable_mismatches": 164.65508845966565
+        },
+        {
+          "cell": "upscale & measured_ok",
+          "count": 464,
+          "cumulative_accuracy_if_eliminated_pct": 99.47061597381708,
+          "mismatch_count": 79,
+          "mismatch_rate_pct": 17.025862068965516,
+          "rank": 2,
+          "recoverable_mismatches": 78.05859438402857
+        },
+        {
+          "cell": "downscale & measured_off",
+          "count": 35,
+          "cumulative_accuracy_if_eliminated_pct": 99.62071756906087,
+          "mismatch_count": 20,
+          "mismatch_rate_pct": 57.14285714285714,
+          "rank": 3,
+          "recoverable_mismatches": 19.928988800519395
+        },
+        {
+          "cell": "upscale & measured_off",
+          "count": 12,
+          "cumulative_accuracy_if_eliminated_pct": 99.71091605744708,
+          "mismatch_count": 12,
+          "mismatch_rate_pct": 100.0,
+          "rank": 4,
+          "recoverable_mismatches": 11.975653303035221
+        },
+        {
+          "cell": "downscale & measured_ok",
+          "count": 274,
+          "cumulative_accuracy_if_eliminated_pct": 99.79711085862685,
+          "mismatch_count": 12,
+          "mismatch_rate_pct": 4.37956204379562,
+          "rank": 5,
+          "recoverable_mismatches": 11.444083752637559
+        }
+      ],
+      "observed_accuracy_pct": 97.64253973036078,
+      "total_mismatches": 313
+    }
+  ],
+  "features": {
+    "class_bw": {
+      "mean_abs_shapley": 0.012565589616128135,
+      "mean_signed_shapley": -0.005686525570535513,
+      "net_contribution_share_pct": -19.764397905759164,
+      "total_signed_shapley": -75.50000000000001
+    },
+    "class_sf": {
+      "mean_abs_shapley": 0.01341919610353744,
+      "mean_signed_shapley": 0.012691119981923625,
+      "net_contribution_share_pct": 44.109947643979055,
+      "total_signed_shapley": 168.49999999999997
+    },
+    "measured_bw": {
+      "mean_abs_shapley": 0.02221887474580101,
+      "mean_signed_shapley": 0.021766965428937256,
+      "net_contribution_share_pct": 75.6544502617801,
+      "total_signed_shapley": 288.99999999999994
+    }
+  },
+  "mean_observed_contribution": 0.028771559840325374,
+  "n_rows": 13277,
+  "regimes": {
+    "class_bw within tol & sf wrong": {
+      "contribution_share_pct": 7.329842931937172,
+      "count": 23,
+      "total_contribution": 28.0
+    },
+    "class_ok & measured_off": {
+      "contribution_share_pct": 57.85340314136126,
+      "count": 170,
+      "total_contribution": 221.0
+    },
+    "class_ok & measured_ok": {
+      "contribution_share_pct": 7.853403141361256,
+      "count": 12322,
+      "total_contribution": 30.0
+    },
+    "class_sf_match": {
+      "contribution_share_pct": 77.74869109947645,
+      "count": 13007,
+      "total_contribution": 297.0
+    },
+    "downscale & measured_off": {
+      "contribution_share_pct": 6.282722513089005,
+      "count": 35,
+      "total_contribution": 24.0
+    },
+    "downscale & measured_ok": {
+      "contribution_share_pct": 3.1413612565445024,
+      "count": 274,
+      "total_contribution": 12.0
+    },
+    "upscale & measured_off": {
+      "contribution_share_pct": 4.18848167539267,
+      "count": 12,
+      "total_contribution": 16.0
+    },
+    "upscale & measured_ok": {
+      "contribution_share_pct": 20.680628272251308,
+      "count": 464,
+      "total_contribution": 79.0
+    }
+  }
+}
