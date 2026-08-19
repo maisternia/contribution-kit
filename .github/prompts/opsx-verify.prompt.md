@@ -75,14 +75,12 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
        - Recommendation: "Review <file>:<lines> against requirement X"
 
    **Scenario Coverage**:
-    - Determine whether code tests are required by the repository testing policy in [AGENTS.md](../../AGENTS.md) or by the accepted change artifacts
    - For each scenario in delta specs (marked with "#### Scenario:"):
      - Check if conditions are handled in code
-       - When tests are required, check if they cover the scenario
-       - Otherwise, inspect relevant implementation or non-test validation evidence; do not report missing tests
+     - Check if tests exist covering the scenario
      - If scenario appears uncovered:
        - Add WARNING: "Scenario not covered: <scenario name>"
-          - Recommendation: "Add the required test, implementation, or validation evidence for scenario: <description>"
+       - Recommendation: "Add test or implementation for scenario: <description>"
 
 7. **Verify Coherence**
 

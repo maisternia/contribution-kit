@@ -56,7 +56,7 @@ Scan the codebase for small improvement opportunities. Look for:
 
 1. **TODO/FIXME comments** - Search for `TODO`, `FIXME`, `HACK`, `XXX` in code files
 2. **Missing error handling** - `catch` blocks that swallow errors, risky operations without try-catch
-3. **Missing required tests** - Only cross-reference code with tests when required by [AGENTS.md](../../AGENTS.md); do not propose tests for scripts by default
+3. **Functions without tests** - Cross-reference `src/` with test directories
 4. **Type issues** - `any` types in TypeScript files (`: any`, `as any`)
 5. **Debug artifacts** - `console.log`, `console.debug`, `debugger` statements in non-debug code
 6. **Missing validation** - User input handlers without validation
