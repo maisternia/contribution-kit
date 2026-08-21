@@ -74,11 +74,13 @@ A plain `baseline` asserts what a feature should have been in isolation. When tw
 }
 ```
 
+That snippet is the **ungrouped** form of the example, kept here to show the mechanism; the shipped config supersedes it by making the class decision one player, which makes the dependent baseline redundant — see [Grouping or a dependent baseline?](#grouping-or-a-dependent-baseline).
+
 `class_bw` inside that baseline is the coalition-resolved sibling, not the raw observed column. Writing `col('Class BW')` there instead pins it to the observed value in every coalition, so the empty coalition stops reproducing `target` and the reported shares stop summing to 100%.
 
 Two things to know when reading the output:
 
-- **A negative share is meaningful.** It means the feature *compensates* for others rather than contributing error. In the example `class_bw` lands at −19.76%, because the detector's coherent `(BW, SF)` pairing partially cancels its own SF offset — which is exactly what the geometric-regression correction is for.
+- **A negative share is meaningful.** It means the feature *compensates* for others rather than contributing error. In the ungrouped variant above, `class_bw` lands at −19.76%, because the detector's coherent `(BW, SF)` pairing partially cancels its own SF offset — which is exactly what the geometric-regression correction is for.
 - **Do not over-reference.** A baseline should reference only the features whose state it conditions on, and use ground-truth columns for the rest. Had `class_sf.baseline` used `measured_bw` in place of `col('GT BW')`, it would become the algebraic inverse of `prediction_expr`, and every coalition leaving `class_sf` at baseline would score zero — burying the bandwidth-measurement error inside the baseline. The kit warns when it detects this (`formula_absorption`).
 
 `independent: true` turns that warning into a fail-fast error. It declares that a feature sits in no dependency edge in **either** direction: nothing may reference it, and its own baseline may not reference another feature. Use it for features determined independently of the rest — here, `measured_bw` comes from bounding-box geometry and cannot inform what the detector's class SF should have been. Omitting it leaves a feature referenceable.
@@ -108,6 +110,24 @@ contribution, listing its members; there is deliberately **no per-member split**
 because splitting a group would have to score exactly the states grouping
 removes. Features left out of every group stay players in their own right.
 
+This is not a new value. Partitioning players into blocks that act as units is a
+*coalition structure* / *a priori unions* game \[[Aumann & Drèze 1974](#ref-aumann74),
+[Owen 1977](#ref-owen77)\], and what the kit computes is plain Shapley on the
+**quotient game** — the game in which each block is a single player,
+`v^P(Q) = v(union of the blocks in Q)`. In ML terms it is groupShapley
+\[[Jullum et al. 2021](#ref-jullum21)\], here over an explicit
+`prediction_expr` and author-declared baselines \[[Sundararajan & Najmi 2020](#ref-sundararajan20)\]
+rather than a black-box model; see also \[[Xu et al. 2025](#ref-xu25)\] for
+baseline Shapley over feature groups on tree models.
+
+The per-member alternative is the **Owen value** \[[Owen 1977](#ref-owen77)\],
+which the kit deliberately does not compute. Nothing is lost at the group level:
+the Owen value satisfies the quotient game property, so members' Owen values sum
+to exactly the group figure reported here — on the bundled example both the plain
+and the dependent baseline give Owen values summing to the reported `class`
+contribution, while disagreeing sharply on the split. Only the split is declined,
+and only because it is defined by the unrealizable states grouping removes.
+
 Group rules: members must be declared features, a feature may belong to at most
 one group, `members` may not be empty, and a group name may not collide with a
 feature or regime name. A single-member group is allowed and is equivalent to
@@ -132,9 +152,23 @@ Neither corrects the other. The shipped config groups, because "fix `class_bw`
 alone" is not an available action — you cannot change the bandwidth class
 without changing the class that was picked.
 
-Note that grouping made the dependent baseline unnecessary here: the grouped
-class player's baseline is the ground-truth class, so `class_sf` reverts to a
-plain `col('GT SF')`.
+Grouping does not merely make the dependent baseline optional here — it makes it
+provably redundant. `class_sf`'s baseline is only ever evaluated in coalitions
+where the `class` player is *out*, and then every member of the group is at its
+baseline, so `class_bw` is `GT BW` and the correction term vanishes identically
+on every row:
+
+```
+GT SF - round(2 * log2(GT BW / GT BW))  =  GT SF - round(2 * log2(1))  =  GT SF
+```
+
+Running the grouped example with the dependent baseline restored reproduces the
+shipped config's output exactly — `class` 26.44%, `measured_bw` 73.56%, equal to
+full float precision. The dependent baseline only ever corrected the split
+coalitions `{class_sf}` and `{class_bw}`, which are the states grouping removes.
+So `class_sf` reverting to a plain `col('GT SF')` in the shipped config is not a
+regression against the archived `dependent-prediction-feature-baselines` change:
+it is the same game, written without a term that is zero everywhere.
 
 The mirror of the over-referencing trap applies: grouping features that really
 are separable silently destroys per-feature signal, and unlike over-referencing
@@ -470,6 +504,21 @@ Each folder ships a `config.json` and a matching `measurements.csv` that can be 
 
 <a id="ref-lundberg17"></a>
 [Lundberg & Lee 2017] Lundberg, S. M., & Lee, S.-I. (2017). A unified approach to interpreting model predictions. *Advances in Neural Information Processing Systems (NeurIPS)*, 30, 4765–4774.
+
+<a id="ref-aumann74"></a>
+[Aumann & Drèze 1974] Aumann, R. J., & Drèze, J. H. (1974). Cooperative games with coalition structures. *International Journal of Game Theory*, 3(4), 217–237.
+
+<a id="ref-owen77"></a>
+[Owen 1977] Owen, G. (1977). Values of games with a priori unions. In R. Henn & O. Moeschlin (Eds.), *Mathematical Economics and Game Theory: Essays in Honor of Oskar Morgenstern* (pp. 76–88). Springer.
+
+<a id="ref-sundararajan20"></a>
+[Sundararajan & Najmi 2020] Sundararajan, M., & Najmi, A. (2020). The many Shapley values for model explanation. *Proceedings of the 37th International Conference on Machine Learning (ICML)*, PMLR 119, 9269–9278.
+
+<a id="ref-jullum21"></a>
+[Jullum et al. 2021] Jullum, M., Redelmeier, A., & Aas, K. (2021). groupShapley: Efficient prediction explanation with Shapley values for feature groups. arXiv:2106.12228.
+
+<a id="ref-xu25"></a>
+[Xu et al. 2025] Xu, F., Zhou, Z.-J., Ni, J., & Gao, W. (2025). Interpretation with baseline Shapley value for feature groups on tree models. *Frontiers of Computer Science*, 19(5), 195316.
 
 <a id="ref-dudarek26"></a>
 [Dudarek & Martyniuk 2026] Dudarek, G., & Martyniuk, A. (2026). From Discrete to Continuous LoRa Parameter Estimation Using Vision-Based Deep Learning. *Preprint*. SSRN. http://ssrn.com/abstract=6891362

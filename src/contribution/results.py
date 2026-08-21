@@ -67,7 +67,14 @@ class FeatureAttribution:
     """One Shapley player's contribution.
 
     ``members`` names the grouped prediction features when this player is a
-    declared feature group, and is empty for a lone feature.
+    declared feature group, and is empty for a lone feature. A group carries one
+    contribution -- the Shapley value of that block in the quotient game -- and
+    is never split across its members. @cite: Owen, 1977
+
+    References:
+        Owen, G. (1977). Values of games with a priori unions. In R. Henn &
+        O. Moeschlin (Eds.), Mathematical Economics and Game Theory (pp. 76-88).
+        Springer.
     """
 
     name: str
@@ -590,8 +597,17 @@ class AssessmentResult:
         lines.append("**References**")
         lines.append(
             "Shapley values: Shapley (1953) *A value for n-person games*, Princeton UP; "
-            "Lundberg & Lee (2017) *A unified approach to interpreting model predictions*, NeurIPS 30."
+            "Lundberg & Lee (2017) *A unified approach to interpreting model predictions*, NeurIPS 30. "
+            "Explicit per-feature baselines: Sundararajan & Najmi (2020) "
+            "*The many Shapley values for model explanation*, ICML, PMLR 119:9269-9278."
         )
+        if any(row.members for row in self.feature_attributions):
+            lines.append(
+                "Grouped players (Shapley over the quotient game): Aumann & Drèze (1974) "
+                "*Cooperative games with coalition structures*, Int. J. Game Theory 3(4):217-237; "
+                "Owen (1977) *Values of games with a priori unions*, in Henn & Moeschlin (eds.), 76-88; "
+                "Jullum, Redelmeier & Aas (2021) *groupShapley*, arXiv:2106.12228."
+            )
         lines.append(
             "Risk ratio CI: Koopman (1984) *Biometrics* 40(2):513-517. "
             "Odds ratio CI: Baptista & Pike (1977) *J. Roy. Statist. Soc. C* 26(2):214-220. "

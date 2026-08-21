@@ -215,6 +215,12 @@ class Estimator:
                 mean_signed_shapley=signed_total / n_rows if n_rows else 0.0,
                 total_signed_shapley=signed_total,
                 net_contribution_share_pct=(signed_total / observed_contribution_total * 100.0) if observed_contribution_total else 0.0,
+                # One entry per player. A group reports a single contribution
+                # and names its members; the per-member split (the Owen value)
+                # is deliberately not computed, since its inner step scores the
+                # split states grouping exists to remove. Group totals are
+                # unaffected: Owen values sum to the quotient-game Shapley value
+                # reported here. @cite: Owen, 1977
                 members=player.feature_names if player.is_group else (),
             )
 
@@ -325,8 +331,26 @@ class Estimator:
     def _build_players(self, features: Sequence[_Feature]) -> list[_Player]:
         """Partition features into Shapley players, validating the grouping.
 
+        The partition turns the game into a *coalition structure* game: each
+        group is a block of a priori united players, and the Shapley value is
+        then taken over the quotient game, in which every block acts as one
+        player. @cite: Aumann & Drèze, 1974; Owen, 1977
+
         A group takes the declaration position of its first member, so player
         order still tracks ``prediction_features`` order.
+
+        References:
+            Aumann, R. J., & Drèze, J. H. (1974). Cooperative games with
+            coalition structures. International Journal of Game Theory, 3(4),
+            217-237.
+
+            Owen, G. (1977). Values of games with a priori unions. In R. Henn &
+            O. Moeschlin (Eds.), Mathematical Economics and Game Theory
+            (pp. 76-88). Springer.
+
+            Jullum, M., Redelmeier, A., & Aas, K. (2021). groupShapley:
+            Efficient prediction explanation with Shapley values for feature
+            groups. arXiv:2106.12228.
         """
         assert self.spec is not None
         feature_names = [feature.name for feature in features]
@@ -1263,10 +1287,19 @@ class Estimator:
         """
         resolved: dict[str, Any] = {}
         for feature in features:
+            # Membership is tested on the feature's *player*, which is what
+            # makes a group atomic: every member of a block flips together, so
+            # only whole blocks are ever scored — the quotient game.
+            # @cite: Aumann & Drèze, 1974; Owen, 1977
             player = feature_player[feature.name] if feature_player else feature.name
             if player in subset:
                 resolved[feature.name] = actual_values[feature.name]
                 continue
+            # An absent feature falls back to an explicit, author-declared
+            # reference value rather than a marginalized or conditional
+            # expectation — i.e. baseline Shapley (BShap), extended here so the
+            # reference may itself be a function of coalition-resolved siblings.
+            # @cite: Sundararajan & Najmi, 2020
             context = build_row_context(row, resolved) if feature.baseline_deps else build_row_context(row)
             resolved[feature.name] = feature.baseline.evaluate(context)
         return resolved
@@ -1304,6 +1337,8 @@ class Estimator:
     def _assess_row(self, score, names: list[str], *, exact: bool, max_exact_features: int, n_samples: int, seed: int) -> dict[str, float]:
         # `names` are players, so the exact-path cap is compared against the
         # player count: grouping shrinks it and can restore the exact path.
+        # Cutting the exponent by grouping is groupShapley's stated motivation
+        # @cite: Jullum et al., 2021
         if exact and len(names) <= max_exact_features:
             return self._exact_shapley(score, names)
         return self._sample_shapley(score, names, n_samples=n_samples, seed=seed)

@@ -73,6 +73,16 @@ class PredictionFeature:
     feature is determined independently of the others, so that an
     over-referencing baseline fails validation instead of silently absorbing
     the prediction formula.
+
+    Requiring an explicit reference value per feature makes this a *baseline*
+    Shapley value (BShap): absent features take a declared reference rather than
+    being marginalized out or replaced by a conditional expectation.
+    @cite: Sundararajan & Najmi, 2020
+
+    References:
+        Sundararajan, M., & Najmi, A. (2020). The many Shapley values for model
+        explanation. Proceedings of the 37th International Conference on Machine
+        Learning (ICML), PMLR 119, 9269-9278.
     """
 
     actual: str
@@ -94,7 +104,22 @@ class FeatureGroup:
 
     The group's contribution is reported as a single number. No per-member
     split is computed: an internal decomposition would have to score exactly
-    the split states the grouping exists to exclude.
+    the split states the grouping exists to exclude. That per-member split is
+    the Owen value, which this kit deliberately does not compute; nothing is
+    lost at the group level, since the Owen value satisfies the quotient game
+    property and members' Owen values sum to the group figure reported here.
+
+    References:
+        Aumann, R. J., & Drèze, J. H. (1974). Cooperative games with coalition
+        structures. International Journal of Game Theory, 3(4), 217-237.
+
+        Owen, G. (1977). Values of games with a priori unions. In R. Henn &
+        O. Moeschlin (Eds.), Mathematical Economics and Game Theory (pp. 76-88).
+        Springer.
+
+        Jullum, M., Redelmeier, A., & Aas, K. (2021). groupShapley: Efficient
+        prediction explanation with Shapley values for feature groups.
+        arXiv:2106.12228.
     """
 
     members: tuple[str, ...]
