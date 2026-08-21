@@ -7,6 +7,9 @@ from contribution.results import (
     AssessmentResult,
     BurdenRankingEntry,
     BurdenRankingResult,
+    FactorialCellResult,
+    FactorialMarginalResult,
+    FactorialMatrixResult,
     FeatureAttribution,
     HypothesisAssessment,
     RegimeAssessment,
@@ -328,3 +331,64 @@ def test_markdown_and_json_include_burden_when_present(tmp_path) -> None:
 def test_markdown_omits_burden_reference_without_burden_table() -> None:
     markdown = _sample_result(include_risk=False).to_markdown()
     assert "Risk difference CI: Miettinen & Nurminen (1985)" not in markdown
+
+
+def _matrix_result(description: str | None) -> AssessmentResult:
+    matrix = FactorialMatrixResult(
+        label="Row × Quality",
+        description=description,
+        cells=[
+            FactorialCellResult(
+                name=f"{row} & {column}",
+                row_level=row,
+                column_level=column,
+                count=1,
+                mismatch_rate_pct=10.0,
+                risk_ratio=2.0,
+                rr_ci_low=1.0,
+                rr_ci_high=3.0,
+            )
+            for row in ("up", "down")
+            for column in ("ok", "off")
+        ],
+        row_marginals=[
+            FactorialMarginalResult(
+                level=level, count=2, mismatch_rate_pct=10.0, risk_ratio=2.0, rr_ci_low=1.0, rr_ci_high=3.0
+            )
+            for level in ("up", "down")
+        ],
+        column_marginals=[
+            FactorialMarginalResult(
+                level=level, count=2, mismatch_rate_pct=10.0, risk_ratio=2.0, rr_ci_low=1.0, rr_ci_high=3.0
+            )
+            for level in ("ok", "off")
+        ],
+    )
+    return AssessmentResult(
+        regimes=[],
+        n_rows=4,
+        mean_observed_contribution=0.5,
+        factorial_matrices=[matrix],
+    )
+
+
+def test_markdown_renders_crossing_description_between_heading_and_table() -> None:
+    description = "Rows split by direction; columns by measurement quality."
+    lines = _matrix_result(description).to_markdown().splitlines()
+    heading = lines.index("### Row × Quality")
+    prose = lines.index(description)
+    table = next(index for index, line in enumerate(lines) if line.startswith("| Row level |"))
+    assert heading < prose < table
+
+
+def test_markdown_omits_description_when_the_crossing_declares_none() -> None:
+    with_description = _matrix_result("Rows split by direction.").to_markdown()
+    without_description = _matrix_result(None).to_markdown()
+    assert "Rows split by direction." in with_description
+    assert "Rows split by direction." not in without_description
+    # The description-free section is exactly the pre-description rendering:
+    # heading, blank line, table header.
+    lines = without_description.splitlines()
+    heading = lines.index("### Row × Quality")
+    assert lines[heading + 1] == ""
+    assert lines[heading + 2].startswith("| Row level |")

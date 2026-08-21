@@ -44,7 +44,7 @@ The same report also contains the supporting analyses that explain *why* each ce
 - `prediction_features` is the only source of Shapley features: each entry pairs an explicit `actual` expression with a `baseline` expression.
 - A `baseline` may reference other declared features by name, to state a *conditional* ideal — "what this feature should have been, given what the features it depends on actually did". Each reference resolves to the referenced feature's **coalition-resolved** value: its `actual` when that feature is in the coalition being scored, its own baseline otherwise. `actual` expressions may reference only input columns. See [Dependent baselines](#dependent-baselines).
 - Every entry in `regimes` declares a regime: the rows matching its boolean `condition` form a subset whose observed-contribution share and mismatch risk (versus the rest, using `prediction != target`) are reported. Equality conditions are legal and analyzed only as regimes.
-- `factorials` declares two-axis crossings; every `(row level, column level)` cell becomes a regime automatically. A crossing that also names a `baseline` cell gets the attributable burden ranking.
+- `factorials` declares two-axis crossings; every `(row level, column level)` cell becomes a regime automatically. A crossing that also names a `baseline` cell gets the attributable burden ranking, and an optional `description` records what its levels mean.
 - All expressions use a safe DSL — `col('Column Name')`, arithmetic, comparisons, `and`/`or`/`not`, ternary `a if cond else b`, and the functions `abs`, `bool`, `ceil`, `floor`, `float`, `int`, `log2`, `max`, `min`, `round`, `str` — with no arbitrary code execution.
 - Conditions may additionally call `coalition_score('<player>', ...)`, which returns the error a row would still carry if only the named players were as observed and everything else were ideal. It is available **only** in `regimes` conditions and `factorials` axis level conditions; it is rejected in `target`, `prediction`, `prediction_expr`, and any `prediction_features` expression, because those define the quantity it measures. See [Conditioning on coalition scores](#conditioning-on-coalition-scores).
 
@@ -257,6 +257,30 @@ mismatch where only the measurement is at fault (194.2 recoverable), 81 rows at
 where both are — because a bad measurement often *rescues* a bad class, the same
 cancellation that gives `class_bw` its negative share above.
 
+#### Describing a crossing
+
+Level names are the crossing's identity — they compose cell names, resolve
+`baseline`, and key every marginal, contrast, and burden record — so they stay
+short, and the axis maps stay one line per level. That leaves nowhere to say
+what `bw_neutral` means. An optional `description` on the crossing is that
+place:
+
+```json
+{
+  "label": "Class decision × BW measurement",
+  "description": "Each axis holds one Shapley player at its observed value and every other player at its declared baseline — for measured_bw that baseline is col('GT BW'), i.e. an exact bandwidth measurement. Rows: class_workable means the observed class decision reaches GT SF once the bandwidth is measured exactly, so measuring better rescues it; class_unworkable means it misses GT SF even with an exact measurement ...",
+  "rows": { "class_workable": "...", "class_unworkable": "..." },
+  "columns": { "bw_neutral": "...", "bw_shifts": "..." }
+}
+```
+
+One paragraph per crossing, not one label per level: it can say what both axes
+are and what separates their levels in one place, and the grid above stays
+readable. It renders under the crossing's matrix heading — where every level
+name of the crossing appears together — and is carried on the matrix record in
+`run.json`. Nothing validates that it still matches the axes, so it sits
+directly above the levels it describes.
+
 ## Install
 
 ```bash
@@ -395,10 +419,11 @@ Config validation:
 Optional factorial regime declarations:
 
 - `factorials`: list of 2-axis crossings with inline level maps:
-    - Each crossing is an object with `rows` (level map), `columns` (level map), optional `label`, and optional `baseline`:
+    - Each crossing is an object with `rows` (level map), `columns` (level map), optional `label`, optional `description`, and optional `baseline`:
     - `"factorials": [{"rows": {"level_a": "<bool expr>", "level_b": "<bool expr>"}, "columns": {"level_c": "<bool expr>", ...}, "label": "My Factorial"}]`
     - Baseline form: `"baseline": {"rows": "<row_level>", "columns": "<column_level>"}`
     - If `label` is omitted, a fallback label "Factorial <n>" is generated based on crossing position.
+    - `description` is prose explaining what the crossing's levels mean. It renders under the crossing's matrix heading and is carried in the JSON matrix record. See [Describing a crossing](#describing-a-crossing).
 
 Each crossing generates one regime cell per `(row_level, column_level)` with condition `(<row_cond>) and (<col_cond>)` and name `"<label>: rows=<row_level>, columns=<column_level>"`. Generated cells are appended to the same regime/risk pipeline used by declared non-equality regimes.
 

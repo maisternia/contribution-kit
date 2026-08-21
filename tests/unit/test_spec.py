@@ -65,3 +65,17 @@ def test_prediction_expr_variable_requires_prediction_feature() -> None:
     )
     with pytest.raises(ValueError, match=r"undeclared prediction feature\(s\): missing"):
         Estimator.from_dataframe([{}], spec).assess(exact=True)
+
+
+def test_factorial_crossing_description_defaults_to_none() -> None:
+    crossing = FactorialCrossing(rows={"low": "x < 0"}, columns={"a": "y == 1"})
+    assert crossing.description is None
+
+
+def test_factorial_crossing_with_description() -> None:
+    crossing = FactorialCrossing(
+        rows={"low": "x < 0", "high": "x >= 0"},
+        columns={"a": "y == 1", "b": "y == 2"},
+        description="Rows split by sign of x; columns by the value of y.",
+    )
+    assert crossing.description == "Rows split by sign of x; columns by the value of y."

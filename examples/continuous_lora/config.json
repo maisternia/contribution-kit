@@ -29,7 +29,10 @@
     }
   },
   "regimes": {
-    "class_sf_match": "col('Class SF') == col('GT SF')",
+    "class_sf_match": {
+      "label": "Nominal class SF already equals GT SF",
+      "condition": "col('Class SF') == col('GT SF')"
+    },
     "class_bw within tol & sf wrong": {
       "label": "Class BW within 10% of GT BW but class SF wrong",
       "condition": "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10 and col('Class SF') != col('GT SF')"
@@ -42,6 +45,7 @@
   "factorials": [
     {
       "label": "BW quality × scaling direction",
+      "description": "Rows split by where the nominal class BW sits relative to GT BW, and so by which way the geometric correction has to scale: class_ok is within 10% of GT BW, upscale is at least 10% below it (the correction pushes SF up), downscale at least 10% above it (the correction pushes SF down). Columns split by the bounding-box BW measurement: measured_ok is within half an SF step of GT BW, measured_off at least half a step away. This crossing asks which way the detector misses, not which decision to fix.",
       "baseline": {
         "rows": "class_ok",
         "columns": "measured_ok"
@@ -58,6 +62,7 @@
     },
     {
       "label": "Class decision × BW measurement",
+      "description": "Each axis holds one Shapley player at its observed value and every other player at its declared baseline — for measured_bw that baseline is col('GT BW'), i.e. an exact bandwidth measurement; for the class it is the ground-truth class. A level therefore says whether that player alone, with nothing else contributing error, is enough to miss GT SF. Rows: class_workable means the observed class decision reaches GT SF once the bandwidth is measured exactly, so measuring better rescues it; class_unworkable means it misses GT SF even with an exact measurement, so measuring better cannot rescue it. Note that class_unworkable does not mean the row is lost — a compensating measurement error can still cancel the class error, which is what the low mismatch rate of the class_unworkable & bw_shifts cell counts. Columns: bw_neutral means the observed bandwidth measurement still reaches GT SF when paired with the ground-truth class, its error fitting inside the rounding step so it moves nothing on its own; bw_shifts means that error alone moves the estimate by at least one SF step.",
       "baseline": {
         "rows": "class_workable",
         "columns": "bw_neutral"

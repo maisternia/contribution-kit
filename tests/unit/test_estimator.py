@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -1072,3 +1073,69 @@ def test_grouping_reduces_the_player_count_for_the_exact_path() -> None:
     result = Estimator.from_dataframe(rows, _grouped_spec()).assess(exact=True, max_exact_features=2)
     shares = [i.feature.net_contribution_share_pct for i in result.regimes if i.analysis == "feature"]
     assert abs(sum(shares) - 100.0) < 1e-9
+
+
+def _described_crossing_spec(description: str | None) -> AttributionSpec:
+    return AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="f",
+        prediction_features={"f": PredictionFeature(actual="f", baseline="0")},
+        regimes=[Hypothesis(name="all_rows", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"up": "col('row') == 'up'", "down": "col('row') == 'down'"},
+                columns={"ok": "col('quality') == 'ok'", "off": "col('quality') == 'off'"},
+                label="Row × Quality",
+                baseline={"rows": "up", "columns": "ok"},
+                description=description,
+            )
+        ],
+    )
+
+
+def _described_crossing_rows() -> list[dict]:
+    return [
+        {"target": 1, "prediction": 1, "row": "up", "quality": "ok", "f": 0},
+        {"target": 1, "prediction": 1, "row": "up", "quality": "off", "f": 1},
+        {"target": 1, "prediction": 0, "row": "down", "quality": "ok", "f": 1},
+        {"target": 1, "prediction": 0, "row": "down", "quality": "off", "f": 1},
+    ]
+
+
+def test_crossing_description_reaches_the_matrix_result() -> None:
+    description = "Rows split by direction; columns by measurement quality."
+    result = Estimator.from_dataframe(
+        _described_crossing_rows(), _described_crossing_spec(description)
+    ).assess(exact=True)
+    assert result.factorial_matrices[0].description == description
+
+
+def test_crossing_without_description_leaves_the_matrix_result_none() -> None:
+    result = Estimator.from_dataframe(
+        _described_crossing_rows(), _described_crossing_spec(None)
+    ).assess(exact=True)
+    assert result.factorial_matrices[0].description is None
+
+
+def test_description_does_not_change_any_computed_value() -> None:
+    """A description is display-only: nothing it touches feeds the statistics."""
+    rows = _described_crossing_rows()
+    plain = Estimator.from_dataframe(rows, _described_crossing_spec(None)).assess(exact=True)
+    described = Estimator.from_dataframe(
+        rows, _described_crossing_spec("Rows split by direction; columns by quality.")
+    ).assess(exact=True)
+
+    def _comparable(result) -> dict:
+        matrix = result.factorial_matrices[0]
+        return {
+            "cells": [asdict(cell) for cell in matrix.cells],
+            "row_marginals": [asdict(row) for row in matrix.row_marginals],
+            "column_marginals": [asdict(row) for row in matrix.column_marginals],
+            "contrasts": [asdict(contrast) for contrast in result.contrast_results],
+            "burden": [asdict(entry) for ranking in result.burden_rankings for entry in ranking.entries],
+            "regimes": [asdict(summary) for summary in result.regime_summaries],
+            "partition_warnings": [asdict(warning) for warning in result.partition_warnings],
+        }
+
+    assert _comparable(described) == _comparable(plain)

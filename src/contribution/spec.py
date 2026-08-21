@@ -38,12 +38,21 @@ class FactorialCrossing:
     
     Axes are declared inline as maps of level name to boolean condition DSL strings.
     An optional label provides the human-readable display identity for the crossing.
+
+    ``description`` is optional prose explaining the crossing's axes and what
+    distinguishes their levels. Level names are deliberately terse -- they are
+    the identity that composes cell names, resolves ``baseline``, and keys every
+    marginal, contrast, and burden record -- so the explanation is written once
+    per crossing rather than once per level, keeping the axis maps one line per
+    level. It is display-only: it never affects level names, generated cell
+    names, partition validation, or any computed statistic.
     """
 
     rows: dict[str, str]
     columns: dict[str, str]
     label: str | None = None
     baseline: dict[str, str] | None = None
+    description: str | None = None
 
 
 @dataclass(slots=True)

@@ -64,6 +64,7 @@ def _result_from_run(payload: dict[str, Any]) -> AssessmentResult:
         factorial_matrices.append(
             FactorialMatrixResult(
                 label=item["label"],
+                description=item.get("description"),
                 cells=[FactorialCellResult(**cell) for cell in item.get("cells", [])],
                 row_marginals=[FactorialMarginalResult(**row) for row in item.get("row_marginals", [])],
                 column_marginals=[FactorialMarginalResult(**row) for row in item.get("column_marginals", [])],
@@ -225,7 +226,7 @@ def _load_spec(path: str | Path) -> AttributionSpec:
             raise ValueError(f"factorials[{index}] must be an object")
         
         # Validate known keys
-        allowed_crossing_keys = {"rows", "columns", "label", "baseline"}
+        allowed_crossing_keys = {"rows", "columns", "label", "description", "baseline"}
         unknown_keys = sorted(set(item).difference(allowed_crossing_keys))
         if unknown_keys:
             raise ValueError(f"factorials[{index}] has unknown key(s): {', '.join(unknown_keys)}")
@@ -259,6 +260,12 @@ def _load_spec(path: str | Path) -> AttributionSpec:
         if label is not None and (not isinstance(label, str) or not label.strip()):
             raise ValueError(f"factorials[{index}] 'label' must be a non-empty string when provided")
 
+        # Parse optional description: prose explaining what the crossing's
+        # levels mean, written once per crossing so the axis maps stay compact.
+        description = item.get("description")
+        if description is not None and (not isinstance(description, str) or not description.strip()):
+            raise ValueError(f"factorials[{index}] 'description' must be a non-empty string when provided")
+
         baseline_payload = item.get("baseline")
         baseline: dict[str, str] | None = None
         if baseline_payload is not None:
@@ -289,7 +296,9 @@ def _load_spec(path: str | Path) -> AttributionSpec:
                 )
             baseline = {"rows": baseline_row, "columns": baseline_column}
         
-        factorials.append(FactorialCrossing(rows=rows, columns=columns, label=label, baseline=baseline))
+        factorials.append(
+            FactorialCrossing(rows=rows, columns=columns, label=label, baseline=baseline, description=description)
+        )
 
     return AttributionSpec(
         target=payload["target"],

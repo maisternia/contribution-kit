@@ -182,6 +182,7 @@ class FactorialMarginalResult:
 @dataclass(slots=True)
 class FactorialMatrixResult:
     label: str
+    description: str | None = None
     cells: list[FactorialCellResult] = field(default_factory=list)
     row_marginals: list[FactorialMarginalResult] = field(default_factory=list)
     column_marginals: list[FactorialMarginalResult] = field(default_factory=list)
@@ -486,6 +487,13 @@ class AssessmentResult:
             for matrix in self.factorial_matrices:
                 lines.append("")
                 lines.append(f"### {matrix.label}")
+                # Level names are terse by design, so the crossing's prose
+                # description -- what its axes are and what separates their
+                # levels -- is rendered once here, where every level name of
+                # the crossing appears together.
+                if matrix.description:
+                    lines.append("")
+                    lines.append(matrix.description)
                 lines.append("")
                 column_levels = [m.level for m in matrix.column_marginals]
                 header = "| Row level | " + " | ".join(column_levels) + " | Row marginal |"

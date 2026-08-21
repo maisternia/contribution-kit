@@ -876,3 +876,55 @@ def test_load_spec_feature_group_rejects_unknown_keys(tmp_path: Path) -> None:
 def test_load_spec_feature_groups_must_be_an_object(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="'feature_groups' must be an object"):
         cli._load_spec(_group_config(tmp_path, ["class"]))
+
+
+def _factorial_config(**crossing_extras: object) -> dict:
+    crossing: dict = {
+        "rows": {"up": "row == 'up'", "down": "row == 'down'"},
+        "columns": {"ok": "col == 'ok'", "off": "col == 'off'"},
+    }
+    crossing.update(crossing_extras)
+    return {
+        "target": "target",
+        "prediction": "prediction",
+        "prediction_expr": "f",
+        "prediction_features": {"f": {"actual": "f", "baseline": "0"}},
+        "regimes": {"all": "1 == 1"},
+        "factorials": [crossing],
+    }
+
+
+def test_load_spec_parses_factorial_description(tmp_path: Path) -> None:
+    cfg = tmp_path / "described.json"
+    description = "Rows split by direction; columns by measurement quality."
+    cfg.write_text(json.dumps(_factorial_config(description=description)), encoding="utf-8")
+    loaded = cli._load_spec(cfg)
+    assert loaded.factorials[0].description == description
+
+
+def test_load_spec_factorial_description_defaults_to_none(tmp_path: Path) -> None:
+    cfg = tmp_path / "undescribed.json"
+    cfg.write_text(json.dumps(_factorial_config()), encoding="utf-8")
+    loaded = cli._load_spec(cfg)
+    assert loaded.factorials[0].description is None
+
+
+def test_load_spec_factorial_empty_description_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "empty_description.json"
+    cfg.write_text(json.dumps(_factorial_config(description="   ")), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"factorials\[0\] 'description' must be a non-empty string"):
+        cli._load_spec(cfg)
+
+
+def test_load_spec_factorial_non_string_description_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "bad_description.json"
+    cfg.write_text(json.dumps(_factorial_config(description=42)), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"factorials\[0\] 'description' must be a non-empty string"):
+        cli._load_spec(cfg)
+
+
+def test_load_spec_factorial_unknown_key_still_rejected(tmp_path: Path) -> None:
+    cfg = tmp_path / "unknown_key.json"
+    cfg.write_text(json.dumps(_factorial_config(descriptions="typo")), encoding="utf-8")
+    with pytest.raises(ValueError, match="unknown key"):
+        cli._load_spec(cfg)

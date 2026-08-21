@@ -101,6 +101,7 @@ class _Player:
 @dataclass(slots=True)
 class _FactorialPlan:
     label: str
+    description: str | None
     row_levels: list[str]
     column_levels: list[str]
     cell_names: dict[tuple[str, str], str]
@@ -907,6 +908,7 @@ class Estimator:
             plans.append(
                 _FactorialPlan(
                     label=effective_label,
+                    description=crossing.description,
                     row_levels=row_levels,
                     column_levels=column_levels,
                     cell_names=cell_names,
@@ -944,7 +946,7 @@ class Estimator:
     ) -> list[FactorialMatrixResult]:
         matrices: list[FactorialMatrixResult] = []
         for plan in plans:
-            matrix = FactorialMatrixResult(label=plan.label)
+            matrix = FactorialMatrixResult(label=plan.label, description=plan.description)
             for row_level in plan.row_levels:
                 for column_level in plan.column_levels:
                     mask = plan.cell_masks[(row_level, column_level)]
