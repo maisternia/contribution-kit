@@ -1,0 +1,3 @@
+name,label,mean_abs_shapley,mean_signed_shapley,total_signed_shapley,net_contribution_share_pct,members
+class,Nominal class decision (BW and SF chosen together),0.19032321834535929,0.18409607591183158,1862.5,92.29435084241824,"['class_sf', 'class_bw']"
+measured_bw,Measured BW (box estimate vs GT BW),0.0482850647425126,0.015370169022437482,155.5,7.705649157581764,
