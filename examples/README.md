@@ -2,7 +2,7 @@
 
 This directory contains small, self-contained example scenarios for the kit.
 
-- [continuous_lora](continuous_lora) - the bundled Sobel-style measurement example used in the package README, with formula (2.7) and experimental data referenced from Dudarek and Martyniuk's pre-print on discrete-to-continuous LoRa parameter estimation.
+- [continuous_lora](continuous_lora) - the bundled Sobel-style measurement example used in the package README, with formula (2.7) and the C18x2 model's 8,678 matched detections on the continuous-bandwidth evaluation set from Dudarek and Martyniuk's manuscript on discrete-to-continuous LoRa parameter estimation.
 - [household_temperature](household_temperature) - smart-home temperature, humidity, and window-state signals.
 - [rainy_walkway](rainy_walkway) - wet-surface estimation under rain, glare, and wind.
 - [grocery_shelf_count](grocery_shelf_count) - shelf-item counting under blur, occlusion, and low light.

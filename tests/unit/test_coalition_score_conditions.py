@@ -431,5 +431,5 @@ def test_example_coalition_scored_regime_counts_the_unworkable_rows(example_resu
         for item in example_result.regimes
         if item.analysis == "regime" and item.regime is not None
     }
-    assert counts["class_unworkable"] == 95
-    assert counts["class_unworkable & bw_neutral"] + counts["class_unworkable & bw_shifts"] == 95
+    assert counts["class_unworkable"] == 379
+    assert counts["class_unworkable & bw_neutral"] + counts["class_unworkable & bw_shifts"] == 379

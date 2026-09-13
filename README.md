@@ -4,7 +4,7 @@
 
 Answers *"what should we fix first?"* for any prediction pipeline. You declare failure **regimes** as boolean conditions over CSV columns and mark one factorial cell as the healthy **baseline**; the kit ranks every other cell by *recoverable mismatches* — how many errors would disappear if that cell reverted to the baseline rate — together with the accuracy you would reach by eliminating each cause.
 
-> Running example: throughout this README the modeled quantity is a prediction *error* (`|prediction - target|`) on the bundled continuous-LoRa dataset \[[Dudarek & Martyniuk 2026](#ref-dudarek26)\]. Swap the expressions and `score_mode` and the same math attributes any positive or negative contribution.
+> Running example: throughout this README the modeled quantity is a prediction *error* (`|prediction - target|`) on the bundled continuous-LoRa dataset — the 8,678 matched detections of the C18x2 model on the continuous-bandwidth evaluation set \[[Dudarek & Martyniuk 2026](#ref-dudarek26)\]. Swap the expressions and `score_mode` and the same math attributes any positive or negative contribution.
 
 ## The result
 
@@ -14,21 +14,21 @@ One command over a CSV and a declarative config:
 contrib run --config examples/continuous_lora/config.json --input examples/continuous_lora/measurements.csv --out outputs/run_001
 ```
 
-writes `contribution.csv`, `run.json`, and `report.md`. The centerpiece of the report is the **attributable burden ranking** — real output on the bundled 13,277-row dataset:
+writes `contribution.csv`, `run.json`, and `report.md`. The centerpiece of the report is the **attributable burden ranking** — real output on the bundled 8,678-row dataset:
 
 **BW quality × scaling direction** — baseline cell: `class_ok & measured_ok`
 
 | Rank | Cell | n | Mismatch rate | Baseline rate | Recoverable mismatches | Share of all mismatches | Risk difference (95% CI) | Accuracy if eliminated (accumulating) |
 |---:|---|---:|---:|---:|---:|---:|---:|---:|
-| 1 | class_ok & measured_off | 170 | 97.06% | 0.20% | 164.66 | 52.61% | 0.969 (0.931 to 0.985) | 98.88% |
-| 2 | upscale & measured_ok | 464 | 17.03% | 0.20% | 78.06 | 24.94% | 0.168 (0.137 to 0.205) | 99.47% |
-| 3 | downscale & measured_off | 35 | 57.14% | 0.20% | 19.93 | 6.37% | 0.569 (0.407 to 0.718) | 99.62% |
-| 4 | upscale & measured_off | 12 | 100.00% | 0.20% | 11.98 | 3.83% | 0.998 (0.755 to 0.999) | 99.71% |
-| 5 | downscale & measured_ok | 274 | 4.38% | 0.20% | 11.44 | 3.66% | 0.042 (0.023 to 0.073) | 99.80% |
+| 1 | upscale & measured_ok | 973 | 24.25% | 0.33% | 232.81 | 46.84% | 0.239 (0.213 to 0.267) | 96.96% |
+| 2 | downscale & measured_ok | 1529 | 12.82% | 0.33% | 190.98 | 38.43% | 0.125 (0.109 to 0.143) | 99.16% |
+| 3 | downscale & measured_off | 33 | 54.55% | 0.33% | 17.89 | 3.60% | 0.542 (0.377 to 0.698) | 99.36% |
+| 4 | class_ok & measured_off | 29 | 51.72% | 0.33% | 14.90 | 3.00% | 0.514 (0.341 to 0.683) | 99.53% |
+| 5 | upscale & measured_off | 21 | 57.14% | 0.33% | 11.93 | 2.40% | 0.568 (0.362 to 0.752) | 99.67% |
 
-Observed accuracy: 97.64% | Ceiling accuracy after ranked eliminations: 99.80% | Total observed mismatches: 313
+Observed accuracy: 94.27% | Ceiling accuracy after ranked eliminations: 99.67% | Total observed mismatches: 497
 
-Read it top-down as an intervention plan: fixing the rank-1 cell recovers ≈165 of the 313 observed mismatches and lifts accuracy from 97.64% to 98.88%; the rank-2 cell adds ≈78 more. Recoverable counts assume rows in a fixed regime revert to the baseline mismatch rate. Risk differences carry Miettinen-Nurminen score CIs with an Agresti-Caffo guardrail fallback \[[Miettinen & Nurminen 1985](#ref-miettinen85), [Agresti & Caffo 2000](#ref-agresti00)\].
+Read it top-down as an intervention plan: fixing the rank-1 cell recovers ≈233 of the 497 observed mismatches and lifts accuracy from 94.27% to 96.96%; the rank-2 cell adds ≈191 more. Recoverable counts assume rows in a fixed regime revert to the baseline mismatch rate. Risk differences carry Miettinen-Nurminen score CIs with an Agresti-Caffo guardrail fallback \[[Miettinen & Nurminen 1985](#ref-miettinen85), [Agresti & Caffo 2000](#ref-agresti00)\].
 
 The same report also contains the supporting analyses that explain *why* each cell misbehaves (run the command above to see them all):
 
@@ -80,7 +80,7 @@ That snippet is the **ungrouped** form of the example, kept here to show the mec
 
 Two things to know when reading the output:
 
-- **A negative share is meaningful.** It means the feature *compensates* for others rather than contributing error. In the ungrouped variant above, `class_bw` lands at −19.76%, because the detector's coherent `(BW, SF)` pairing partially cancels its own SF offset — which is exactly what the geometric-regression correction is for.
+- **A negative share is meaningful.** It means the feature *compensates* for others rather than contributing error. No player is net-compensating on the bundled example, but the mechanism is visible in its `class_unworkable & bw_shifts` cell: a bad measurement rescues a bad class in 12 of those 17 rows (29.41% mismatch against 75.69% when the measurement is neutral) — the detector's coherent `(BW, SF)` pairing partially cancels its own SF offset, which is exactly what the geometric-regression correction is for.
 - **Do not over-reference.** A baseline should reference only the features whose state it conditions on, and use ground-truth columns for the rest. Had `class_sf.baseline` used `measured_bw` in place of `col('GT BW')`, it would become the algebraic inverse of `prediction_expr`, and every coalition leaving `class_sf` at baseline would score zero — burying the bandwidth-measurement error inside the baseline. The kit warns when it detects this (`formula_absorption`).
 
 `independent: true` turns that warning into a fail-fast error. It declares that a feature sits in no dependency edge in **either** direction: nothing may reference it, and its own baseline may not reference another feature. Use it for features determined independently of the rest — here, `measured_bw` comes from bounding-box geometry and cannot inform what the detector's class SF should have been. Omitting it leaves a feature referenceable.
@@ -146,8 +146,8 @@ mis-state your analysis:
 | Reports | One contribution per feature | One contribution for the whole group |
 
 On the bundled example the two give different, individually correct answers:
-ungrouped with a dependent baseline splits the class into `class_sf` 44.11% and
-`class_bw` −19.76%; grouping reports the class decision as a single 26.44%.
+ungrouped with a dependent baseline splits the class into `class_sf` 60.90% and
+`class_bw` 11.90%; grouping reports the class decision as a single 79.78%.
 Neither corrects the other. The shipped config groups, because "fix `class_bw`
 alone" is not an available action — you cannot change the bandwidth class
 without changing the class that was picked.
@@ -163,7 +163,7 @@ GT SF - round(2 * log2(GT BW / GT BW))  =  GT SF - round(2 * log2(1))  =  GT SF
 ```
 
 Running the grouped example with the dependent baseline restored reproduces the
-shipped config's output exactly — `class` 26.44%, `measured_bw` 73.56%, equal to
+shipped config's output exactly — `class` 79.78%, `measured_bw` 20.22%, equal to
 full float precision. The dependent baseline only ever corrected the split
 coalitions `{class_sf}` and `{class_bw}`, which are the states grouping removes.
 So `class_sf` reverting to a plain `col('GT SF')` in the shipped config is not a
@@ -248,14 +248,13 @@ second asks *which decision to fix*, and only the second ranks actions. Its
 axes also partition by construction, so they cannot raise a partition warning.
 
 The difference shows up in the burden ranking. The direction axis scatters the
-95 rows whose class is genuinely unrecoverable across all three of its levels
-(23/42/30), so no level isolates them; its 10% tolerance is also a hand-picked
+379 rows whose class is genuinely unrecoverable across all three of its levels
+(9/171/199), so no level isolates them; its 10% tolerance is also a hand-picked
 number that disagrees with the formula's real flip point, which sits at a 41%
-bandwidth ratio. The decision crossing separates them: 203 rows at 96.06%
-mismatch where only the measurement is at fault (194.2 recoverable), 81 rows at
-77.78% where only the class is (62.7 recoverable), and 14 rows at just 14.29%
-where both are — because a bad measurement often *rescues* a bad class, the same
-cancellation that gives `class_bw` its negative share above.
+bandwidth ratio. The decision crossing separates them: 362 rows at 75.69%
+mismatch where only the class is at fault (266.2 recoverable), 66 rows at
+60.61% where only the measurement is (38.6 recoverable), and 17 rows at just 29.41%
+where both are — because a bad measurement often *rescues* a bad class.
 
 #### Describing a crossing
 
@@ -479,7 +478,7 @@ tests/                  — pytest suite
   unit/                 — exhaustive unit tests and coverage gate
   smoke/                — lightweight API smoke checks
 examples/               — example configs and data
-  continuous_lora/      — config.json + measurements.csv (13,277-row real sample used in The result)
+  continuous_lora/      — config.json + measurements.csv (8,678-row real sample used in The result)
 openspec/               — spec-driven development artifacts (see Generative AI usage notice)
   specs/                — current capability specifications
   changes/archive/      — every applied change: proposal.md, design.md, tasks.md, spec deltas

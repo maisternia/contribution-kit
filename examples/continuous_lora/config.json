@@ -1,5 +1,5 @@
 {
-  "description": "Continuous-LoRa example using formula (2.7) and experimental data from Dudarek and Martyniuk's pre-print on discrete-to-continuous LoRa parameter estimation.",
+  "description": "Continuous-LoRa example using formula (2.7) and the continuous-bandwidth evaluation set of the C18x2 model (8,678 matched detections at confidence 0.7, IoU 0.5) from Dudarek and Martyniuk's Array manuscript on discrete-to-continuous LoRa parameter estimation.",
   "score_mode": "absolute",
   "target": "col('GT SF')",
   "prediction": "col('Measured SF')",
@@ -25,7 +25,10 @@
   "feature_groups": {
     "class": {
       "label": "Nominal class decision (BW and SF chosen together)",
-      "members": ["class_sf", "class_bw"]
+      "members": [
+        "class_sf",
+        "class_bw"
+      ]
     }
   },
   "regimes": {
@@ -56,7 +59,7 @@
         "downscale": "col('Class BW') > col('GT BW') * (1 + 0.10)"
       },
       "columns": {
-        "measured_ok":  "abs(2 * log2(col('Measured BW') / col('GT BW'))) < 0.5",
+        "measured_ok": "abs(2 * log2(col('Measured BW') / col('GT BW'))) < 0.5",
         "measured_off": "abs(2 * log2(col('Measured BW') / col('GT BW'))) >= 0.5"
       }
     },
@@ -68,12 +71,12 @@
         "columns": "bw_neutral"
       },
       "rows": {
-        "class_workable":   "coalition_score('class') == 0",
+        "class_workable": "coalition_score('class') == 0",
         "class_unworkable": "coalition_score('class') != 0"
       },
       "columns": {
         "bw_neutral": "coalition_score('measured_bw') == 0",
-        "bw_shifts":  "coalition_score('measured_bw') != 0"
+        "bw_shifts": "coalition_score('measured_bw') != 0"
       }
     }
   ]
