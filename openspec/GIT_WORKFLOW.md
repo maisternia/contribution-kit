@@ -5,22 +5,22 @@ archive changes in the current working tree on the current branch. OpenSpec
 skills and `/opsx:*` prompts MUST NOT create, switch, merge, rename, or delete
 git branches unless the user explicitly asks for branch management.
 
-## Scope: this repository only
+## Scope: this repository, plus the superproject gitlink
 
-Every git action described here applies to **this repository and no other**.
+Every git action described here applies to **this repository**, with one
+outward exception: the superproject's gitlink.
 
 `contribution-kit` is consumed as a git submodule (it sits under
 `ultralytics-lora/ResearchData/external/contribution-kit` in the Unchirp
-superproject). That superproject is **out of scope for every OpenSpec step**.
-OpenSpec skills and `/opsx:*` prompts MUST NOT `git add`, `git commit`, or
-`git push` in any enclosing repository, and MUST NOT update its gitlink to
-point at a commit made here — not as archive finalization, not as a courtesy,
-not because a workflow step "isn't finished" without it. Publishing a commit
-here is the whole of the finalization.
+superproject). Once a commit here is pushed, updating that gitlink to point at
+it is part of finalization. Leaving it behind is what causes drift: the
+manuscript cites this repo for figures its own tree still pins to an older
+commit.
 
-Bumping the superproject's gitlink is a separate, outward-facing act with its
-own review surface. It happens only when the user asks for it in that request,
-and asking once does not authorize it next time.
+That bump is the only thing an OpenSpec step may do in an enclosing repository.
+Stage the submodule path alone, commit it on its own, and leave every unrelated
+edit in that tree uncommitted — the superproject's working tree usually holds
+manuscript work that is none of this change's business.
 
 ## Definitions
 
@@ -42,8 +42,9 @@ openspec/changes/<name> openspec/changes/archive/YYYY-MM-DD-<name>`), commit
 and push the archive result on the current branch:
 
 This repository contains no nested git repositories or submodules, so the
-archive is a single commit here. Do not look outward for a second one: see
-[Scope](#scope-this-repository-only).
+archive is a single commit here, followed by the gitlink bump in the
+superproject: see
+[Scope](#scope-this-repository-plus-the-superproject-gitlink).
 
 ```bash
 # Perform the OpenSpec archive move (folder -> openspec/changes/archive/...),
@@ -58,10 +59,20 @@ tree contains only the intended archive/spec-sync work or already-intended
 change work. If it also holds unrelated edits, stage the change work by path
 instead of using `git add -A`, and leave the rest uncommitted.
 
+Then point the superproject at the commit just pushed:
+
+```bash
+cd ../../../..   # the Unchirp superproject root
+git add ultralytics-lora/ResearchData/external/contribution-kit
+git commit -m "Bump contribution-kit to the <name> archive"
+git push
+```
+
 ## Notes
 
 - Keep OpenSpec branch-neutral by default.
-- Keep OpenSpec repository-local: never commit or push outside this repository.
+- Keep OpenSpec repository-local apart from the gitlink bump: make no other
+  change in an enclosing repository.
 - Do not merge, rename, or delete branches as part of OpenSpec archive.
 - For `bulk-archive`, apply Section 2 to each selected change independently.
 - Confirm with the user before any irreversible/destructive git action not

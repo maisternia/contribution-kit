@@ -6,10 +6,10 @@ context: |
   OpenSpec git behavior: Use the default branch-neutral OpenSpec flow. Do not
   create, switch, merge, rename, or delete git branches for OpenSpec changes
   unless the user explicitly asks for branch management.
-  Repository scope: every OpenSpec git action applies to this repository only.
-  This repo is consumed as a submodule of the Unchirp superproject; never
-  `git add`/`commit`/`push` in that or any other enclosing repository, and never
-  update its gitlink as part of an OpenSpec step. See openspec/GIT_WORKFLOW.md.
+  Repository scope: every OpenSpec git action applies to this repository, except
+  for the gitlink of the Unchirp superproject that consumes it as a submodule.
+  After pushing here, bump that gitlink as its own commit, staging the submodule
+  path alone; make no other change there. See openspec/GIT_WORKFLOW.md.
   Archive finalization (MANDATORY): after an archive move, commit and push the
   archive result on the current branch:
   - `git add -A`
