@@ -480,6 +480,9 @@ tests/                  — pytest suite
   smoke/                — lightweight API smoke checks
 examples/               — example configs and data
   continuous_lora/      — config.json + measurements.csv (13,277-row real sample used in The result)
+openspec/               — spec-driven development artifacts (see Generative AI usage notice)
+  specs/                — current capability specifications
+  changes/archive/      — every applied change: proposal.md, design.md, tasks.md, spec deltas
 ```
 
 ### Additional example datasets
@@ -547,6 +550,16 @@ Each folder ships a `config.json` and a matching `measurements.csv` that can be 
 
 <a id="ref-dudarek26"></a>
 [Dudarek & Martyniuk 2026] Dudarek, G., & Martyniuk, A. (2026). From Discrete to Continuous LoRa Parameter Estimation Using Vision-Based Deep Learning. *Preprint*. SSRN. http://ssrn.com/abstract=6891362
+
+## Generative AI usage notice
+
+In the spirit of the [Elsevier generative AI policy for authors](https://www.elsevier.com/about/policies-and-standards/generative-ai-policies-for-journals), the authors declare the following.
+
+Everything in this repository — the source code, tests, CLI, example configurations, documentation, the OpenSpec proposals, designs, task lists, and specifications, this README, and this notice itself — was generated with GitHub Copilot, driven by several underlying models including Anthropic's Claude Fable 5, under the close control of the authors. The only exception is the measurement data bundled under [examples/continuous_lora/](examples/continuous_lora), which was produced by the experimental pipeline of \[[Dudarek & Martyniuk 2026](#ref-dudarek26)\] rather than by an AI tool.
+
+Development followed spec-driven development (SDD) with [OpenSpec](https://github.com/Fission-AI/OpenSpec). Every capability was first captured as a proposal, a design, a task list, and a specification delta that the authors reviewed and approved before any code was applied. All SDD artifacts are retained in [openspec/](openspec): the current specifications live under `openspec/specs/`, and the complete change history, including the artifacts of every archived change, lives under `openspec/changes/archive/`, so each capability can be traced from its proposal to the code that implements it.
+
+While the AI contribution is significant, the ideas, the decisions on methods, the CLI and configuration design, and the fine-tuning remain solely the credit and responsibility of the authors. The authors reviewed and edited all generated content as needed and take full responsibility for the content of this repository.
 
 ## License
 
