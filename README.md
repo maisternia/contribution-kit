@@ -250,8 +250,11 @@ axes also partition by construction, so they cannot raise a partition warning.
 The difference shows up in the burden ranking. The direction axis scatters the
 379 rows whose class is genuinely unrecoverable across all three of its levels
 (9/171/199), so no level isolates them; its 10% tolerance is also a hand-picked
-number that disagrees with the formula's real flip point, which sits at a 41%
-bandwidth ratio. The decision crossing separates them: 362 rows at 75.69%
+number that disagrees with the formula's real flip point: a class is rescued
+exactly when `round(2·log2(class_bw / GT BW))` equals the class SF offset, so
+for a class with the correct SF the cut-off sits about 19% above or 16% below
+GT BW (2^±¼), and it moves with the class SF. The decision crossing separates
+them: 362 rows at 75.69%
 mismatch where only the class is at fault (266.2 recoverable), 66 rows at
 60.61% where only the measurement is (38.6 recoverable), and 17 rows at just 29.41%
 where both are — because a bad measurement often *rescues* a bad class.
