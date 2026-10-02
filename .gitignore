@@ -9,3 +9,4 @@ build/
 *.DS_Store
 
 examples/continuous_lora/DiscreteContinuous-v2
+examples/continuous_lora/DiscreteContinuous-v3

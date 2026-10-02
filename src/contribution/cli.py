@@ -14,7 +14,7 @@ from typing import Any
 from .contributor import combine_contributors, rank_contributors
 from .estimator import Estimator
 from .expr import build_row_context, evaluate_expression, parse_feature_equality_shorthand
-from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis
+from .hypothesis import OR_INTERVALS, BinaryHypothesisResult, evaluate_binary_hypothesis
 from .results import (
     AssessmentResult,
     BurdenRankingEntry,
@@ -343,8 +343,25 @@ def _help_text() -> str:
         CI method options (for hypothesis):
             --ci-method score-exact   Default. Uses Koopman asymptotic-score RR CI + Baptista-Pike exact OR CI.
             --ci-method wald          Legacy mode. Uses Wald-type confidence intervals: Katz RR CI + Haldane-Anscombe corrected OR CI.
+
+        Odds-ratio interval options (for run and hypothesis, with --ci-method score-exact):
+            --or-interval baptista-pike        Default. Baptista-Pike exact conditional interval.
+            --or-interval baptista-pike-midp   Baptista-Pike mid-p interval.
+            --or-interval cornfield            Cornfield exact conditional (central) interval.
         """
     ).strip()
+
+
+def _add_or_interval_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--or-interval",
+        default="baptista-pike",
+        choices=list(OR_INTERVALS),
+        help=(
+            "Odds-ratio interval for --ci-method score-exact: baptista-pike (default; exact conditional), "
+            "baptista-pike-midp (mid-p) or cornfield (central exact conditional)."
+        ),
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -359,6 +376,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--config", required=True)
     run_parser.add_argument("--input", required=True)
     run_parser.add_argument("--out", required=True)
+    _add_or_interval_argument(run_parser)
 
     report_parser = subcommands.add_parser("report", help="Write a markdown report")
     report_parser.add_argument("--run", required=True)
@@ -389,6 +407,7 @@ def build_parser() -> argparse.ArgumentParser:
             "or wald (legacy; Katz RR + Haldane-Anscombe OR)."
         ),
     )
+    _add_or_interval_argument(hypothesis_parser)
     hypothesis_parser.add_argument("--out", required=True)
 
     subcommands.add_parser("help", help="Show command workflow and examples")
@@ -420,7 +439,8 @@ def _load_rows(path: str | Path) -> list[dict[str, Any]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
 
     if args.command == "help":
         print(_help_text())
@@ -442,7 +462,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"hint: crossing \"{crossing_name}\" has no baseline - declare one to get an attributable-burden ranking",
                 file=sys.stderr,
             )
-        result = Estimator.from_csv(args.input, spec=spec).assess(exact=True)
+        result = Estimator.from_csv(args.input, spec=spec).assess(exact=True, or_interval=args.or_interval)
         result.save(args.out)
         return 0
 
@@ -490,6 +510,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "hypothesis":
+        if args.ci_method == "wald" and args.or_interval != "baptista-pike":
+            parser.error("--or-interval applies to --ci-method score-exact; wald always uses Haldane-Anscombe")
         rows = _load_rows(args.input)
 
         def mismatch_fn_hypothesis(row: dict[str, Any]) -> bool:
@@ -506,6 +528,7 @@ def main(argv: list[str] | None = None) -> int:
             group_b_rows=group_b_rows,
             mismatch_fn=mismatch_fn_hypothesis,
             ci_method=args.ci_method,
+            or_interval=args.or_interval,
         )
         Path(args.out).write_text(json.dumps(asdict(result), indent=2), encoding="utf-8")
         return 0

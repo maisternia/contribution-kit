@@ -1,10 +1,4 @@
-# attribution-kit-statistical-baselines Specification
-
-## Purpose
-
-Define the baseline and accuracy-test requirements for independently validating the statistical outputs contribution-kit reports: effect-size baselines and their generators live in this repository, Shapley and regime-share baselines stay in the parent repository.
-
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Effect-size baselines reside in contribution-kit
 The effect-size and confidence-interval baselines, their generator scripts and the accuracy test that compares the kit against them SHALL live in this repository: baselines and generators under `tests/reference/`, the comparison test under `tests/accuracy/`. The default `pytest` run of this repository SHALL collect and run that comparison. The Shapley and regime-share baselines and their integration tests SHALL remain in the parent repository under `ResearchData/tests/`.
@@ -27,6 +21,8 @@ Every committed effect-size baseline file SHALL carry a provenance block naming 
 #### Scenario: Generator runs as documented
 - **WHEN** the documented regeneration commands (`Rscript tests/reference/generate_effect_size_baselines.R`, then `python tests/reference/generate_effect_size_baselines.py`) are run from the repository root with the listed R and Python packages installed
 - **THEN** they rewrite `tests/reference/effect_size_baselines.json` without error, and the result is identical to the committed file apart from the timestamp
+
+## MODIFIED Requirements
 
 ### Requirement: Reported statistics are validated against independent baselines
 
@@ -98,13 +94,8 @@ The accuracy layer SHALL exercise the reported statistics across numeric edge ca
 - **WHEN** accuracy tests cover confidence-interval computation
 - **THEN** both the `score-exact` and `wald` `ci_method` paths are validated against baselines
 
-### Requirement: Existing cross-repo integration test remains green
+## REMOVED Requirements
 
-The system SHALL keep the existing parent-repo integration test
-`ResearchData/tests/test_error_attribution_kit_integration.py` in the parent repository, and
-this test MUST continue to pass after this change.
-
-#### Scenario: Existing integration test still passes
-
-- **WHEN** the parent-repo test suite is run after this change
-- **THEN** `test_error_attribution_kit_integration.py` passes unchanged in behavior
+### Requirement: Integration tests reside in the parent repository
+**Reason**: Keeping the effect-size baselines outside this repository meant the kit's own test run never compared it against an independent reference. The superproject copy was filled with kit output and has been failing unnoticed.
+**Migration**: The effect-size baselines, generator and comparison test move to `tests/reference/` and `tests/accuracy/` in this repository (see "Effect-size baselines reside in contribution-kit"). The Shapley and regime-share integration tests stay in `ResearchData/tests/`. The obsolete superproject effect-size files are removed in a separate, user-approved superproject commit.

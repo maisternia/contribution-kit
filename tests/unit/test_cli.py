@@ -928,3 +928,36 @@ def test_load_spec_factorial_unknown_key_still_rejected(tmp_path: Path) -> None:
     cfg.write_text(json.dumps(_factorial_config(descriptions="typo")), encoding="utf-8")
     with pytest.raises(ValueError, match="unknown key"):
         cli._load_spec(cfg)
+
+
+def _hypothesis_args(data: Path, out: Path, *extra: str) -> list[str]:
+    return [
+        "hypothesis", "--input", str(data), "--mismatch-expr", "mismatch", "--name", "gA",
+        "--group-a", "group == 'A'", "--group-b", "group == 'B'",
+        "--group-a-label", "A", "--group-b-label", "B", "--out", str(out), *extra,
+    ]
+
+
+def test_main_or_interval_option(tmp_path: Path) -> None:
+    data = tmp_path / "in.csv"
+    _write_csv(data, _rows())
+
+    hyp_out = tmp_path / "hyp.json"
+    assert cli.main(_hypothesis_args(data, hyp_out, "--or-interval", "baptista-pike-midp")) == 0
+    assert json.loads(hyp_out.read_text(encoding="utf-8"))["or_ci_method"] == "baptista-pike-midp"
+
+    out_dir = tmp_path / "run-out"
+    cfg = _config(tmp_path / "cfg.json")
+    assert cli.main(["run", "--config", str(cfg), "--input", str(data), "--out", str(out_dir), "--or-interval", "cornfield"]) == 0
+    payload = json.loads((out_dir / "run.json").read_text(encoding="utf-8"))
+    assert payload["metadata"]["or_interval"] == "cornfield"
+    assert "Odds ratio CI: Cornfield (1956)" in (out_dir / "report.md").read_text(encoding="utf-8")
+
+
+def test_main_rejects_or_interval_with_wald(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    data = tmp_path / "in.csv"
+    _write_csv(data, _rows())
+    with pytest.raises(SystemExit) as excinfo:
+        cli.main(_hypothesis_args(data, tmp_path / "hyp.json", "--ci-method", "wald", "--or-interval", "cornfield"))
+    assert excinfo.value.code == 2
+    assert "--or-interval applies to --ci-method score-exact" in capsys.readouterr().err

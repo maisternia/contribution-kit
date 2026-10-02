@@ -1,0 +1,1542 @@
+{
+  "provenance": {
+    "generator": "tests/reference/generate_effect_size_baselines.R",
+    "conf_level": 0.95,
+    "versions": {
+      "R": "4.5.2",
+      "PropCIs": "0.3.0",
+      "exact2x2": "1.7.0",
+      "epitools": "0.5.10.1",
+      "DescTools": "0.99.60",
+      "contingencytables": "3.1.0"
+    },
+    "calls": {
+      "koopman": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)",
+      "katz": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]",
+      "haldane_anscombe": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)",
+      "exact2x2_minlike": "exact2x2::exact2x2(matrix(c(a, b, c, d), 2, byrow = TRUE), tsmethod = 'minlike', tol = 1e-10)",
+      "exact2x2_central": "exact2x2::exact2x2(matrix(c(a, b, c, d), 2, byrow = TRUE), tsmethod = 'central', tol = 1e-10)",
+      "contingencytables_midp": "contingencytables::BaptistaPike_midP_CI_2x2(matrix(c(a, b, c, d), 2, byrow = TRUE), alpha = 0.05)"
+    }
+  },
+  "cases": [
+    {
+      "set": "legacy",
+      "label": "legacy balanced sparse",
+      "a": 1,
+      "b": 13,
+      "c": 9,
+      "d": 1,
+      "koopman": {
+        "value": 0.0793650793650794,
+        "ci_low": 0.014034259570284,
+        "ci_high": 0.361965891057327
+      },
+      "katz": {
+        "value": 0.0793650793650794,
+        "ci_low": 0.0118713007667594,
+        "ci_high": 0.530591882589862
+      },
+      "haldane_anscombe": {
+        "value": 0.0175438596491228,
+        "ci_low": 0.00157480446500056,
+        "ci_high": 0.195444588981407
+      },
+      "exact2x2_minlike": {
+        "value": 0.00854700854700855,
+        "ci_low": 0.000371879,
+        "ci_high": 0.185896273
+      },
+      "exact2x2_central": {
+        "value": 0.00854700854700855,
+        "ci_low": 0.000192791201491441,
+        "ci_high": 0.205173437004871
+      },
+      "contingencytables_midp": {
+        "value": 0.00854700854700855,
+        "ci_low": 0.000757893229318022,
+        "ci_high": 0.131111806741354
+      }
+    },
+    {
+      "set": "legacy",
+      "label": "legacy zero-event reference",
+      "a": 10,
+      "b": 90,
+      "c": 0,
+      "d": 100,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 2.67693422081022,
+        "ci_high": "inf"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 23.3204419889503,
+        "ci_low": 1.34731373811558,
+        "ci_high": 403.64986949561
+      },
+      "exact2x2_minlike": {
+        "value": "inf",
+        "ci_low": 2.542350239,
+        "ci_high": "inf"
+      },
+      "exact2x2_central": {
+        "value": "inf",
+        "ci_low": 2.39342953560197,
+        "ci_high": "inf"
+      },
+      "contingencytables_midp": {
+        "value": "inf",
+        "ci_low": 3.18440450158307,
+        "ci_high": "inf"
+      }
+    },
+    {
+      "set": "legacy",
+      "label": "legacy zero-event exposed",
+      "a": 0,
+      "b": 100,
+      "c": 10,
+      "d": 90,
+      "koopman": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 0.37356166327359
+      },
+      "katz": {
+        "value": 0,
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 0.0428808339256101,
+        "ci_low": 0.00247739458270995,
+        "ci_high": 0.742217622896544
+      },
+      "exact2x2_minlike": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 0.393336836
+      },
+      "exact2x2_central": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 0.417810503766718
+      },
+      "contingencytables_midp": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 0.314030460858639
+      }
+    },
+    {
+      "set": "legacy",
+      "label": "legacy all ones",
+      "a": 1,
+      "b": 1,
+      "c": 1,
+      "d": 1,
+      "koopman": {
+        "value": 1,
+        "ci_low": 0.15056961354701,
+        "ci_high": 6.64144628150895
+      },
+      "katz": {
+        "value": 1,
+        "ci_low": 0.140863494093218,
+        "ci_high": 7.09907138423133
+      },
+      "haldane_anscombe": {
+        "value": 1,
+        "ci_low": 0.0407374368806162,
+        "ci_high": 24.5474452143508
+      },
+      "exact2x2_minlike": {
+        "value": 1,
+        "ci_low": 0.013114895,
+        "ci_high": 76.249182998
+      },
+      "exact2x2_central": {
+        "value": 1,
+        "ci_low": 0.00641299089985111,
+        "ci_high": 155.933481836567
+      },
+      "contingencytables_midp": {
+        "value": 1,
+        "ci_low": 0.0273820623723109,
+        "ci_high": 36.5202591772574
+      }
+    },
+    {
+      "set": "realistic",
+      "label": "old SF-wrong vs rest",
+      "a": 22,
+      "b": 1,
+      "c": 291,
+      "d": 12963,
+      "koopman": {
+        "value": 43.5661138502914,
+        "ci_low": 35.3210256988694,
+        "ci_high": 49.4948216759619
+      },
+      "katz": {
+        "value": 43.5661138502914,
+        "ci_low": 37.7539990600218,
+        "ci_high": 50.2729862603183
+      },
+      "haldane_anscombe": {
+        "value": 667.075471698113,
+        "ci_low": 127.236191161328,
+        "ci_high": 3497.35150730062
+      },
+      "exact2x2_minlike": {
+        "value": 980.020618556701,
+        "ci_low": 162.505555018,
+        "ci_high": 19952.239831962
+      },
+      "exact2x2_central": {
+        "value": 980.020618556701,
+        "ci_low": 157.431181664145,
+        "ci_high": 4.5035996273705e+15
+      },
+      "contingencytables_midp": null
+    },
+    {
+      "set": "realistic",
+      "label": "upscale vs downscale (measured_ok)",
+      "a": 236,
+      "b": 737,
+      "c": 196,
+      "d": 1333,
+      "koopman": {
+        "value": 1.89212827988338,
+        "ci_low": 1.59404026868395,
+        "ci_high": 2.24551964598945
+      },
+      "katz": {
+        "value": 1.89212827988338,
+        "ci_low": 1.59391105341495,
+        "ci_high": 2.24614128866475
+      },
+      "haldane_anscombe": {
+        "value": 2.17620390736188,
+        "ci_low": 1.76491418350262,
+        "ci_high": 2.68333921880463
+      },
+      "exact2x2_minlike": {
+        "value": 2.17780300722731,
+        "ci_low": 1.76386644,
+        "ci_high": 2.696527636
+      },
+      "exact2x2_central": {
+        "value": 2.17780300722731,
+        "ci_low": 1.75604978573019,
+        "ci_high": 2.70140360112879
+      },
+      "contingencytables_midp": null
+    },
+    {
+      "set": "realistic",
+      "label": "class_ok & measured_off vs rest",
+      "a": 15,
+      "b": 14,
+      "c": 482,
+      "d": 8167,
+      "koopman": {
+        "value": 9.28137072542567,
+        "ci_low": 6.12776601678565,
+        "ci_high": 12.5160180130275
+      },
+      "katz": {
+        "value": 9.28137072542567,
+        "ci_low": 6.46143003886405,
+        "ci_high": 13.3320088625355
+      },
+      "haldane_anscombe": {
+        "value": 18.0948722529926,
+        "ci_low": 8.79065683645038,
+        "ci_high": 37.2468642496043
+      },
+      "exact2x2_minlike": {
+        "value": 18.1542679312389,
+        "ci_low": 8.691262199,
+        "ci_high": 38.440079712
+      },
+      "exact2x2_central": {
+        "value": 18.1542679312389,
+        "ci_low": 8.10914312501988,
+        "ci_high": 40.8189454816324
+      },
+      "contingencytables_midp": null
+    },
+    {
+      "set": "realistic",
+      "label": "class_unworkable vs rest",
+      "a": 279,
+      "b": 100,
+      "c": 218,
+      "d": 8081,
+      "koopman": {
+        "value": 28.0242671443441,
+        "ci_low": 24.2450560778851,
+        "ci_high": 32.3472385467935
+      },
+      "katz": {
+        "value": 28.0242671443441,
+        "ci_low": 24.2612067544286,
+        "ci_high": 32.3710010358082
+      },
+      "haldane_anscombe": {
+        "value": 102.862313148218,
+        "ci_low": 78.9465499659695,
+        "ci_high": 134.023025335026
+      },
+      "exact2x2_minlike": {
+        "value": 103.421972477064,
+        "ci_low": 78.696272387,
+        "ci_high": 134.966355031
+      },
+      "exact2x2_central": {
+        "value": 103.421972477064,
+        "ci_low": 78.5870154461168,
+        "ci_high": 136.323719008521
+      },
+      "contingencytables_midp": null
+    },
+    {
+      "set": "realistic",
+      "label": "class BW under vs clean",
+      "a": 248,
+      "b": 746,
+      "c": 0,
+      "d": 6002,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 390.067506133976,
+        "ci_high": "inf"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 3996.30609511052,
+        "ci_low": 249.00886132741,
+        "ci_high": 64136.1207817366
+      },
+      "exact2x2_minlike": {
+        "value": "inf",
+        "ci_low": 519.115128058,
+        "ci_high": "inf"
+      },
+      "exact2x2_central": {
+        "value": "inf",
+        "ci_low": 542.516556291332,
+        "ci_high": "inf"
+      },
+      "contingencytables_midp": null
+    },
+    {
+      "set": "realistic",
+      "label": "class BW over vs clean",
+      "a": 214,
+      "b": 1348,
+      "c": 0,
+      "d": 6002,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 214.193445825652,
+        "ci_high": "inf"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 1909.58286985539,
+        "ci_low": 118.982364173702,
+        "ci_high": 30647.455714711
+      },
+      "exact2x2_minlike": {
+        "value": "inf",
+        "ci_low": 247.994634541,
+        "ci_high": "inf"
+      },
+      "exact2x2_central": {
+        "value": "inf",
+        "ci_low": 254.601715645454,
+        "ci_high": "inf"
+      },
+      "contingencytables_midp": null
+    },
+    {
+      "set": "realistic",
+      "label": "SF wrong vs clean",
+      "a": 9,
+      "b": 0,
+      "c": 0,
+      "d": 6002,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 1563.42726530529,
+        "ci_high": "inf"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 228095,
+        "ci_low": 4299.5510031643,
+        "ci_high": 12100642.3663099
+      },
+      "exact2x2_minlike": {
+        "value": "inf",
+        "ci_low": 8097.580031137,
+        "ci_high": "inf"
+      },
+      "exact2x2_central": {
+        "value": "inf",
+        "ci_low": 4201.02564102301,
+        "ci_high": "inf"
+      },
+      "contingencytables_midp": {
+        "value": "inf",
+        "ci_low": 9082.9570044375,
+        "ci_high": "inf"
+      }
+    },
+    {
+      "set": "realistic",
+      "label": "measured BW off vs clean",
+      "a": 26,
+      "b": 85,
+      "c": 0,
+      "d": 6002,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 366.183698698002,
+        "ci_high": "inf"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 3720.84795321637,
+        "ci_low": 224.919019518905,
+        "ci_high": 61554.1963528381
+      },
+      "exact2x2_minlike": {
+        "value": "inf",
+        "ci_low": 457.0406231,
+        "ci_high": "inf"
+      },
+      "exact2x2_central": {
+        "value": "inf",
+        "ci_low": 452.550312291674,
+        "ci_high": "inf"
+      },
+      "contingencytables_midp": {
+        "value": "inf",
+        "ci_low": 530.818819186077,
+        "ci_high": "inf"
+      }
+    },
+    {
+      "set": "edge",
+      "label": "zero-event reference (wald point-estimate case)",
+      "a": 91,
+      "b": 385,
+      "c": 0,
+      "d": 11972,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 595.990944573751,
+        "ci_high": "inf"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 5683.44357976653,
+        "ci_low": 352.162339572424,
+        "ci_high": 91723.4107531433
+      },
+      "exact2x2_minlike": {
+        "value": "inf",
+        "ci_low": 714.017350952,
+        "ci_high": "inf"
+      },
+      "exact2x2_central": {
+        "value": "inf",
+        "ci_low": 734.091951133401,
+        "ci_high": "inf"
+      },
+      "contingencytables_midp": null
+    },
+    {
+      "set": "edge",
+      "label": "all-event exposed with non-zero reference",
+      "a": 12,
+      "b": 0,
+      "c": 30,
+      "d": 970,
+      "koopman": {
+        "value": 33.3333333333333,
+        "ci_low": 23.1006622653183,
+        "ci_high": 47.4074325141933
+      },
+      "katz": {
+        "value": 33.3333333333333,
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 795.491803278689,
+        "ci_low": 46.0337236422654,
+        "ci_high": 13746.6005140322
+      },
+      "exact2x2_minlike": {
+        "value": "inf",
+        "ci_low": 90.250533931,
+        "ci_high": "inf"
+      },
+      "exact2x2_central": {
+        "value": "inf",
+        "ci_low": 83.2185313268696,
+        "ci_high": "inf"
+      },
+      "contingencytables_midp": {
+        "value": "inf",
+        "ci_low": 90.2505339462741,
+        "ci_high": "inf"
+      }
+    },
+    {
+      "set": "edge",
+      "label": "collapsed support",
+      "a": 0,
+      "b": 1,
+      "c": 0,
+      "d": 1,
+      "koopman": {
+        "value": null,
+        "ci_low": 0,
+        "ci_high": "inf"
+      },
+      "katz": {
+        "value": null,
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 1,
+        "ci_low": 0.0108201738707806,
+        "ci_high": 92.4199566423285
+      },
+      "exact2x2_minlike": null,
+      "exact2x2_central": null,
+      "contingencytables_midp": null
+    },
+    {
+      "set": "edge",
+      "label": "non-monotone BP p-value (small)",
+      "a": 3,
+      "b": 7,
+      "c": 8,
+      "d": 2,
+      "koopman": {
+        "value": 0.375,
+        "ci_low": 0.130585918337954,
+        "ci_high": 0.88770165416034
+      },
+      "katz": {
+        "value": 0.375,
+        "ci_low": 0.138482627813824,
+        "ci_high": 1.01547033169428
+      },
+      "haldane_anscombe": {
+        "value": 0.137254901960784,
+        "ci_low": 0.0205925237689502,
+        "ci_high": 0.914842120550092
+      },
+      "exact2x2_minlike": {
+        "value": 0.107142857142857,
+        "ci_low": 0.011899344,
+        "ci_high": 1
+      },
+      "exact2x2_central": {
+        "value": 0.107142857142857,
+        "ci_low": 0.00787055506929871,
+        "ci_high": 1.13363583888992
+      },
+      "contingencytables_midp": {
+        "value": 0.107142857142857,
+        "ci_low": 0.0176905874356395,
+        "ci_high": 0.999999967998586
+      }
+    },
+    {
+      "set": "edge",
+      "label": "non-monotone BP p-value (moderate)",
+      "a": 12,
+      "b": 30,
+      "c": 4,
+      "d": 40,
+      "koopman": {
+        "value": 3.14285714285714,
+        "ci_low": 1.17455503795378,
+        "ci_high": 8.74060776950294
+      },
+      "katz": {
+        "value": 3.14285714285714,
+        "ci_low": 1.1002145284945,
+        "ci_high": 8.97784092519151
+      },
+      "haldane_anscombe": {
+        "value": 3.68852459016393,
+        "ci_low": 1.1385294571307,
+        "ci_high": 11.9498125999582
+      },
+      "exact2x2_minlike": {
+        "value": 4,
+        "ci_low": 1.058221585,
+        "ci_high": 14.451813908
+      },
+      "exact2x2_central": {
+        "value": 4,
+        "ci_low": 1.05778601130475,
+        "ci_high": 18.4326301470191
+      },
+      "contingencytables_midp": {
+        "value": 4,
+        "ci_low": 1.23354858151193,
+        "ci_high": 12.0435777443041
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 2,
+      "b": 10,
+      "c": 2,
+      "d": 8,
+      "koopman": {
+        "value": 0.833333333333333,
+        "ci_low": 0.16794620407112,
+        "ci_high": 4.19086906115685
+      },
+      "katz": {
+        "value": 0.833333333333333,
+        "ci_low": 0.141772248408415,
+        "ci_high": 4.89831015759799
+      },
+      "haldane_anscombe": {
+        "value": 0.80952380952381,
+        "ci_low": 0.112606044763383,
+        "ci_high": 5.81965914496838
+      },
+      "exact2x2_minlike": {
+        "value": 0.8,
+        "ci_low": 0.072715465,
+        "ci_high": 8.967166346
+      },
+      "exact2x2_central": {
+        "value": 0.8,
+        "ci_low": 0.0482419311123796,
+        "ci_high": 13.5082182016383
+      },
+      "contingencytables_midp": {
+        "value": 0.8,
+        "ci_low": 0.107966756345736,
+        "ci_high": 6.04254045867677
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 5,
+      "b": 6,
+      "c": 11,
+      "d": 5,
+      "koopman": {
+        "value": 0.661157024793388,
+        "ci_low": 0.294413461221358,
+        "ci_high": 1.27376744812918
+      },
+      "katz": {
+        "value": 0.661157024793388,
+        "ci_low": 0.319647002976016,
+        "ci_high": 1.36753546056693
+      },
+      "haldane_anscombe": {
+        "value": 0.404682274247492,
+        "ci_low": 0.0881742499620143,
+        "ci_high": 1.85731937794394
+      },
+      "exact2x2_minlike": {
+        "value": 0.378787878787879,
+        "ci_low": 0.069224689,
+        "ci_high": 1.955928658
+      },
+      "exact2x2_central": {
+        "value": 0.378787878787879,
+        "ci_low": 0.0582738814817845,
+        "ci_high": 2.40350315808761
+      },
+      "contingencytables_midp": {
+        "value": 0.378787878787879,
+        "ci_low": 0.0923670697595903,
+        "ci_high": 1.87068896468386
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 1,
+      "b": 10,
+      "c": 7,
+      "d": 5,
+      "koopman": {
+        "value": 0.155844155844156,
+        "ci_low": 0.0267742286551947,
+        "ci_high": 0.743183928112171
+      },
+      "katz": {
+        "value": 0.155844155844156,
+        "ci_low": 0.0226439956793678,
+        "ci_high": 1.07257576156964
+      },
+      "haldane_anscombe": {
+        "value": 0.104761904761905,
+        "ci_low": 0.0137029846963302,
+        "ci_high": 0.800924538161502
+      },
+      "exact2x2_minlike": {
+        "value": 0.0714285714285714,
+        "ci_low": 0.00293964,
+        "ci_high": 0.778370542
+      },
+      "exact2x2_central": {
+        "value": 0.0714285714285714,
+        "ci_low": 0.00145154739614631,
+        "ci_high": 0.903290929777821
+      },
+      "contingencytables_midp": {
+        "value": 0.0714285714285714,
+        "ci_low": 0.00588075624529326,
+        "ci_high": 0.778370511518838
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 4,
+      "b": 7,
+      "c": 9,
+      "d": 11,
+      "koopman": {
+        "value": 0.808080808080808,
+        "ci_low": 0.306513918016976,
+        "ci_high": 1.86103123436761
+      },
+      "katz": {
+        "value": 0.808080808080808,
+        "ci_low": 0.322123649858875,
+        "ci_high": 2.02715507748225
+      },
+      "haldane_anscombe": {
+        "value": 0.726315789473684,
+        "ci_low": 0.170268992956324,
+        "ci_high": 3.09824247433061
+      },
+      "exact2x2_minlike": {
+        "value": 0.698412698412698,
+        "ci_low": 0.147272056,
+        "ci_high": 3.470720163
+      },
+      "exact2x2_central": {
+        "value": 0.698412698412698,
+        "ci_low": 0.112852482667438,
+        "ci_high": 3.94034959320291
+      },
+      "contingencytables_midp": {
+        "value": 0.698412698412698,
+        "ci_low": 0.184163572175584,
+        "ci_high": 2.9081223460077
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 9,
+      "b": 12,
+      "c": 4,
+      "d": 0,
+      "koopman": {
+        "value": 0.428571428571429,
+        "ci_low": 0.244689383201797,
+        "ci_high": 0.928001858665665
+      },
+      "katz": {
+        "value": 0.428571428571429,
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 0.0844444444444444,
+        "ci_low": 0.00403497184703243,
+        "ci_high": 1.7672649197727
+      },
+      "exact2x2_minlike": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 1.096289389
+      },
+      "exact2x2_central": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 1.47732955916968
+      },
+      "contingencytables_midp": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 1.09628933887993
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 10,
+      "b": 7,
+      "c": 11,
+      "d": 3,
+      "koopman": {
+        "value": 0.748663101604278,
+        "ci_low": 0.438107538375168,
+        "ci_high": 1.24230494246502
+      },
+      "katz": {
+        "value": 0.748663101604278,
+        "ci_low": 0.462005415957055,
+        "ci_high": 1.21318153498841
+      },
+      "haldane_anscombe": {
+        "value": 0.426086956521739,
+        "ci_low": 0.0932133610721765,
+        "ci_high": 1.94768316934073
+      },
+      "exact2x2_minlike": {
+        "value": 0.38961038961039,
+        "ci_low": 0.071114246,
+        "ci_high": 2.148644853
+      },
+      "exact2x2_central": {
+        "value": 0.38961038961039,
+        "ci_low": 0.0523131601463721,
+        "ci_high": 2.39433282224067
+      },
+      "contingencytables_midp": {
+        "value": 0.38961038961039,
+        "ci_low": 0.092799868394802,
+        "ci_high": 1.76919796205745
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 4,
+      "b": 6,
+      "c": 8,
+      "d": 1,
+      "koopman": {
+        "value": 0.45,
+        "ci_low": 0.185496409043785,
+        "ci_high": 0.909464445164129
+      },
+      "katz": {
+        "value": 0.45,
+        "ci_low": 0.203525557485917,
+        "ci_high": 0.994961038315849
+      },
+      "haldane_anscombe": {
+        "value": 0.122171945701358,
+        "ci_low": 0.0147927321170377,
+        "ci_high": 1.00900795055055
+      },
+      "exact2x2_minlike": {
+        "value": 0.0833333333333333,
+        "ci_low": 0.003289417,
+        "ci_high": 1.176079023
+      },
+      "exact2x2_central": {
+        "value": 0.0833333333333333,
+        "ci_low": 0.0016227760334347,
+        "ci_high": 1.2073491639073
+      },
+      "contingencytables_midp": {
+        "value": 0.0833333333333333,
+        "ci_low": 0.00660665991825913,
+        "ci_high": 0.759835748909704
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 8,
+      "b": 10,
+      "c": 1,
+      "d": 0,
+      "koopman": {
+        "value": 0.444444444444444,
+        "ci_low": 0.245588866049845,
+        "ci_high": 2.26415885541123
+      },
+      "katz": {
+        "value": 0.444444444444444,
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 0.26984126984127,
+        "ci_low": 0.00969803738744619,
+        "ci_high": 7.50814912343036
+      },
+      "exact2x2_minlike": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 17.1
+      },
+      "exact2x2_central": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 35.100398584907
+      },
+      "contingencytables_midp": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 8.09999999956941
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 12,
+      "b": 3,
+      "c": 10,
+      "d": 1,
+      "koopman": {
+        "value": 0.88,
+        "ci_low": 0.590790340673548,
+        "ci_high": 1.3329153978533
+      },
+      "katz": {
+        "value": 0.88,
+        "ci_low": 0.642498201012534,
+        "ci_high": 1.20529520359683
+      },
+      "haldane_anscombe": {
+        "value": 0.510204081632653,
+        "ci_low": 0.0636587409461086,
+        "ci_high": 4.08911959372535
+      },
+      "exact2x2_minlike": {
+        "value": 0.4,
+        "ci_low": 0.014122541,
+        "ci_high": 4.390679171
+      },
+      "exact2x2_central": {
+        "value": 0.4,
+        "ci_low": 0.00694344776499117,
+        "ci_high": 6.12280766887204
+      },
+      "contingencytables_midp": {
+        "value": 0.4,
+        "ci_low": 0.0283248966955208,
+        "ci_high": 3.15633838458999
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 12,
+      "b": 2,
+      "c": 5,
+      "d": 1,
+      "koopman": {
+        "value": 1.02857142857143,
+        "ci_low": 0.683479339685451,
+        "ci_high": 2.00513662978338
+      },
+      "katz": {
+        "value": 1.02857142857143,
+        "ci_low": 0.677938473018994,
+        "ci_high": 1.56055339205366
+      },
+      "haldane_anscombe": {
+        "value": 1.36363636363636,
+        "ci_low": 0.142430953286918,
+        "ci_high": 13.0554776845841
+      },
+      "exact2x2_minlike": {
+        "value": 1.2,
+        "ci_low": 0.034625085,
+        "ci_high": 18.518379008
+      },
+      "exact2x2_central": {
+        "value": 1.2,
+        "ci_low": 0.0169897898222852,
+        "ci_high": 28.1805140447235
+      },
+      "contingencytables_midp": {
+        "value": 1.2,
+        "ci_low": 0.0700618169297672,
+        "ci_high": 12.1220744464943
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 11,
+      "b": 0,
+      "c": 12,
+      "d": 2,
+      "koopman": {
+        "value": 1.16666666666667,
+        "ci_low": 0.848531266602305,
+        "ci_high": 1.66503990871645
+      },
+      "katz": {
+        "value": 1.16666666666667,
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 4.6,
+        "ci_low": 0.19906099923545,
+        "ci_high": 106.29907456142
+      },
+      "exact2x2_minlike": {
+        "value": "inf",
+        "ci_low": 0.228364794,
+        "ci_high": "inf"
+      },
+      "exact2x2_central": {
+        "value": "inf",
+        "ci_low": 0.148060713167598,
+        "ci_high": "inf"
+      },
+      "contingencytables_midp": {
+        "value": "inf",
+        "ci_low": 0.369687687638424,
+        "ci_high": "inf"
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 9,
+      "b": 7,
+      "c": 6,
+      "d": 4,
+      "koopman": {
+        "value": 0.9375,
+        "ci_low": 0.487310073641353,
+        "ci_high": 1.97107975997774
+      },
+      "katz": {
+        "value": 0.9375,
+        "ci_low": 0.481910490427965,
+        "ci_high": 1.82379563727588
+      },
+      "haldane_anscombe": {
+        "value": 0.876923076923077,
+        "ci_low": 0.188631698584412,
+        "ci_high": 4.07669595625316
+      },
+      "exact2x2_minlike": {
+        "value": 0.857142857142857,
+        "ci_low": 0.164406083,
+        "ci_high": 4.573964764
+      },
+      "exact2x2_central": {
+        "value": 0.857142857142857,
+        "ci_low": 0.12504814028226,
+        "ci_high": 5.51097970433058
+      },
+      "contingencytables_midp": {
+        "value": 0.857142857142857,
+        "ci_low": 0.20649488929313,
+        "ci_high": 4.573964733199
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 12,
+      "b": 5,
+      "c": 7,
+      "d": 9,
+      "koopman": {
+        "value": 1.61344537815126,
+        "ci_low": 0.885147533373081,
+        "ci_high": 3.21359379963096
+      },
+      "katz": {
+        "value": 1.61344537815126,
+        "ci_low": 0.855279878709257,
+        "ci_high": 3.0436890345255
+      },
+      "haldane_anscombe": {
+        "value": 2.87878787878788,
+        "ci_low": 0.719564528074126,
+        "ci_high": 11.5172709711481
+      },
+      "exact2x2_minlike": {
+        "value": 3.08571428571429,
+        "ci_low": 0.678888835,
+        "ci_high": 14.261296746
+      },
+      "exact2x2_central": {
+        "value": 3.08571428571429,
+        "ci_low": 0.599262480737033,
+        "ci_high": 16.6454802164678
+      },
+      "contingencytables_midp": {
+        "value": 3.08571428571429,
+        "ci_low": 0.678888870583678,
+        "ci_high": 14.261296709912
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 12,
+      "b": 3,
+      "c": 7,
+      "d": 11,
+      "koopman": {
+        "value": 2.05714285714286,
+        "ci_low": 1.13826943681916,
+        "ci_high": 4.07413372430223
+      },
+      "katz": {
+        "value": 2.05714285714286,
+        "ci_low": 1.09345798920702,
+        "ci_high": 3.8701411270156
+      },
+      "haldane_anscombe": {
+        "value": 5.47619047619048,
+        "ci_low": 1.22145097740108,
+        "ci_high": 24.5516706657578
+      },
+      "exact2x2_minlike": {
+        "value": 6.28571428571429,
+        "ci_low": 1.198357034,
+        "ci_high": 32.903930361
+      },
+      "exact2x2_central": {
+        "value": 6.28571428571429,
+        "ci_low": 1.06360220851018,
+        "ci_high": 44.7715526214537
+      },
+      "contingencytables_midp": {
+        "value": 6.28571428571429,
+        "ci_low": 1.19835710043241,
+        "ci_high": 25.2174690867065
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 6,
+      "b": 6,
+      "c": 2,
+      "d": 6,
+      "koopman": {
+        "value": 2,
+        "ci_low": 0.637179123861526,
+        "ci_high": 7.60213040593678
+      },
+      "katz": {
+        "value": 2,
+        "ci_low": 0.530595822954367,
+        "ci_high": 7.53869485388695
+      },
+      "haldane_anscombe": {
+        "value": 2.6,
+        "ci_low": 0.421595308001419,
+        "ci_high": 16.0343340442898
+      },
+      "exact2x2_minlike": {
+        "value": 3,
+        "ci_low": 0.326503804,
+        "ci_high": 26.75913581
+      },
+      "exact2x2_central": {
+        "value": 3,
+        "ci_low": 0.316604108411896,
+        "ci_high": 40.1965602688
+      },
+      "contingencytables_midp": {
+        "value": 3,
+        "ci_low": 0.500418877325902,
+        "ci_high": 18.2698882404054
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 10,
+      "b": 3,
+      "c": 0,
+      "d": 12,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 3.08949836067395,
+        "ci_high": "inf"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 75,
+        "ci_low": 3.46533641983501,
+        "ci_high": 1623.21902364326
+      },
+      "exact2x2_minlike": {
+        "value": "inf",
+        "ci_low": 5.133192358,
+        "ci_high": "inf"
+      },
+      "exact2x2_central": {
+        "value": "inf",
+        "ci_low": 4.76493424905991,
+        "ci_high": "inf"
+      },
+      "contingencytables_midp": {
+        "value": "inf",
+        "ci_low": 7.38225613856944,
+        "ci_high": "inf"
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 9,
+      "b": 12,
+      "c": 3,
+      "d": 7,
+      "koopman": {
+        "value": 1.42857142857143,
+        "ci_low": 0.561890760475355,
+        "ci_high": 4.32795322621003
+      },
+      "katz": {
+        "value": 1.42857142857143,
+        "ci_low": 0.491080872761386,
+        "ci_high": 4.15576423299678
+      },
+      "haldane_anscombe": {
+        "value": 1.62857142857143,
+        "ci_low": 0.35489887395201,
+        "ci_high": 7.47324123186096
+      },
+      "exact2x2_minlike": {
+        "value": 1.75,
+        "ci_low": 0.331632297,
+        "ci_high": 9.733401561
+      },
+      "exact2x2_central": {
+        "value": 1.75,
+        "ci_low": 0.283792633605185,
+        "ci_high": 13.2262300916614
+      },
+      "contingencytables_midp": {
+        "value": 1.75,
+        "ci_low": 0.377198782412331,
+        "ci_high": 7.46070581703273
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 5,
+      "b": 0,
+      "c": 10,
+      "d": 4,
+      "koopman": {
+        "value": 1.4,
+        "ci_low": 0.757060604537817,
+        "ci_high": 2.20502714272461
+      },
+      "katz": {
+        "value": 1.4,
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 4.71428571428572,
+        "ci_low": 0.21268766854242,
+        "ci_high": 104.493551263343
+      },
+      "exact2x2_minlike": {
+        "value": "inf",
+        "ci_low": 0.265848358,
+        "ci_high": "inf"
+      },
+      "exact2x2_central": {
+        "value": "inf",
+        "ci_low": 0.228289758354604,
+        "ci_high": "inf"
+      },
+      "contingencytables_midp": {
+        "value": "inf",
+        "ci_low": 0.384286180168809,
+        "ci_high": "inf"
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 2,
+      "b": 11,
+      "c": 6,
+      "d": 0,
+      "koopman": {
+        "value": 0.153846153846154,
+        "ci_low": 0.0432553395531875,
+        "ci_high": 0.423442370166361
+      },
+      "katz": {
+        "value": 0.153846153846154,
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 0.0167224080267558,
+        "ci_low": 0.000691910266039559,
+        "ci_high": 0.404154908430453
+      },
+      "exact2x2_minlike": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 0.258012018
+      },
+      "exact2x2_central": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 0.331642055625985
+      },
+      "contingencytables_midp": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 0.234623529677284
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 5,
+      "b": 9,
+      "c": 8,
+      "d": 3,
+      "koopman": {
+        "value": 0.491071428571429,
+        "ci_low": 0.212809314525586,
+        "ci_high": 1.04860248949317
+      },
+      "katz": {
+        "value": 0.491071428571429,
+        "ci_low": 0.222762972296142,
+        "ci_high": 1.08254592526534
+      },
+      "haldane_anscombe": {
+        "value": 0.238390092879257,
+        "ci_low": 0.0467735484875502,
+        "ci_high": 1.21499946488147
+      },
+      "exact2x2_minlike": {
+        "value": 0.208333333333333,
+        "ci_low": 0.034978599,
+        "ci_high": 1.263695011
+      },
+      "exact2x2_central": {
+        "value": 0.208333333333333,
+        "ci_low": 0.0254165408700245,
+        "ci_high": 1.49349491426254
+      },
+      "contingencytables_midp": {
+        "value": 0.208333333333333,
+        "ci_low": 0.0466325499332221,
+        "ci_high": 1.14869836761998
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 0,
+      "b": 3,
+      "c": 4,
+      "d": 5,
+      "koopman": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 1.64781373465567
+      },
+      "katz": {
+        "value": 0,
+        "ci_low": null,
+        "ci_high": null
+      },
+      "haldane_anscombe": {
+        "value": 0.174603174603175,
+        "ci_low": 0.00701522268527924,
+        "ci_high": 4.34573069868176
+      },
+      "exact2x2_minlike": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 3.349539799
+      },
+      "exact2x2_central": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 4.91393359113287
+      },
+      "contingencytables_midp": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 2.4101422911369
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 8,
+      "b": 10,
+      "c": 12,
+      "d": 4,
+      "koopman": {
+        "value": 0.592592592592593,
+        "ci_low": 0.313084189823105,
+        "ci_high": 1.04649697654144
+      },
+      "katz": {
+        "value": 0.592592592592593,
+        "ci_low": 0.328853133443543,
+        "ci_high": 1.06785049337503
+      },
+      "haldane_anscombe": {
+        "value": 0.291428571428571,
+        "ci_low": 0.0713865554162507,
+        "ci_high": 1.18972839843123
+      },
+      "exact2x2_minlike": {
+        "value": 0.266666666666667,
+        "ci_low": 0.060074855,
+        "ci_high": 1.217065337
+      },
+      "exact2x2_central": {
+        "value": 0.266666666666667,
+        "ci_low": 0.0460707734077728,
+        "ci_high": 1.39931710995465
+      },
+      "contingencytables_midp": {
+        "value": 0.266666666666667,
+        "ci_low": 0.0748763616757979,
+        "ci_high": 1.21706527522821
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 6,
+      "b": 7,
+      "c": 11,
+      "d": 2,
+      "koopman": {
+        "value": 0.545454545454546,
+        "ci_low": 0.26725494979371,
+        "ci_high": 0.969541067694176
+      },
+      "katz": {
+        "value": 0.545454545454546,
+        "ci_low": 0.290142533260482,
+        "ci_high": 1.02542932197369
+      },
+      "haldane_anscombe": {
+        "value": 0.188405797101449,
+        "ci_low": 0.0335864877294601,
+        "ci_high": 1.05687574918103
+      },
+      "exact2x2_minlike": {
+        "value": 0.155844155844156,
+        "ci_low": 0.019526857,
+        "ci_high": 1.040583234
+      },
+      "exact2x2_central": {
+        "value": 0.155844155844156,
+        "ci_low": 0.0130799729040338,
+        "ci_high": 1.26752597448099
+      },
+      "contingencytables_midp": {
+        "value": 0.155844155844156,
+        "ci_low": 0.0283109321937557,
+        "ci_high": 1.0000000310536
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 10,
+      "b": 6,
+      "c": 7,
+      "d": 1,
+      "koopman": {
+        "value": 0.714285714285714,
+        "ci_low": 0.426897287851569,
+        "ci_high": 1.27294511365588
+      },
+      "katz": {
+        "value": 0.714285714285714,
+        "ci_low": 0.450402119007446,
+        "ci_high": 1.13277460318569
+      },
+      "haldane_anscombe": {
+        "value": 0.323076923076923,
+        "ci_low": 0.0433974630465121,
+        "ci_high": 2.40517972474525
+      },
+      "exact2x2_minlike": {
+        "value": 0.238095238095238,
+        "ci_low": 0.009234441,
+        "ci_high": 2.698156943
+      },
+      "exact2x2_central": {
+        "value": 0.238095238095238,
+        "ci_low": 0.00454518262609482,
+        "ci_high": 2.86565705497265
+      },
+      "contingencytables_midp": {
+        "value": 0.238095238095238,
+        "ci_low": 0.018448351500042,
+        "ci_high": 1.82201645834578
+      }
+    }
+  ]
+}

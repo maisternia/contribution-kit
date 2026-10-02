@@ -8,14 +8,14 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .hypothesis import BinaryHypothesisResult
+from .hypothesis import FALLBACK_CI_METHODS, BinaryHypothesisResult
 
 
 def _format_effect_ci(value: float, ci_low: float | None, ci_high: float | None) -> str:
     """Format an effect size with its confidence interval as ``value (low to high)``.
 
-    Matches the Prism-style reporting of a point estimate alongside its range. When
-    the value is infinite or a CI bound is unavailable the range is reported as n/a.
+    Reports the point estimate alongside its range. When the value is infinite or
+    a CI bound is unavailable the range is reported as n/a.
     """
 
     point = "inf" if value == float("inf") else f"{value:.2f}"
@@ -53,6 +53,40 @@ def _attribution_record(row: "FeatureAttribution") -> dict[str, Any]:
     else:
         record["members"] = list(record["members"])
     return record
+
+
+FALLBACK_MARKER = "†"
+FALLBACK_FOOTNOTE = (
+    "† Interval from the Katz (risk ratio) or Haldane-Anscombe (odds ratio) fallback: "
+    "the primary score or exact inversion failed numerically for that table."
+)
+
+_OR_INTERVAL_REFERENCES = {
+    "baptista-pike": "Odds ratio CI: Baptista & Pike (1977) *J. Roy. Statist. Soc. C* 26(2):214-220. ",
+    "baptista-pike-midp": (
+        "Odds ratio CI: Baptista & Pike (1977) *J. Roy. Statist. Soc. C* 26(2):214-220, "
+        "mid-p variant: Lancaster (1961) *J. Amer. Statist. Assoc.* 56(294):223-234. "
+    ),
+    "cornfield": (
+        "Odds ratio CI: Cornfield (1956) *Proc. Third Berkeley Symp. Math. Statist. Probab.* 4:135-148. "
+    ),
+}
+
+
+def _mismatch_risk_reference(metadata: dict[str, Any]) -> str:
+    """Cite the interval methods the analysis actually used."""
+
+    if metadata.get("ci_method", "score-exact") == "wald":
+        return (
+            "Risk ratio CI: Katz, Baptista, Azen & Pike (1978) *Biometrics* 34(3):469-474. "
+            "Odds ratio CI: Haldane (1956) *Ann. Hum. Genet.* 20(4):309-311; "
+            "Anscombe (1956) *Biometrika* 43(3-4):461-464."
+        )
+    return (
+        "Risk ratio CI: Koopman (1984) *Biometrics* 40(2):513-517. "
+        + _OR_INTERVAL_REFERENCES[metadata.get("or_interval", "baptista-pike")]
+        + "Small-sample recommendation: Fagerland, Lydersen & Laake (2015, 2017)."
+    )
 
 
 def _format_rd(value: float, ci_low: float | None, ci_high: float | None) -> str:
@@ -167,6 +201,7 @@ class FactorialCellResult:
     risk_ratio: float | None
     rr_ci_low: float | None
     rr_ci_high: float | None
+    rr_ci_method: str | None = None
 
 
 @dataclass(slots=True)
@@ -177,6 +212,7 @@ class FactorialMarginalResult:
     risk_ratio: float | None
     rr_ci_low: float | None
     rr_ci_high: float | None
+    rr_ci_method: str | None = None
 
 
 @dataclass(slots=True)
@@ -206,6 +242,8 @@ class ContrastResult:
     odds_ratio: float
     or_ci_low: float
     or_ci_high: float
+    rr_ci_method: str | None = None
+    or_ci_method: str | None = None
 
 
 @dataclass(slots=True)
@@ -322,6 +360,16 @@ class AssessmentResult:
 
     def to_markdown(self) -> str:
         lines: list[str] = ["# Factor-Contribution Analysis Report", ""]
+        score_exact = self.metadata.get("ci_method", "score-exact") == "score-exact"
+        fallback_rows = 0
+
+        def marked(text: str, ci_method: str | None) -> str:
+            """Append the fallback marker when a score-exact interval fell back."""
+            nonlocal fallback_rows
+            if score_exact and ci_method in FALLBACK_CI_METHODS:
+                fallback_rows += 1
+                return f"{text} {FALLBACK_MARKER}"
+            return text
 
         features = self.feature_attributions
         lines.append("## Shapley Value Contributions")
@@ -435,8 +483,8 @@ class AssessmentResult:
             lines.append("| Regime | Regime mismatch rate | Rest mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |")
             lines.append("|---|---:|---:|---:|---:|")
             for risk in risks:
-                rr = _format_effect_ci(risk.risk_ratio, risk.rr_ci_low, risk.rr_ci_high)
-                or_ = _format_effect_ci(risk.odds_ratio, risk.or_ci_low, risk.or_ci_high)
+                rr = marked(_format_effect_ci(risk.risk_ratio, risk.rr_ci_low, risk.rr_ci_high), risk.rr_ci_method)
+                or_ = marked(_format_effect_ci(risk.odds_ratio, risk.or_ci_low, risk.or_ci_high), risk.or_ci_method)
                 lines.append(
                     f"| {risk.test_name} | {risk.mismatch_rate_a_pct:.2f}% ({_format_mismatch_split(risk.mismatch_count_a, risk.total_count_a)}) | "
                     f"{risk.mismatch_rate_b_pct:.2f}% ({_format_mismatch_split(risk.mismatch_count_b, risk.total_count_b)}) | {rr} | {or_} |"
@@ -506,19 +554,20 @@ class AssessmentResult:
                     for column_level in column_levels:
                         cell = cell_lookup[(row_marginal.level, column_level)]
                         row_cells.append(
-                            f"n={cell.count}, mismatch={cell.mismatch_rate_pct:.2f}%, RR={_format_rr(cell.risk_ratio, cell.rr_ci_low, cell.rr_ci_high)}"
+                            f"n={cell.count}, mismatch={cell.mismatch_rate_pct:.2f}%, "
+                            f"RR={marked(_format_rr(cell.risk_ratio, cell.rr_ci_low, cell.rr_ci_high), cell.rr_ci_method)}"
                         )
                     marginal = row_lookup[row_marginal.level]
                     marginal_text = (
                         f"n={marginal.count}, mismatch={marginal.mismatch_rate_pct:.2f}%, "
-                        f"RR={_format_rr(marginal.risk_ratio, marginal.rr_ci_low, marginal.rr_ci_high)}"
+                        f"RR={marked(_format_rr(marginal.risk_ratio, marginal.rr_ci_low, marginal.rr_ci_high), marginal.rr_ci_method)}"
                     )
                     lines.append(f"| {row_marginal.level} | " + " | ".join(row_cells) + f" | {marginal_text} |")
                 col_cells: list[str] = []
                 for column_marginal in matrix.column_marginals:
                     col_cells.append(
                         f"n={column_marginal.count}, mismatch={column_marginal.mismatch_rate_pct:.2f}%, "
-                        f"RR={_format_rr(column_marginal.risk_ratio, column_marginal.rr_ci_low, column_marginal.rr_ci_high)}"
+                        f"RR={marked(_format_rr(column_marginal.risk_ratio, column_marginal.rr_ci_low, column_marginal.rr_ci_high), column_marginal.rr_ci_method)}"
                     )
                 lines.append("| Column marginal | " + " | ".join(col_cells) + " | n/a |")
 
@@ -527,8 +576,8 @@ class AssessmentResult:
             lines.append("## Within-stratum contrasts")
             lines.append("")
             lines.append(
-                "Sibling-level contrasts within each stratum reuse Koopman risk-ratio and "
-                "Baptista-Pike odds-ratio intervals."
+                "Sibling-level contrasts within each stratum use the same risk-ratio and "
+                "odds-ratio intervals as the mismatch-risk table."
             )
             grouped: dict[tuple[str, str], list[ContrastResult]] = {}
             for contrast in self.contrast_results:
@@ -541,8 +590,8 @@ class AssessmentResult:
                 lines.append("| Comparison | A mismatch rate | B mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |")
                 lines.append("|---|---:|---:|---:|---:|")
                 for contrast in grouped[(factorial, stratum)]:
-                    rr = _format_effect_ci(contrast.risk_ratio, contrast.rr_ci_low, contrast.rr_ci_high)
-                    or_ = _format_effect_ci(contrast.odds_ratio, contrast.or_ci_low, contrast.or_ci_high)
+                    rr = marked(_format_effect_ci(contrast.risk_ratio, contrast.rr_ci_low, contrast.rr_ci_high), contrast.rr_ci_method)
+                    or_ = marked(_format_effect_ci(contrast.odds_ratio, contrast.or_ci_low, contrast.or_ci_high), contrast.or_ci_method)
                     lines.append(
                         f"| {contrast.level_a} vs {contrast.level_b} | "
                         f"{contrast.mismatch_rate_a_pct:.2f}% ({_format_mismatch_split(contrast.mismatch_count_a, contrast.total_count_a)}) | "
@@ -597,6 +646,9 @@ class AssessmentResult:
                     f"Observed accuracy: {ranking.observed_accuracy_pct:.2f}% | Ceiling accuracy after ranked eliminations: {ranking.ceiling_accuracy_pct:.2f}% | Total observed mismatches: {ranking.total_mismatches}"
                 )
 
+        if fallback_rows:
+            lines.append("")
+            lines.append(FALLBACK_FOOTNOTE)
         lines.append("")
         lines.append(f"Rows: {self.n_rows}")
         lines.append(f"Mean observed contribution: {self.mean_observed_contribution:.6f}")
@@ -616,11 +668,7 @@ class AssessmentResult:
                 "Owen (1977) *Values of games with a priori unions*, in Henn & Moeschlin (eds.), 76-88; "
                 "Jullum, Redelmeier & Aas (2021) *groupShapley*, arXiv:2106.12228."
             )
-        lines.append(
-            "Risk ratio CI: Koopman (1984) *Biometrics* 40(2):513-517. "
-            "Odds ratio CI: Baptista & Pike (1977) *J. Roy. Statist. Soc. C* 26(2):214-220. "
-            "Small-sample recommendation: Fagerland, Lydersen & Laake (2015, 2017)."
-        )
+        lines.append(_mismatch_risk_reference(self.metadata))
         if self.burden_rankings:
             lines.append(
                 "Risk difference CI: Miettinen & Nurminen (1985) *Statistics in Medicine* 4(2):213-226. "

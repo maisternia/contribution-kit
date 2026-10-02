@@ -1,0 +1,42 @@
+set,label,a,b,c,d
+legacy,legacy balanced sparse,1,13,9,1
+legacy,legacy zero-event reference,10,90,0,100
+legacy,legacy zero-event exposed,0,100,10,90
+legacy,legacy all ones,1,1,1,1
+realistic,old SF-wrong vs rest,22,1,291,12963
+realistic,upscale vs downscale (measured_ok),236,737,196,1333
+realistic,class_ok & measured_off vs rest,15,14,482,8167
+realistic,class_unworkable vs rest,279,100,218,8081
+realistic,class BW under vs clean,248,746,0,6002
+realistic,class BW over vs clean,214,1348,0,6002
+realistic,SF wrong vs clean,9,0,0,6002
+realistic,measured BW off vs clean,26,85,0,6002
+edge,zero-event reference (wald point-estimate case),91,385,0,11972
+edge,all-event exposed with non-zero reference,12,0,30,970
+edge,collapsed support,0,1,0,1
+edge,non-monotone BP p-value (small),3,7,8,2
+edge,non-monotone BP p-value (moderate),12,30,4,40
+sweep,seeded small-table sweep,2,10,2,8
+sweep,seeded small-table sweep,5,6,11,5
+sweep,seeded small-table sweep,1,10,7,5
+sweep,seeded small-table sweep,4,7,9,11
+sweep,seeded small-table sweep,9,12,4,0
+sweep,seeded small-table sweep,10,7,11,3
+sweep,seeded small-table sweep,4,6,8,1
+sweep,seeded small-table sweep,8,10,1,0
+sweep,seeded small-table sweep,12,3,10,1
+sweep,seeded small-table sweep,12,2,5,1
+sweep,seeded small-table sweep,11,0,12,2
+sweep,seeded small-table sweep,9,7,6,4
+sweep,seeded small-table sweep,12,5,7,9
+sweep,seeded small-table sweep,12,3,7,11
+sweep,seeded small-table sweep,6,6,2,6
+sweep,seeded small-table sweep,10,3,0,12
+sweep,seeded small-table sweep,9,12,3,7
+sweep,seeded small-table sweep,5,0,10,4
+sweep,seeded small-table sweep,2,11,6,0
+sweep,seeded small-table sweep,5,9,8,3
+sweep,seeded small-table sweep,0,3,4,5
+sweep,seeded small-table sweep,8,10,12,4
+sweep,seeded small-table sweep,6,7,11,2
+sweep,seeded small-table sweep,10,6,7,1

@@ -5,7 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Sequence
 
-from .stats import baptista_pike_odds_ratio, haldane_anscombe_odds_ratio, katz_risk_ratio, koopman_risk_ratio
+from .stats import (
+    baptista_pike_odds_ratio,
+    cornfield_exact_odds_ratio,
+    haldane_anscombe_odds_ratio,
+    katz_risk_ratio,
+    koopman_risk_ratio,
+)
+
+CI_METHODS = ("score-exact", "wald")
+OR_INTERVALS = ("baptista-pike", "baptista-pike-midp", "cornfield")
+FALLBACK_CI_METHODS = frozenset({"katz", "haldane-anscombe"})
+"""CI-method labels that, under ``ci_method="score-exact"``, mark a numerical fallback."""
 
 
 @dataclass(slots=True)
@@ -35,6 +46,24 @@ class BinaryHypothesisResult:
     odds_ratio: float
     or_ci_low: float
     or_ci_high: float
+    rr_ci_method: str | None = None
+    """Method behind ``rr_ci_low``/``rr_ci_high``; ``None`` when no interval is reported."""
+    or_ci_method: str | None = None
+    """Method behind ``or_ci_low``/``or_ci_high``."""
+
+
+def validate_ci_options(ci_method: str, or_interval: str) -> None:
+    """Reject unknown or conflicting confidence-interval options."""
+
+    if ci_method not in CI_METHODS:
+        raise ValueError("ci_method must be 'score-exact' or 'wald'")
+    if or_interval not in OR_INTERVALS:
+        raise ValueError(f"or_interval must be one of {', '.join(repr(name) for name in OR_INTERVALS)}")
+    if ci_method == "wald" and or_interval != "baptista-pike":
+        raise ValueError(
+            f"or_interval={or_interval!r} applies to ci_method='score-exact'; "
+            "ci_method='wald' always uses the Haldane-Anscombe odds-ratio interval"
+        )
 
 
 def _raw_risk_ratio(a: int, b: int, c: int, d: int) -> float:
@@ -65,7 +94,9 @@ def evaluate_binary_hypothesis(
     group_b_rows: Sequence[dict[str, Any]],
     mismatch_fn: Callable[[dict[str, Any]], bool],
     ci_method: str = "score-exact",
+    or_interval: str = "baptista-pike",
 ) -> BinaryHypothesisResult:
+    validate_ci_options(ci_method, or_interval)
     a = sum(1 for row in group_a_rows if mismatch_fn(row))
     b = len(group_a_rows) - a
     c = sum(1 for row in group_b_rows if mismatch_fn(row))
@@ -73,14 +104,15 @@ def evaluate_binary_hypothesis(
 
     rr_value = _raw_risk_ratio(a, b, c, d)
 
-    if ci_method == "score-exact":
-        rr = koopman_risk_ratio(a, b, c, d)
-        odds = baptista_pike_odds_ratio(a, b, c, d)
-    elif ci_method == "wald":
+    if ci_method == "wald":
         rr = katz_risk_ratio(a, b, c, d)
         odds = haldane_anscombe_odds_ratio(a, b, c, d)
     else:
-        raise ValueError("ci_method must be 'score-exact' or 'wald'")
+        rr = koopman_risk_ratio(a, b, c, d)
+        if or_interval == "cornfield":
+            odds = cornfield_exact_odds_ratio(a, b, c, d)
+        else:
+            odds = baptista_pike_odds_ratio(a, b, c, d, mid_p=or_interval == "baptista-pike-midp")
 
     rate_a = (a / len(group_a_rows) * 100.0) if group_a_rows else 0.0
     rate_b = (c / len(group_b_rows) * 100.0) if group_b_rows else 0.0
@@ -89,11 +121,15 @@ def evaluate_binary_hypothesis(
     # ratio value is 0.0 and RR CI is treated as not available.
     rr_ci_low = rr.ci_low
     rr_ci_high = rr.ci_high
+    rr_ci_method: str | None = rr.ci_method
     if a == 0:
         rr_ci_low = None
         rr_ci_high = None
+        rr_ci_method = None
 
-    reported_odds_ratio = odds.value
+    # Point estimates come from the table itself, never from the CI routine
+    # (the Haldane-Anscombe routine returns its continuity-corrected value).
+    reported_odds_ratio = _raw_odds_ratio(a, b, c, d)
     if reported_odds_ratio == 0.0:
         # Backward-compatible reporting convention: keep a strictly positive
         # point estimate for sparse zero-mismatch cases via continuity-correction.
@@ -116,6 +152,8 @@ def evaluate_binary_hypothesis(
         odds_ratio=reported_odds_ratio,
         or_ci_low=odds.ci_low,
         or_ci_high=odds.ci_high,
+        rr_ci_method=rr_ci_method,
+        or_ci_method=odds.ci_method,
     )
 
 
@@ -126,6 +164,7 @@ def evaluate_binary_hypotheses(
     tests: Iterable[BinaryHypothesisTest],
     mismatch_fn: Callable[[dict[str, Any]], bool],
     ci_method: str = "score-exact",
+    or_interval: str = "baptista-pike",
 ) -> list[BinaryHypothesisResult]:
     results: list[BinaryHypothesisResult] = []
     for test in tests:
@@ -143,6 +182,7 @@ def evaluate_binary_hypotheses(
                 group_b_rows=group_b_rows,
                 mismatch_fn=mismatch_fn,
                 ci_method=ci_method,
+                or_interval=or_interval,
             )
         )
     return results

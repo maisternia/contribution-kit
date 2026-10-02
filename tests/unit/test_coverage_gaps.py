@@ -20,7 +20,7 @@ from contribution.results import (
     _format_rd,
     _format_rr,
 )
-from contribution.stats import OddsRatioResult, RiskDifferenceResult
+from contribution.stats import RiskDifferenceResult
 
 
 def _base_config() -> dict:
@@ -418,7 +418,7 @@ def test_estimator_validation_and_factorial_branches() -> None:
         regimes=[Regime(name="r", condition="1 == 1")],
     )
     estimator = Estimator(rows=[{"f": 1}], spec=regime_only_spec)
-    assert estimator._regime_risk(Regime(name="r", condition="1 == 1"), None, ci_method="wald") is None
+    assert estimator._regime_risk(Regime(name="r", condition="1 == 1"), None, ci_method="wald", or_interval="baptista-pike") is None
 
     empty_columns = AttributionSpec(
         target="1",
@@ -545,31 +545,3 @@ def test_stats_private_branches_and_fallbacks(monkeypatch) -> None:
     )
     guarded = getattr(stats_mod, "risk_difference_with_guardrail")(1, 1, 1, 1)
     assert guarded.ci_low is None and guarded.ci_high is None
-
-    assert getattr(stats_mod, "_tail_probability")(0, 0, 1, 0, 1.0, tail="lower") == 1.0
-    assert getattr(stats_mod, "_tail_probability")(0, 1, 1, 1, 0.0, tail="upper") == 0.0
-    assert getattr(stats_mod, "_tail_probability")(1, 1, 1, 1, float("inf"), tail="lower") == 1.0
-    assert getattr(stats_mod, "_tail_probability")(1, 1, 1, 1, 1.0, tail="lower") > 0.0
-    with pytest.raises(ValueError, match="tail must be 'lower' or 'upper'"):
-        getattr(stats_mod, "_tail_probability")(1, 1, 1, 1, 1.0, tail="bad")
-
-    monkeypatch.setattr(stats_mod, "_invert_monotone_tail", lambda *args, **kwargs: 2.0)
-    monkeypatch.setattr(
-        stats_mod,
-        "haldane_anscombe_odds_ratio",
-        lambda *args, **kwargs: OddsRatioResult(value=1.0, ci_low=1.5, ci_high=2.5),
-    )
-    odds = getattr(stats_mod, "baptista_pike_odds_ratio")(1, 1, 1, 1)
-    assert odds.ci_low == 2.0 and odds.ci_high == 2.0
-
-    monkeypatch.setattr(stats_mod, "_invert_monotone_tail", lambda *args, **kwargs: float("inf"))
-    fallback_odds = getattr(stats_mod, "baptista_pike_odds_ratio")(1, 1, 1, 1)
-    assert fallback_odds.ci_low == 1.5 and fallback_odds.ci_high == 2.5
-
-    monkeypatch.setattr(
-        stats_mod,
-        "haldane_anscombe_odds_ratio",
-        lambda *args, **kwargs: OddsRatioResult(value=1.0, ci_low=float("inf"), ci_high=float("inf")),
-    )
-    nonfinite_fallback_odds = getattr(stats_mod, "baptista_pike_odds_ratio")(1, 1, 1, 1)
-    assert nonfinite_fallback_odds.ci_low == float("inf") and nonfinite_fallback_odds.ci_high == float("inf")

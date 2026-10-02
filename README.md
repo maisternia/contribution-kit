@@ -34,7 +34,10 @@ The same report also contains the supporting analyses that explain *why* each ce
 
 - **Exact Shapley feature attribution** — closed-form decomposition of the prediction formula for ≤12 features, deterministic sampling beyond \[[Shapley 1953](#ref-shapley53), [Lundberg & Lee 2017](#ref-lundberg17)\].
 - **Regime contribution shares** — observed-contribution share of the rows matching each declared condition.
-- **Mismatch risk** — condition-vs-rest risk ratios (Koopman, with Katz guardrail) and odds ratios (Baptista-Pike, with Haldane-Anscombe guardrail) for sparse 2×2 tables \[[Koopman 1984](#ref-koopman84), [Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\]. Pass `ci_method="wald"` to `assess()` (or `--ci-method wald`) to force the legacy Katz / Haldane-Anscombe pair.
+- **Mismatch risk** — condition-vs-rest risk ratios with the Koopman score interval and odds ratios with the Baptista-Pike exact conditional interval, for sparse 2×2 tables \[[Koopman 1984](#ref-koopman84), [Baptista & Pike 1977](#ref-baptista77), [Fagerland et al. 2015](#ref-fagerland15), [Fagerland et al. 2017](#ref-fagerland17)\]. All intervals are 95%, using the exact normal quantile 1.959964. The Baptista-Pike confidence set can have gaps, and the interval reported is its hull, as R's `exact2x2(tsmethod = "minlike")` reports it.
+  - *Odds-ratio interval options:* pass `or_interval="baptista-pike-midp"` (mid-p variant \[[Lancaster 1961](#ref-lancaster61)\]) or `or_interval="cornfield"` (central exact conditional interval, as in `fisher.test` \[[Cornfield 1956](#ref-cornfield56)\]) to `assess()`, or `--or-interval` on `contrib run` / `contrib hypothesis`.
+  - *Wald mode:* pass `ci_method="wald"` (or `--ci-method wald` on `contrib hypothesis`) to use the Katz / Haldane-Anscombe pair instead \[[Katz 1978](#ref-katz78), [Haldane 1956](#ref-haldane56), [Anscombe 1956](#ref-anscombe56)\]. Point estimates are the same under every choice.
+  - *Fallback:* if the score or exact inversion fails numerically for a finite estimate, that one interval falls back to Katz or Haldane-Anscombe. Each result records the method behind its bounds in `rr_ci_method` / `or_ci_method` (`run.json`), and `report.md` marks fallback intervals with `†` and a footnote. On every table with cells up to 7 the primary methods need no fallback. The kit's intervals are checked against R (`PropCIs`, `exact2x2`, `epitools`, `DescTools`) and an independent high-precision reference in `tests/accuracy/` (see [tests/reference/README.md](tests/reference/README.md)).
 - **Factorial matrices, partition warnings, and within-stratum contrasts** — per-cell counts and rates for each declared crossing, plus sibling-level 2×2 contrasts.
 - **Contributor ranking** — lift/share/score scoring for categorical contribution buckets.
 
@@ -433,7 +436,7 @@ If factorials are present, reports add:
 
 - `## Partition Warnings` when a factorial axis has overlaps or gaps over loaded rows
 - `## Factorial Matrices` with per-cell count, mismatch rate, risk ratio vs rest, and union-based row/column marginals
-- `## Within-stratum contrasts` with sibling-level pairwise contrasts inside each stratum using Koopman/Baptista-Pike intervals
+- `## Within-stratum contrasts` with sibling-level pairwise contrasts inside each stratum, using the same intervals as the mismatch-risk table
 - `## Attributable burden` per baselined crossing: rank, cell size, mismatch rate, recoverable mismatches, share of all mismatches, risk difference CI, and cumulative accuracy-if-eliminated
 
 Burden table semantics:
@@ -457,6 +460,7 @@ pytest tests/unit --cov=contribution --cov-branch --cov-fail-under=100
 Test layout:
 
 - `tests/unit/` contains exhaustive unit tests and is the required coverage gate.
+- `tests/accuracy/` compares every risk-ratio and odds-ratio interval with independent baselines committed under `tests/reference/` (R and a high-precision reference; no R needed to run). `pytest` runs it together with `tests/unit/`.
 - `tests/smoke/` contains lightweight API smoke checks (fast integration-style sanity tests).
 
 Optional smoke run:
@@ -472,13 +476,15 @@ src/contribution/  — reusable library
     spec.py               — AttributionSpec, Regime, PredictionFeature, FactorialCrossing
   estimator.py          — Estimator (from_csv, from_dataframe, assess); feature, regime, and burden analyses
   expr.py               — safe AST expression evaluator and free-variable discovery
-  stats.py              — Koopman/Katz risk ratio, Baptista-Pike/Haldane-Anscombe odds ratio, Miettinen-Nurminen/Agresti-Caffo risk difference
+  stats.py              — Koopman/Katz risk ratio, Baptista-Pike (exact, mid-p)/Cornfield/Haldane-Anscombe odds ratio, Miettinen-Nurminen/Agresti-Caffo risk difference
   contributor.py        — contributor lift/share/score ranking
   hypothesis.py         — binary mismatch hypothesis test helpers
   results.py            — AssessmentResult → contribution.csv + report.md + run.json
   cli.py                — contrib CLI (help, validate, run, report, contributor, hypothesis)
 tests/                  — pytest suite
   unit/                 — exhaustive unit tests and coverage gate
+  accuracy/             — interval accuracy against independent baselines
+  reference/            — the baselines, their generators and provenance
   smoke/                — lightweight API smoke checks
 examples/               — example configs and data
   continuous_lora/      — config.json + measurements.csv (8,678-row real sample used in The result)
@@ -503,13 +509,19 @@ Each folder ships a `config.json` and a matching `measurements.csv` that can be 
 [Koopman 1984] Koopman, P. A. R. (1984). Confidence intervals for the ratio of two binomial proportions. *Biometrics*, 40(2), 513–517.
 
 <a id="ref-baptista77"></a>
-[Baptista & Pike 1977] Baptista, J., & Pike, M. C. (1977). Algorithm AS 64: Exact two-sided confidence limits for the odds ratio in a 2×2 table. *Journal of the Royal Statistical Society, Series C (Applied Statistics)*, 26(2), 214–220.
+[Baptista & Pike 1977] Baptista, J., & Pike, M. C. (1977). Algorithm AS 115: Exact two-sided confidence limits for the odds ratio in a 2×2 table. *Journal of the Royal Statistical Society, Series C (Applied Statistics)*, 26(2), 214–220.
 
 <a id="ref-fagerland15"></a>
 [Fagerland et al. 2015] Fagerland, M. W., Lydersen, S., & Laake, P. (2015). Recommended confidence intervals for two independent binomial proportions. *Statistical Methods in Medical Research*, 24(2), 224–254.
 
 <a id="ref-fagerland17"></a>
 [Fagerland et al. 2017] Fagerland, M. W., Lydersen, S., & Laake, P. (2017). *Statistical Analysis of Contingency Tables*. CRC Press.
+
+<a id="ref-cornfield56"></a>
+[Cornfield 1956] Cornfield, J. (1956). A statistical problem arising from retrospective studies. In *Proceedings of the Third Berkeley Symposium on Mathematical Statistics and Probability*, 4, 135–148.
+
+<a id="ref-lancaster61"></a>
+[Lancaster 1961] Lancaster, H. O. (1961). Significance tests in discrete distributions. *Journal of the American Statistical Association*, 56(294), 223–234.
 
 <a id="ref-katz78"></a>
 [Katz 1978] Katz, D., Baptista, J., Azen, S. P., & Pike, M. C. (1978). Obtaining confidence intervals for the risk ratio in cohort studies. *Biometrics*, 34(3), 469–474.

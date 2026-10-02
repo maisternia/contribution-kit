@@ -20,7 +20,7 @@ from .expr import (
     evaluate_expression,
     free_variables,
 )
-from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis
+from .hypothesis import BinaryHypothesisResult, evaluate_binary_hypothesis, validate_ci_options
 from .results import (
     AssessmentResult,
     AttributionWarning,
@@ -131,7 +131,8 @@ class Estimator:
             raise TypeError("Unsupported dataframe-like object")
         return cls(rows=rows, spec=spec)
 
-    def assess(self, *, spec: AttributionSpec | None = None, exact: bool = True, max_exact_features: int = 12, n_samples: int = 512, seed: int = 0, ci_method: str = "score-exact") -> AssessmentResult:
+    def assess(self, *, spec: AttributionSpec | None = None, exact: bool = True, max_exact_features: int = 12, n_samples: int = 512, seed: int = 0, ci_method: str = "score-exact", or_interval: str = "baptista-pike") -> AssessmentResult:
+        validate_ci_options(ci_method, or_interval)
         if spec is not None:
             self.spec = spec
         self._validate_spec()
@@ -243,12 +244,12 @@ class Estimator:
                     label=regime.label or regime.name,
                     analysis="regime",
                     regime=self._regime_summary(regime, observed_contributions, observed_contribution_total, binders),
-                    risk=self._regime_risk(regime, mismatch_fn, ci_method=ci_method, binders=binders),
+                    risk=self._regime_risk(regime, mismatch_fn, ci_method=ci_method, or_interval=or_interval, binders=binders),
                 )
             )
 
-        factorial_matrices = self._build_factorial_matrices(factorial_plans, mismatch_fn, ci_method=ci_method)
-        contrast_results = self._build_contrast_results(factorial_plans, mismatch_fn, ci_method=ci_method)
+        factorial_matrices = self._build_factorial_matrices(factorial_plans, mismatch_fn, ci_method=ci_method, or_interval=or_interval)
+        contrast_results = self._build_contrast_results(factorial_plans, mismatch_fn, ci_method=ci_method, or_interval=or_interval)
         burden_rankings = self._build_burden_rankings(factorial_plans, mismatch_fn, partition_warnings)
 
         return AssessmentResult(
@@ -265,6 +266,7 @@ class Estimator:
                 "n_samples": n_samples,
                 "seed": seed,
                 "ci_method": ci_method,
+                "or_interval": or_interval,
                 "target": self.spec.target,
                 "prediction": self.spec.prediction,
                 "prediction_expr": self.spec.prediction_expr,
@@ -693,6 +695,7 @@ class Estimator:
         mismatch_fn,
         *,
         ci_method: str,
+        or_interval: str,
         binders: Sequence[Callable[[tuple[str, ...]], float]] | None = None,
     ) -> BinaryHypothesisResult | None:
         assert self.spec is not None
@@ -711,6 +714,7 @@ class Estimator:
             group_b_matches=None,
             mismatch_fn=mismatch_fn,
             ci_method=ci_method,
+            or_interval=or_interval,
         )
 
     def _evaluate_binary_from_masks(
@@ -723,6 +727,7 @@ class Estimator:
         group_b_matches: Sequence[bool] | None,
         mismatch_fn,
         ci_method: str,
+        or_interval: str,
     ) -> BinaryHypothesisResult | None:
         assert self.spec is not None
         if group_b_matches is None:
@@ -740,6 +745,7 @@ class Estimator:
             group_b_rows=group_b_rows,
             mismatch_fn=mismatch_fn,
             ci_method=ci_method,
+            or_interval=or_interval,
         )
 
     def _mismatch_fn(self):
@@ -943,6 +949,7 @@ class Estimator:
         mismatch_fn,
         *,
         ci_method: str,
+        or_interval: str,
     ) -> list[FactorialMatrixResult]:
         matrices: list[FactorialMatrixResult] = []
         for plan in plans:
@@ -959,6 +966,7 @@ class Estimator:
                         group_b_matches=None,
                         mismatch_fn=mismatch_fn,
                         ci_method=ci_method,
+                        or_interval=or_interval,
                     )
                     matrix.cells.append(
                         FactorialCellResult(
@@ -970,6 +978,7 @@ class Estimator:
                             risk_ratio=risk.risk_ratio if risk is not None else None,
                             rr_ci_low=risk.rr_ci_low if risk is not None else None,
                             rr_ci_high=risk.rr_ci_high if risk is not None else None,
+                            rr_ci_method=risk.rr_ci_method if risk is not None else None,
                         )
                     )
 
@@ -984,6 +993,7 @@ class Estimator:
                     group_b_matches=None,
                     mismatch_fn=mismatch_fn,
                     ci_method=ci_method,
+                    or_interval=or_interval,
                 )
                 matrix.row_marginals.append(
                     FactorialMarginalResult(
@@ -993,6 +1003,7 @@ class Estimator:
                         risk_ratio=risk.risk_ratio if risk is not None else None,
                         rr_ci_low=risk.rr_ci_low if risk is not None else None,
                         rr_ci_high=risk.rr_ci_high if risk is not None else None,
+                        rr_ci_method=risk.rr_ci_method if risk is not None else None,
                     )
                 )
 
@@ -1007,6 +1018,7 @@ class Estimator:
                     group_b_matches=None,
                     mismatch_fn=mismatch_fn,
                     ci_method=ci_method,
+                    or_interval=or_interval,
                 )
                 matrix.column_marginals.append(
                     FactorialMarginalResult(
@@ -1016,6 +1028,7 @@ class Estimator:
                         risk_ratio=risk.risk_ratio if risk is not None else None,
                         rr_ci_low=risk.rr_ci_low if risk is not None else None,
                         rr_ci_high=risk.rr_ci_high if risk is not None else None,
+                        rr_ci_method=risk.rr_ci_method if risk is not None else None,
                     )
                 )
 
@@ -1028,6 +1041,7 @@ class Estimator:
         mismatch_fn,
         *,
         ci_method: str,
+        or_interval: str,
     ) -> list[ContrastResult]:
         contrasts: list[ContrastResult] = []
         for plan in plans:
@@ -1041,6 +1055,7 @@ class Estimator:
                         group_b_matches=plan.cell_masks[(row_level, level_b)],
                         mismatch_fn=mismatch_fn,
                         ci_method=ci_method,
+                        or_interval=or_interval,
                     )
                     if risk is None:
                         continue
@@ -1062,6 +1077,8 @@ class Estimator:
                             odds_ratio=risk.odds_ratio,
                             or_ci_low=risk.or_ci_low,
                             or_ci_high=risk.or_ci_high,
+                            rr_ci_method=risk.rr_ci_method,
+                            or_ci_method=risk.or_ci_method,
                         )
                     )
 
@@ -1075,6 +1092,7 @@ class Estimator:
                         group_b_matches=plan.cell_masks[(level_b, column_level)],
                         mismatch_fn=mismatch_fn,
                         ci_method=ci_method,
+                        or_interval=or_interval,
                     )
                     if risk is None:
                         continue
@@ -1096,6 +1114,8 @@ class Estimator:
                             odds_ratio=risk.odds_ratio,
                             or_ci_low=risk.or_ci_low,
                             or_ci_high=risk.or_ci_high,
+                            rr_ci_method=risk.rr_ci_method,
+                            or_ci_method=risk.or_ci_method,
                         )
                     )
         return contrasts

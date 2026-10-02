@@ -392,3 +392,70 @@ def test_markdown_omits_description_when_the_crossing_declares_none() -> None:
     heading = lines.index("### Row × Quality")
     assert lines[heading + 1] == ""
     assert lines[heading + 2].startswith("| Row level |")
+
+
+def _fallback_result(metadata: dict) -> AssessmentResult:
+    from contribution.results import ContrastResult
+
+    risk = BinaryHypothesisResult(
+        scope="s", test_name="reg", group_a="A", group_b="B",
+        mismatch_rate_a_pct=10.0, mismatch_rate_b_pct=5.0,
+        mismatch_count_a=1, total_count_a=10, mismatch_count_b=1, total_count_b=20,
+        risk_ratio=2.0, rr_ci_low=1.1, rr_ci_high=3.3, odds_ratio=2.2, or_ci_low=1.0, or_ci_high=4.0,
+        rr_ci_method="katz", or_ci_method="baptista-pike",
+    )
+    cell = FactorialCellResult("r1 & c1", "r1", "c1", 5, 20.0, 2.0, 1.0, 4.0, rr_ci_method="katz")
+    marginal = FactorialMarginalResult("r1", 5, 20.0, 2.0, 1.0, 4.0, rr_ci_method="koopman")
+    column = FactorialMarginalResult("c1", 5, 20.0, 2.0, 1.0, 4.0, rr_ci_method="koopman")
+    contrast = ContrastResult(
+        factorial="F", stratum="rows=r1", level_a="c1", level_b="c2",
+        mismatch_rate_a_pct=20.0, mismatch_rate_b_pct=10.0,
+        mismatch_count_a=1, total_count_a=5, mismatch_count_b=1, total_count_b=10,
+        risk_ratio=2.0, rr_ci_low=1.0, rr_ci_high=4.0, odds_ratio=2.2, or_ci_low=1.0, or_ci_high=5.0,
+        rr_ci_method="koopman", or_ci_method="haldane-anscombe",
+    )
+    return AssessmentResult(
+        regimes=[RegimeAssessment(name="reg", label="Reg", analysis="regime", regime=RegimeSummary("reg", 2, 0.5, 1.0, 10.0), risk=risk)],
+        n_rows=2,
+        mean_observed_contribution=0.5,
+        factorial_matrices=[FactorialMatrixResult(label="F", cells=[cell], row_marginals=[marginal], column_marginals=[column])],
+        contrast_results=[contrast],
+        metadata=metadata,
+    )
+
+
+def test_markdown_marks_fallback_intervals_once() -> None:
+    from contribution.results import FALLBACK_FOOTNOTE
+
+    markdown = _fallback_result({"ci_method": "score-exact"}).to_markdown()
+    assert "2.00 (1.10 to 3.30) †" in markdown  # regime risk ratio (Katz fallback)
+    assert "2.20 (1.00 to 4.00) |" in markdown  # regime odds ratio (primary)
+    assert "RR=2.00 (1.00 to 4.00) †" in markdown  # factorial cell
+    assert "2.20 (1.00 to 5.00) †" in markdown  # contrast odds ratio (Haldane-Anscombe fallback)
+    assert markdown.count(FALLBACK_FOOTNOTE) == 1
+
+
+def test_markdown_does_not_mark_chosen_wald_intervals() -> None:
+    from contribution.results import FALLBACK_FOOTNOTE
+
+    markdown = _fallback_result({"ci_method": "wald"}).to_markdown()
+    assert "†" not in markdown
+    assert FALLBACK_FOOTNOTE not in markdown
+    assert "Risk ratio CI: Katz, Baptista, Azen & Pike (1978)" in markdown
+    assert "Odds ratio CI: Haldane (1956)" in markdown
+
+
+def test_markdown_footnote_names_the_odds_ratio_interval() -> None:
+    default = _sample_result().to_markdown()
+    assert (
+        "Risk ratio CI: Koopman (1984) *Biometrics* 40(2):513-517. "
+        "Odds ratio CI: Baptista & Pike (1977) *J. Roy. Statist. Soc. C* 26(2):214-220. "
+        "Small-sample recommendation: Fagerland, Lydersen & Laake (2015, 2017)."
+    ) in default
+
+    midp = _fallback_result({"or_interval": "baptista-pike-midp"}).to_markdown()
+    assert "Baptista & Pike (1977)" in midp and "Lancaster (1961)" in midp
+
+    cornfield = _fallback_result({"or_interval": "cornfield"}).to_markdown()
+    assert "Odds ratio CI: Cornfield (1956)" in cornfield
+    assert "Baptista & Pike" not in cornfield

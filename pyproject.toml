@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "contribution-kit"
-version = "0.2.0"
+version = "0.3.0"
 description = "Reusable toolkit for attributing a modeled quantity to its contributing factors"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -31,7 +31,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
-testpaths = ["tests/unit"]
+testpaths = ["tests/unit", "tests/accuracy"]
 
 [tool.coverage.run]
 branch = true

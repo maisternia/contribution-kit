@@ -1,0 +1,2772 @@
+{
+  "provenance": {
+    "generators": [
+      "tests/reference/generate_effect_size_baselines.R",
+      "tests/reference/generate_effect_size_baselines.py",
+      "tests/reference/hp_exact_or.py"
+    ],
+    "generated_at": "2026-10-02T11:16:14+00:00",
+    "conf_level": 0.95,
+    "r": {
+      "generator": "tests/reference/generate_effect_size_baselines.R",
+      "conf_level": 0.95,
+      "versions": {
+        "R": "4.5.2",
+        "PropCIs": "0.3.0",
+        "exact2x2": "1.7.0",
+        "epitools": "0.5.10.1",
+        "DescTools": "0.99.60",
+        "contingencytables": "3.1.0"
+      },
+      "calls": {
+        "koopman": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)",
+        "katz": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]",
+        "haldane_anscombe": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)",
+        "exact2x2_minlike": "exact2x2::exact2x2(matrix(c(a, b, c, d), 2, byrow = TRUE), tsmethod = 'minlike', tol = 1e-10)",
+        "exact2x2_central": "exact2x2::exact2x2(matrix(c(a, b, c, d), 2, byrow = TRUE), tsmethod = 'central', tol = 1e-10)",
+        "contingencytables_midp": "contingencytables::BaptistaPike_midP_CI_2x2(matrix(c(a, b, c, d), 2, byrow = TRUE), alpha = 0.05)"
+      }
+    },
+    "python": {
+      "python": "3.12.7",
+      "mpmath": "1.3.0",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1"
+    },
+    "high_precision_or": {
+      "module": "tests/reference/hp_exact_or.py",
+      "digits": 60,
+      "tie_tolerance": 1e-07,
+      "interval": "hull of the confidence set"
+    },
+    "cross_check_tolerances": {
+      "exact2x2_minlike": 1e-06,
+      "scipy_conditional": 1e-06,
+      "contingencytables_midp": 0.0001
+    }
+  },
+  "cases": [
+    {
+      "set": "legacy",
+      "label": "legacy balanced sparse",
+      "a": 1,
+      "b": 13,
+      "c": 9,
+      "d": 1,
+      "koopman": {
+        "value": 0.0793650793650794,
+        "ci_low": 0.014034259570284,
+        "ci_high": 0.361965891057327,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.0793650793650794,
+        "ci_low": 0.0118713007667594,
+        "ci_high": 0.530591882589862,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.0175438596491228,
+        "ci_low": 0.00157480446500056,
+        "ci_high": 0.195444588981407,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.008547008547008548,
+        "ci_low": 0.0003718786828632167,
+        "ci_high": 0.18589627628116892,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.000371879,
+          "ci_high": 0.185896273,
+          "max_rel_diff": 8.527963497772279e-07,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.008547008547008548,
+        "ci_low": 0.000757893633997677,
+        "ci_high": 0.18589627628116892,
+        "set_has_gaps": true,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.000757893229318022,
+          "ci_high": 0.131111806741354,
+          "skipped": "confidence set has gaps; contingencytables reports an inner end, not the hull"
+        }
+      },
+      "cornfield": {
+        "value": 0.008547008547008548,
+        "ci_low": 0.00018217752702090218,
+        "ci_high": 0.20516509551207068,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.00018217752702010258,
+          "ci_high": 0.2051650955120704,
+          "max_rel_diff": 4.38912041064383e-12,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "legacy",
+      "label": "legacy zero-event reference",
+      "a": 10,
+      "b": 90,
+      "c": 0,
+      "d": 100,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 2.67693422081022,
+        "ci_high": "inf",
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 23.3204419889503,
+        "ci_low": 1.34731373811558,
+        "ci_high": 403.64986949561,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": "inf",
+        "ci_low": 2.5423501966612645,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 2.542350239,
+          "ci_high": "inf",
+          "max_rel_diff": 1.6653384606154744e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": "inf",
+        "ci_low": 2.5423501966612645,
+        "ci_high": "inf",
+        "set_has_gaps": true,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 3.18440450158307,
+          "ci_high": "inf",
+          "skipped": "confidence set has gaps; contingencytables reports an inner end, not the hull"
+        }
+      },
+      "cornfield": {
+        "value": "inf",
+        "ci_low": 2.393566557358262,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 2.3935665573582567,
+          "ci_high": "inf",
+          "max_rel_diff": 2.226414177545309e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "legacy",
+      "label": "legacy zero-event exposed",
+      "a": 0,
+      "b": 100,
+      "c": 10,
+      "d": 90,
+      "koopman": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 0.37356166327359,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0,
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.0428808339256101,
+        "ci_low": 0.00247739458270995,
+        "ci_high": 0.742217622896544,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.3933368429389656,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.0,
+          "ci_high": 0.393336836,
+          "max_rel_diff": 1.7641280478473237e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.3933368429389656,
+        "set_has_gaps": true,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0,
+          "ci_high": 0.314030460858639,
+          "skipped": "confidence set has gaps; contingencytables reports an inner end, not the hull"
+        }
+      },
+      "cornfield": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.41778658584856004,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.0,
+          "ci_high": 0.4177865858485594,
+          "max_rel_diff": 1.594435621771148e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "legacy",
+      "label": "legacy all ones",
+      "a": 1,
+      "b": 1,
+      "c": 1,
+      "d": 1,
+      "koopman": {
+        "value": 1,
+        "ci_low": 0.15056961354701,
+        "ci_high": 6.64144628150895,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 1,
+        "ci_low": 0.140863494093218,
+        "ci_high": 7.09907138423133,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 1,
+        "ci_low": 0.0407374368806162,
+        "ci_high": 24.5474452143508,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 1.0,
+        "ci_low": 0.013114894621608135,
+        "ci_high": 76.24918299781055,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.013114895,
+          "ci_high": 76.249182998,
+          "max_rel_diff": 2.8852070537655303e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 1.0,
+        "ci_low": 0.027382061971164957,
+        "ci_high": 36.52025917745213,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0273820623723109,
+          "ci_high": 36.5202591772574,
+          "max_rel_diff": 1.4649953800942872e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 1.0,
+        "ci_low": 0.006400016357911029,
+        "ci_high": 156.2496006379585,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.006400016357890016,
+          "ci_high": 156.2496006379585,
+          "max_rel_diff": 3.2832268371522773e-12,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "realistic",
+      "label": "old SF-wrong vs rest",
+      "a": 22,
+      "b": 1,
+      "c": 291,
+      "d": 12963,
+      "koopman": {
+        "value": 43.5661138502914,
+        "ci_low": 35.3210256988694,
+        "ci_high": 49.4948216759619,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 43.5661138502914,
+        "ci_low": 37.7539990600218,
+        "ci_high": 50.2729862603183,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 667.075471698113,
+        "ci_low": 127.236191161328,
+        "ci_high": 3497.35150730062,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 980.020618556701,
+        "ci_low": 162.50555298704168,
+        "ci_high": 19952.23983196144,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 162.505555018,
+          "ci_high": 19952.239831962,
+          "max_rel_diff": 1.2497777929396627e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 980.020618556701,
+        "ci_low": 162.50555298704168,
+        "ci_high": 10184.31624277183,
+        "set_has_gaps": true,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": null
+      },
+      "cornfield": {
+        "value": 980.020618556701,
+        "ci_low": 156.82462298496853,
+        "ci_high": 40447.37235913153,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 156.82462298291432,
+          "ci_high": 40447.37235912398,
+          "max_rel_diff": 1.309875599693789e-11,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "realistic",
+      "label": "upscale vs downscale (measured_ok)",
+      "a": 236,
+      "b": 737,
+      "c": 196,
+      "d": 1333,
+      "koopman": {
+        "value": 1.89212827988338,
+        "ci_low": 1.59404026868395,
+        "ci_high": 2.24551964598945,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 1.89212827988338,
+        "ci_low": 1.59391105341495,
+        "ci_high": 2.24614128866475,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 2.17620390736188,
+        "ci_low": 1.76491418350262,
+        "ci_high": 2.68333921880463,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 2.1778030072273142,
+        "ci_low": 1.7638664357475469,
+        "ci_high": 2.6965276429890763,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 1.76386644,
+          "ci_high": 2.696527636,
+          "max_rel_diff": 2.591880134023832e-09,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 2.1778030072273142,
+        "ci_low": 1.7638664357475469,
+        "ci_high": 2.6806656242380575,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": null
+      },
+      "cornfield": {
+        "value": 2.1778030072273142,
+        "ci_low": 1.7560477934186718,
+        "ci_high": 2.7014068804679887,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 1.7560477934164411,
+          "ci_high": 2.7014068804680753,
+          "max_rel_diff": 1.2702730013596144e-12,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "realistic",
+      "label": "class_ok & measured_off vs rest",
+      "a": 15,
+      "b": 14,
+      "c": 482,
+      "d": 8167,
+      "koopman": {
+        "value": 9.28137072542567,
+        "ci_low": 6.12776601678565,
+        "ci_high": 12.5160180130275,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 9.28137072542567,
+        "ci_low": 6.46143003886405,
+        "ci_high": 13.3320088625355,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 18.0948722529926,
+        "ci_low": 8.79065683645038,
+        "ci_high": 37.2468642496043,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 18.154267931238884,
+        "ci_low": 8.69126219863523,
+        "ci_high": 38.44008009674187,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 8.691262199,
+          "ci_high": 38.440079712,
+          "max_rel_diff": 1.0008872846968468e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 18.154267931238884,
+        "ci_low": 8.757057190400555,
+        "ci_high": 38.44008009674187,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": null
+      },
+      "cornfield": {
+        "value": 18.154267931238884,
+        "ci_low": 8.10975834860145,
+        "ci_high": 40.81156614971862,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 8.109758348302101,
+          "ci_high": 40.81156614971478,
+          "max_rel_diff": 3.691208652520144e-11,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "realistic",
+      "label": "class_unworkable vs rest",
+      "a": 279,
+      "b": 100,
+      "c": 218,
+      "d": 8081,
+      "koopman": {
+        "value": 28.0242671443441,
+        "ci_low": 24.2450560778851,
+        "ci_high": 32.3472385467935,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 28.0242671443441,
+        "ci_low": 24.2612067544286,
+        "ci_high": 32.3710010358082,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 102.862313148218,
+        "ci_low": 78.9465499659695,
+        "ci_high": 134.023025335026,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 103.42197247706422,
+        "ci_low": 78.69627213315044,
+        "ci_high": 134.96635551304337,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 78.696272387,
+          "ci_high": 134.966355031,
+          "max_rel_diff": 3.5715816718846843e-09,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 103.42197247706422,
+        "ci_low": 79.34751823797149,
+        "ci_high": 134.96635551304337,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": null
+      },
+      "cornfield": {
+        "value": 103.42197247706422,
+        "ci_low": 78.68941971821718,
+        "ci_high": 136.1202294343155,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 78.68941971823048,
+          "ci_high": 136.12022943425723,
+          "max_rel_diff": 4.2803707115733023e-13,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "realistic",
+      "label": "class BW under vs clean",
+      "a": 248,
+      "b": 746,
+      "c": 0,
+      "d": 6002,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 390.067506133976,
+        "ci_high": "inf",
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 3996.30609511052,
+        "ci_low": 249.00886132741,
+        "ci_high": 64136.1207817366,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": "inf",
+        "ci_low": 519.1151215693995,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 519.115128058,
+          "ci_high": "inf",
+          "max_rel_diff": 1.2499347763602038e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": "inf",
+        "ci_low": 579.7651116233542,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": null
+      },
+      "cornfield": {
+        "value": "inf",
+        "ci_low": 534.701541009236,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 534.7015410115492,
+          "ci_high": "inf",
+          "max_rel_diff": 4.3261257163307205e-12,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "realistic",
+      "label": "class BW over vs clean",
+      "a": 214,
+      "b": 1348,
+      "c": 0,
+      "d": 6002,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 214.193445825652,
+        "ci_high": "inf",
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 1909.58286985539,
+        "ci_low": 118.982364173702,
+        "ci_high": 30647.455714711,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": "inf",
+        "ci_low": 247.99463144144818,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 247.994634541,
+          "ci_high": "inf",
+          "max_rel_diff": 1.2498463434303899e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": "inf",
+        "ci_low": 276.9790435378155,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": null
+      },
+      "cornfield": {
+        "value": "inf",
+        "ci_low": 255.4693385113075,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 255.46933851080095,
+          "ci_high": "inf",
+          "max_rel_diff": 1.9828607618039824e-12,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "realistic",
+      "label": "SF wrong vs clean",
+      "a": 9,
+      "b": 0,
+      "c": 0,
+      "d": 6002,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 1563.42726530529,
+        "ci_high": "inf",
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 228095,
+        "ci_low": 4299.5510031643,
+        "ci_high": 12100642.3663099,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": "inf",
+        "ci_low": 8097.580031137024,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 8097.580031137,
+          "ci_high": "inf",
+          "max_rel_diff": 2.920238164385978e-15,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": "inf",
+        "ci_low": 9082.956777393418,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 9082.9570044375,
+          "ci_high": "inf",
+          "max_rel_diff": 2.499671499091105e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": "inf",
+        "ci_low": 6518.988147709116,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 6518.988147882951,
+          "ci_high": "inf",
+          "max_rel_diff": 2.666600343333276e-11,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "realistic",
+      "label": "measured BW off vs clean",
+      "a": 26,
+      "b": 85,
+      "c": 0,
+      "d": 6002,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 366.183698698002,
+        "ci_high": "inf",
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 3720.84795321637,
+        "ci_low": 224.919019518905,
+        "ci_high": 61554.1963528381,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": "inf",
+        "ci_low": 457.04061657101914,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 457.0406231,
+          "ci_high": "inf",
+          "max_rel_diff": 1.4285340569323959e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": "inf",
+        "ci_low": 457.04061657101914,
+        "ci_high": "inf",
+        "set_has_gaps": true,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 530.818819186077,
+          "ci_high": "inf",
+          "skipped": "confidence set has gaps; contingencytables reports an inner end, not the hull"
+        }
+      },
+      "cornfield": {
+        "value": "inf",
+        "ci_low": 449.24231598398217,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 449.2423159934096,
+          "ci_high": "inf",
+          "max_rel_diff": 2.0985165108494112e-11,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "edge",
+      "label": "zero-event reference (wald point-estimate case)",
+      "a": 91,
+      "b": 385,
+      "c": 0,
+      "d": 11972,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 595.990944573751,
+        "ci_high": "inf",
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 5683.44357976653,
+        "ci_low": 352.162339572424,
+        "ci_high": 91723.4107531433,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": "inf",
+        "ci_low": 714.0173420266117,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 714.017350952,
+          "ci_high": "inf",
+          "max_rel_diff": 1.2500240265213859e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": "inf",
+        "ci_low": 800.8769678011926,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": null
+      },
+      "cornfield": {
+        "value": "inf",
+        "ci_low": 746.162959303005,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 746.1629592644052,
+          "ci_high": "inf",
+          "max_rel_diff": 5.17309931695931e-11,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "edge",
+      "label": "all-event exposed with non-zero reference",
+      "a": 12,
+      "b": 0,
+      "c": 30,
+      "d": 970,
+      "koopman": {
+        "value": 33.3333333333333,
+        "ci_low": 23.1006622653183,
+        "ci_high": 47.4074325141933,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 33.3333333333333,
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 795.491803278689,
+        "ci_low": 46.0337236422654,
+        "ci_high": 13746.6005140322,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": "inf",
+        "ci_low": 90.25053242723804,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 90.250533931,
+          "ci_high": "inf",
+          "max_rel_diff": 1.6662084137173503e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": "inf",
+        "ci_low": 90.25053242723804,
+        "ci_high": "inf",
+        "set_has_gaps": true,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 90.2505339462741,
+          "ci_high": "inf",
+          "skipped": "confidence set has gaps; contingencytables reports an inner end, not the hull"
+        }
+      },
+      "cornfield": {
+        "value": "inf",
+        "ci_low": 83.08191551276406,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 83.08191551278424,
+          "ci_high": "inf",
+          "max_rel_diff": 2.4288575403014916e-13,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "edge",
+      "label": "collapsed support",
+      "a": 0,
+      "b": 1,
+      "c": 0,
+      "d": 1,
+      "koopman": {
+        "value": null,
+        "ci_low": 0,
+        "ci_high": "inf",
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": null,
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 1,
+        "ci_low": 0.0108201738707806,
+        "ci_high": 92.4199566423285,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": null,
+        "ci_low": 0.0,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": null
+      },
+      "baptista_pike_midp": {
+        "value": null,
+        "ci_low": 0.0,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": null
+      },
+      "cornfield": {
+        "value": null,
+        "ci_low": 0.0,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": null
+      }
+    },
+    {
+      "set": "edge",
+      "label": "non-monotone BP p-value (small)",
+      "a": 3,
+      "b": 7,
+      "c": 8,
+      "d": 2,
+      "koopman": {
+        "value": 0.375,
+        "ci_low": 0.130585918337954,
+        "ci_high": 0.88770165416034,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.375,
+        "ci_low": 0.138482627813824,
+        "ci_high": 1.01547033169428,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.137254901960784,
+        "ci_low": 0.0205925237689502,
+        "ci_high": 0.914842120550092,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.10714285714285714,
+        "ci_low": 0.01189934393187682,
+        "ci_high": 1.0000000199999992,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.011899344,
+          "ci_high": 1.0,
+          "max_rel_diff": 1.9999998812316805e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.10714285714285714,
+        "ci_low": 0.01769058750112622,
+        "ci_high": 1.0000000199999992,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0176905874356395,
+          "ci_high": 0.999999967998586,
+          "max_rel_diff": 5.200141213548934e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.10714285714285714,
+        "ci_low": 0.007873456216569697,
+        "ci_high": 1.1336387977546227,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.007873456216569668,
+          "ci_high": 1.1336387977546232,
+          "max_rel_diff": 3.745534144146678e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "edge",
+      "label": "non-monotone BP p-value (moderate)",
+      "a": 12,
+      "b": 30,
+      "c": 4,
+      "d": 40,
+      "koopman": {
+        "value": 3.14285714285714,
+        "ci_low": 1.17455503795378,
+        "ci_high": 8.74060776950294,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 3.14285714285714,
+        "ci_low": 1.1002145284945,
+        "ci_high": 8.97784092519151,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 3.68852459016393,
+        "ci_low": 1.1385294571307,
+        "ci_high": 11.9498125999582,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 4.0,
+        "ci_low": 1.0582215717664951,
+        "ci_high": 14.45181390779157,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 1.058221585,
+          "ci_high": 14.451813908,
+          "max_rel_diff": 1.2505419764246595e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 4.0,
+        "ci_low": 1.2335485708401888,
+        "ci_high": 12.043577734784096,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 1.23354858151193,
+          "ci_high": 12.0435777443041,
+          "max_rel_diff": 8.651253400735146e-09,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 4.0,
+        "ci_low": 1.057816503703878,
+        "ci_high": 18.437466771714096,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 1.0578165037038656,
+          "ci_high": 18.437466771713993,
+          "max_rel_diff": 1.1754872260229576e-14,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 2,
+      "b": 10,
+      "c": 2,
+      "d": 8,
+      "koopman": {
+        "value": 0.833333333333333,
+        "ci_low": 0.16794620407112,
+        "ci_high": 4.19086906115685,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.833333333333333,
+        "ci_low": 0.141772248408415,
+        "ci_high": 4.89831015759799,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.80952380952381,
+        "ci_low": 0.112606044763383,
+        "ci_high": 5.81965914496838,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.8,
+        "ci_low": 0.072715464770714,
+        "ci_high": 8.967166345828831,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.072715465,
+          "ci_high": 8.967166346,
+          "max_rel_diff": 3.15319454493699e-09,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.8,
+        "ci_low": 0.107966756420706,
+        "ci_high": 6.042540457807222,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.107966756345736,
+          "ci_high": 6.04254045867677,
+          "max_rel_diff": 6.943802984908574e-10,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.8,
+        "ci_low": 0.04825754463185228,
+        "ci_high": 13.50762986832671,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.0482575446318524,
+          "ci_high": 13.5076298683267,
+          "max_rel_diff": 2.5881982024400407e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 5,
+      "b": 6,
+      "c": 11,
+      "d": 5,
+      "koopman": {
+        "value": 0.661157024793388,
+        "ci_low": 0.294413461221358,
+        "ci_high": 1.27376744812918,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.661157024793388,
+        "ci_low": 0.319647002976016,
+        "ci_high": 1.36753546056693,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.404682274247492,
+        "ci_low": 0.0881742499620143,
+        "ci_high": 1.85731937794394,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.3787878787878788,
+        "ci_low": 0.06922468895455929,
+        "ci_high": 1.9559286584775788,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.069224689,
+          "ci_high": 1.955928658,
+          "max_rel_diff": 6.564236158656895e-10,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.3787878787878788,
+        "ci_low": 0.09236705983748747,
+        "ci_high": 1.8706889452617526,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0923670697595903,
+          "ci_high": 1.87068896468386,
+          "max_rel_diff": 1.074203601505746e-07,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.3787878787878788,
+        "ci_low": 0.05827172511375809,
+        "ci_high": 2.403503746749322,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.058271725113757715,
+          "ci_high": 2.403503746749325,
+          "max_rel_diff": 6.4302244369717955e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 1,
+      "b": 10,
+      "c": 7,
+      "d": 5,
+      "koopman": {
+        "value": 0.155844155844156,
+        "ci_low": 0.0267742286551947,
+        "ci_high": 0.743183928112171,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.155844155844156,
+        "ci_low": 0.0226439956793678,
+        "ci_high": 1.07257576156964,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.104761904761905,
+        "ci_low": 0.0137029846963302,
+        "ci_high": 0.800924538161502,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.07142857142857142,
+        "ci_low": 0.002939639539743518,
+        "ci_high": 0.778370557118581,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.00293964,
+          "ci_high": 0.778370542,
+          "max_rel_diff": 1.5656901996851647e-07,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.07142857142857142,
+        "ci_low": 0.005880756640211936,
+        "ci_high": 0.778370557118581,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.00588075624529326,
+          "ci_high": 0.778370511518838,
+          "max_rel_diff": 6.715439881546875e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.07142857142857142,
+        "ci_low": 0.001444656788879471,
+        "ci_high": 0.9032726606473352,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.001444656788876449,
+          "ci_high": 0.9032726606473398,
+          "max_rel_diff": 2.0917690059072687e-12,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 4,
+      "b": 7,
+      "c": 9,
+      "d": 11,
+      "koopman": {
+        "value": 0.808080808080808,
+        "ci_low": 0.306513918016976,
+        "ci_high": 1.86103123436761,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.808080808080808,
+        "ci_low": 0.322123649858875,
+        "ci_high": 2.02715507748225,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.726315789473684,
+        "ci_low": 0.170268992956324,
+        "ci_high": 3.09824247433061,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.6984126984126984,
+        "ci_low": 0.14727205643734115,
+        "ci_high": 3.4707201625045525,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.147272056,
+          "ci_high": 3.470720163,
+          "max_rel_diff": 2.969613829725977e-09,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.6984126984126984,
+        "ci_low": 0.1841635924302385,
+        "ci_high": 2.9081223603644375,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.184163572175584,
+          "ci_high": 2.9081223460077,
+          "max_rel_diff": 1.0998186037687615e-07,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.6984126984126984,
+        "ci_low": 0.11287252530619896,
+        "ci_high": 3.9403512194571797,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.11287252530620295,
+          "ci_high": 3.9403512194571757,
+          "max_rel_diff": 3.540988276649339e-14,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 9,
+      "b": 12,
+      "c": 4,
+      "d": 0,
+      "koopman": {
+        "value": 0.428571428571429,
+        "ci_low": 0.244689383201797,
+        "ci_high": 0.928001858665665,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.428571428571429,
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.0844444444444444,
+        "ci_low": 0.00403497184703243,
+        "ci_high": 1.7672649197727,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 1.0962894167359196,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.0,
+          "ci_high": 1.096289389,
+          "max_rel_diff": 2.529981511966773e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 1.0962894167359196,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0,
+          "ci_high": 1.09628933887993,
+          "max_rel_diff": 7.1017733517003e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 1.477329806581358,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.0,
+          "ci_high": 1.477329806581356,
+          "max_rel_diff": 1.3527117881346476e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 10,
+      "b": 7,
+      "c": 11,
+      "d": 3,
+      "koopman": {
+        "value": 0.748663101604278,
+        "ci_low": 0.438107538375168,
+        "ci_high": 1.24230494246502,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.748663101604278,
+        "ci_low": 0.462005415957055,
+        "ci_high": 1.21318153498841,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.426086956521739,
+        "ci_low": 0.0932133610721765,
+        "ci_high": 1.94768316934073,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.38961038961038963,
+        "ci_low": 0.07111424593418815,
+        "ci_high": 2.148644852594372,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.071114246,
+          "ci_high": 2.148644853,
+          "max_rel_diff": 9.254384279879179e-10,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.38961038961038963,
+        "ci_low": 0.09279986839476645,
+        "ci_high": 1.7691979459080274,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.092799868394802,
+          "ci_high": 1.76919796205745,
+          "max_rel_diff": 9.128103910231474e-09,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.38961038961038963,
+        "ci_low": 0.05229688008009092,
+        "ci_high": 2.394333061787256,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.052296880080090674,
+          "ci_high": 2.394333061787253,
+          "max_rel_diff": 4.64389627573995e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 4,
+      "b": 6,
+      "c": 8,
+      "d": 1,
+      "koopman": {
+        "value": 0.45,
+        "ci_low": 0.185496409043785,
+        "ci_high": 0.909464445164129,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.45,
+        "ci_low": 0.203525557485917,
+        "ci_high": 0.994961038315849,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.122171945701358,
+        "ci_low": 0.0147927321170377,
+        "ci_high": 1.00900795055055,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.08333333333333333,
+        "ci_low": 0.0032894171462416254,
+        "ci_high": 1.1760790460462531,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.003289417,
+          "ci_high": 1.176079023,
+          "max_rel_diff": 4.44582181720383e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.08333333333333333,
+        "ci_low": 0.0066066602399472395,
+        "ci_high": 0.759835704647484,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.00660665991825913,
+          "ci_high": 0.759835748909704,
+          "max_rel_diff": 5.8252356041689e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.08333333333333333,
+        "ci_low": 0.0016154359865456567,
+        "ci_high": 1.2073179511471968,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.001615435986547311,
+          "ci_high": 1.2073179511471956,
+          "max_rel_diff": 1.0240428519335999e-12,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 8,
+      "b": 10,
+      "c": 1,
+      "d": 0,
+      "koopman": {
+        "value": 0.444444444444444,
+        "ci_low": 0.245588866049845,
+        "ci_high": 2.26415885541123,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.444444444444444,
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.26984126984127,
+        "ci_low": 0.00969803738744619,
+        "ci_high": 7.50814912343036,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 17.099999999999998,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.0,
+          "ci_high": 17.1,
+          "max_rel_diff": 2.0776103384798255e-16,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 8.1,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0,
+          "ci_high": 8.09999999956941,
+          "max_rel_diff": 5.3159123193903794e-11,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 35.1,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.0,
+          "ci_high": 35.099999999999945,
+          "max_rel_diff": 1.6194706228150432e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 12,
+      "b": 3,
+      "c": 10,
+      "d": 1,
+      "koopman": {
+        "value": 0.88,
+        "ci_low": 0.590790340673548,
+        "ci_high": 1.3329153978533,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.88,
+        "ci_low": 0.642498201012534,
+        "ci_high": 1.20529520359683,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.510204081632653,
+        "ci_low": 0.0636587409461086,
+        "ci_high": 4.08911959372535,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.4,
+        "ci_low": 0.014122541296528561,
+        "ci_high": 4.39067917144795,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.014122541,
+          "ci_high": 4.390679171,
+          "max_rel_diff": 2.0996827282044793e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.4,
+        "ci_low": 0.028324896773631387,
+        "ci_high": 3.1563383676534182,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0283248966955208,
+          "ci_high": 3.15633838458999,
+          "max_rel_diff": 5.365892286524945e-09,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.4,
+        "ci_low": 0.006937311407093568,
+        "ci_high": 6.122788227326824,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.006937311407095509,
+          "ci_high": 6.122788227326816,
+          "max_rel_diff": 2.7981381484953507e-13,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 12,
+      "b": 2,
+      "c": 5,
+      "d": 1,
+      "koopman": {
+        "value": 1.02857142857143,
+        "ci_low": 0.683479339685451,
+        "ci_high": 2.00513662978338,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 1.02857142857143,
+        "ci_low": 0.677938473018994,
+        "ci_high": 1.56055339205366,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 1.36363636363636,
+        "ci_low": 0.142430953286918,
+        "ci_high": 13.0554776845841,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 1.2,
+        "ci_low": 0.03462508468178831,
+        "ci_high": 18.518379008184297,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.034625085,
+          "ci_high": 18.518379008,
+          "max_rel_diff": 9.190206927465207e-09,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 1.2,
+        "ci_low": 0.07006181689483847,
+        "ci_high": 12.12207444649362,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0700618169297672,
+          "ci_high": 12.1220744464943,
+          "max_rel_diff": 4.985417450413436e-10,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 1.2,
+        "ci_low": 0.01698290723518426,
+        "ci_high": 28.178312625131735,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.016982907235183125,
+          "ci_high": 28.178312625131806,
+          "max_rel_diff": 6.680300007400486e-14,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 11,
+      "b": 0,
+      "c": 12,
+      "d": 2,
+      "koopman": {
+        "value": 1.16666666666667,
+        "ci_low": 0.848531266602305,
+        "ci_high": 1.66503990871645,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 1.16666666666667,
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 4.6,
+        "ci_low": 0.19906099923545,
+        "ci_high": 106.29907456142,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": "inf",
+        "ci_low": 0.22836479375656618,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.228364794,
+          "ci_high": "inf",
+          "max_rel_diff": 1.0659866814236234e-09,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": "inf",
+        "ci_low": 0.3696876965892331,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.369687687638424,
+          "ci_high": "inf",
+          "max_rel_diff": 2.421181223094898e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": "inf",
+        "ci_low": 0.14806100451555798,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.14806100451555798,
+          "ci_high": "inf",
+          "max_rel_diff": 0.0,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 9,
+      "b": 7,
+      "c": 6,
+      "d": 4,
+      "koopman": {
+        "value": 0.9375,
+        "ci_low": 0.487310073641353,
+        "ci_high": 1.97107975997774,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.9375,
+        "ci_low": 0.481910490427965,
+        "ci_high": 1.82379563727588,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.876923076923077,
+        "ci_low": 0.188631698584412,
+        "ci_high": 4.07669595625316,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.8571428571428571,
+        "ci_low": 0.16440608338296495,
+        "ci_high": 4.573964855231721,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.164406083,
+          "ci_high": 4.573964764,
+          "max_rel_diff": 1.9945872723579064e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.8571428571428571,
+        "ci_low": 0.20649489373617713,
+        "ci_high": 4.573964855231721,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.20649488929313,
+          "ci_high": 4.573964733199,
+          "max_rel_diff": 2.6679855372688933e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.8571428571428571,
+        "ci_low": 0.12503852118191666,
+        "ci_high": 5.51056429306813,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.1250385211819169,
+          "ci_high": 5.510564293068138,
+          "max_rel_diff": 1.997785787767193e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 12,
+      "b": 5,
+      "c": 7,
+      "d": 9,
+      "koopman": {
+        "value": 1.61344537815126,
+        "ci_low": 0.885147533373081,
+        "ci_high": 3.21359379963096,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 1.61344537815126,
+        "ci_low": 0.855279878709257,
+        "ci_high": 3.0436890345255,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 2.87878787878788,
+        "ci_low": 0.719564528074126,
+        "ci_high": 11.5172709711481,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 3.085714285714286,
+        "ci_low": 0.6788888237462952,
+        "ci_high": 14.261297031405338,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.678888835,
+          "ci_high": 14.261296746,
+          "max_rel_diff": 2.0012579349919124e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 3.085714285714286,
+        "ci_low": 0.6788888237462952,
+        "ci_high": 14.261297031405338,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.678888870583678,
+          "ci_high": 14.261296709912,
+          "max_rel_diff": 6.899124144003223e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 3.085714285714286,
+        "ci_low": 0.5992659658363656,
+        "ci_high": 16.64737227387336,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.5992659658363646,
+          "ci_high": 16.647372273873327,
+          "max_rel_diff": 1.9206888981143083e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 12,
+      "b": 3,
+      "c": 7,
+      "d": 11,
+      "koopman": {
+        "value": 2.05714285714286,
+        "ci_low": 1.13826943681916,
+        "ci_high": 4.07413372430223,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 2.05714285714286,
+        "ci_low": 1.09345798920702,
+        "ci_high": 3.8701411270156,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 5.47619047619048,
+        "ci_low": 1.22145097740108,
+        "ci_high": 24.5516706657578,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 6.285714285714286,
+        "ci_low": 1.1983570143921012,
+        "ci_high": 32.90393036061038,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 1.198357034,
+          "ci_high": 32.903930361,
+          "max_rel_diff": 1.6362318261287658e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 6.285714285714286,
+        "ci_low": 1.1983570143921012,
+        "ci_high": 25.217469078717198,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 1.19835710043241,
+          "ci_high": 25.2174690867065,
+          "max_rel_diff": 7.179856073295976e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 6.285714285714286,
+        "ci_low": 1.0635839640977343,
+        "ci_high": 44.77699473734823,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 1.0635839640977323,
+          "ci_high": 44.776994737348204,
+          "max_rel_diff": 1.8789315294167463e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 6,
+      "b": 6,
+      "c": 2,
+      "d": 6,
+      "koopman": {
+        "value": 2,
+        "ci_low": 0.637179123861526,
+        "ci_high": 7.60213040593678,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 2,
+        "ci_low": 0.530595822954367,
+        "ci_high": 7.53869485388695,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 2.6,
+        "ci_low": 0.421595308001419,
+        "ci_high": 16.0343340442898,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 3.0,
+        "ci_low": 0.3265037979340315,
+        "ci_high": 26.759135810267267,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.326503804,
+          "ci_high": 26.75913581,
+          "max_rel_diff": 1.8578554196484784e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 3.0,
+        "ci_low": 0.5004188786478071,
+        "ci_high": 18.269888225601022,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.500418877325902,
+          "ci_high": 18.2698882404054,
+          "max_rel_diff": 2.6415972644301373e-09,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 3.0,
+        "ci_low": 0.3165918219669091,
+        "ci_high": 40.162580101074695,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.31659182196690894,
+          "ci_high": 40.16258010107467,
+          "max_rel_diff": 7.076664237924167e-16,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 10,
+      "b": 3,
+      "c": 0,
+      "d": 12,
+      "koopman": {
+        "value": "inf",
+        "ci_low": 3.08949836067395,
+        "ci_high": "inf",
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": "inf",
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 75,
+        "ci_low": 3.46533641983501,
+        "ci_high": 1623.21902364326,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": "inf",
+        "ci_low": 5.1331922557008545,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 5.133192358,
+          "ci_high": "inf",
+          "max_rel_diff": 1.992895260085066e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": "inf",
+        "ci_low": 7.382255999954874,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 7.38225613856944,
+          "ci_high": "inf",
+          "max_rel_diff": 1.8776721648291033e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": "inf",
+        "ci_low": 4.765062469138971,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 4.7650624691390115,
+          "ci_high": "inf",
+          "max_rel_diff": 8.574117877952674e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 9,
+      "b": 12,
+      "c": 3,
+      "d": 7,
+      "koopman": {
+        "value": 1.42857142857143,
+        "ci_low": 0.561890760475355,
+        "ci_high": 4.32795322621003,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 1.42857142857143,
+        "ci_low": 0.491080872761386,
+        "ci_high": 4.15576423299678,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 1.62857142857143,
+        "ci_low": 0.35489887395201,
+        "ci_high": 7.47324123186096,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 1.75,
+        "ci_low": 0.33163229681811646,
+        "ci_high": 9.733401561027671,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.331632297,
+          "ci_high": 9.733401561,
+          "max_rel_diff": 5.484494891203209e-10,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 1.75,
+        "ci_low": 0.3771987917066871,
+        "ci_high": 7.4607058257250305,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.377198782412331,
+          "ci_high": 7.46070581703273,
+          "max_rel_diff": 2.4640471462031398e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 1.75,
+        "ci_low": 0.2837939933853643,
+        "ci_high": 13.231016470008365,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.28379399338536454,
+          "ci_high": 13.231016470008395,
+          "max_rel_diff": 2.282369335587802e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 5,
+      "b": 0,
+      "c": 10,
+      "d": 4,
+      "koopman": {
+        "value": 1.4,
+        "ci_low": 0.757060604537817,
+        "ci_high": 2.20502714272461,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 1.4,
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 4.71428571428572,
+        "ci_low": 0.21268766854242,
+        "ci_high": 104.493551263343,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": "inf",
+        "ci_low": 0.2658483510203792,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.265848358,
+          "ci_high": "inf",
+          "max_rel_diff": 2.6254143758849866e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": "inf",
+        "ci_low": 0.2658483510203792,
+        "ci_high": "inf",
+        "set_has_gaps": true,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.384286180168809,
+          "ci_high": "inf",
+          "skipped": "confidence set has gaps; contingencytables reports an inner end, not the hull"
+        }
+      },
+      "cornfield": {
+        "value": "inf",
+        "ci_low": 0.2282957816615172,
+        "ci_high": "inf",
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.22829578166151748,
+          "ci_high": "inf",
+          "max_rel_diff": 1.2157726005108901e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 2,
+      "b": 11,
+      "c": 6,
+      "d": 0,
+      "koopman": {
+        "value": 0.153846153846154,
+        "ci_low": 0.0432553395531875,
+        "ci_high": 0.423442370166361,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.153846153846154,
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.0167224080267558,
+        "ci_low": 0.000691910266039559,
+        "ci_high": 0.404154908430453,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.25801201768502435,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.0,
+          "ci_high": 0.258012018,
+          "max_rel_diff": 1.2207790144579312e-09,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.23462350907086735,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0,
+          "ci_high": 0.234623529677284,
+          "max_rel_diff": 8.782758700506242e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.3316423258663285,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.0,
+          "ci_high": 0.3316423258663448,
+          "max_rel_diff": 4.904309867044596e-14,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 5,
+      "b": 9,
+      "c": 8,
+      "d": 3,
+      "koopman": {
+        "value": 0.491071428571429,
+        "ci_low": 0.212809314525586,
+        "ci_high": 1.04860248949317,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.491071428571429,
+        "ci_low": 0.222762972296142,
+        "ci_high": 1.08254592526534,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.238390092879257,
+        "ci_low": 0.0467735484875502,
+        "ci_high": 1.21499946488147,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.20833333333333334,
+        "ci_low": 0.03497859892738821,
+        "ci_high": 1.2636950113003613,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.034978599,
+          "ci_high": 1.263695011,
+          "max_rel_diff": 2.075891939817346e-09,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.20833333333333334,
+        "ci_low": 0.04663254977285026,
+        "ci_high": 1.1486983779710012,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0466325499332221,
+          "ci_high": 1.14869836761998,
+          "max_rel_diff": 9.011087113752137e-09,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.20833333333333334,
+        "ci_low": 0.0254169677433027,
+        "ci_high": 1.4934879797806873,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.02541696774331137,
+          "ci_high": 1.4934879797806861,
+          "max_rel_diff": 3.4111653366742154e-13,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 0,
+      "b": 3,
+      "c": 4,
+      "d": 5,
+      "koopman": {
+        "value": 0,
+        "ci_low": 0,
+        "ci_high": 1.64781373465567,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0,
+        "ci_low": null,
+        "ci_high": null,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.174603174603175,
+        "ci_low": 0.00701522268527924,
+        "ci_high": 4.34573069868176,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 3.3495397985480837,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.0,
+          "ci_high": 3.349539799,
+          "max_rel_diff": 1.3491891703139665e-10,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 2.410142344513303,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0,
+          "ci_high": 2.4101422911369,
+          "max_rel_diff": 2.214657693339179e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 4.9139035792319214,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.0,
+          "ci_high": 4.913903579231924,
+          "max_rel_diff": 5.422441071822703e-16,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 8,
+      "b": 10,
+      "c": 12,
+      "d": 4,
+      "koopman": {
+        "value": 0.592592592592593,
+        "ci_low": 0.313084189823105,
+        "ci_high": 1.04649697654144,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.592592592592593,
+        "ci_low": 0.328853133443543,
+        "ci_high": 1.06785049337503,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.291428571428571,
+        "ci_low": 0.0713865554162507,
+        "ci_high": 1.18972839843123,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.26666666666666666,
+        "ci_low": 0.06007485521384301,
+        "ci_high": 1.2170653571516272,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.060074855,
+          "ci_high": 1.217065337,
+          "max_rel_diff": 1.6557555547331676e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.26666666666666666,
+        "ci_low": 0.07487636470246384,
+        "ci_high": 1.2170653571516272,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0748763616757979,
+          "ci_high": 1.21706527522821,
+          "max_rel_diff": 6.73122578666676e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.26666666666666666,
+        "ci_low": 0.04606873838074633,
+        "ci_high": 1.399371111353086,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.046068738380746085,
+          "ci_high": 1.3993711113530964,
+          "max_rel_diff": 7.457704640897978e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 6,
+      "b": 7,
+      "c": 11,
+      "d": 2,
+      "koopman": {
+        "value": 0.545454545454546,
+        "ci_low": 0.26725494979371,
+        "ci_high": 0.969541067694176,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.545454545454546,
+        "ci_low": 0.290142533260482,
+        "ci_high": 1.02542932197369,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.188405797101449,
+        "ci_low": 0.0335864877294601,
+        "ci_high": 1.05687574918103,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.15584415584415584,
+        "ci_low": 0.01952685657993785,
+        "ci_high": 1.0405832338508643,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.019526857,
+          "ci_high": 1.040583234,
+          "max_rel_diff": 2.1512021149413317e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.15584415584415584,
+        "ci_low": 0.02831093355186049,
+        "ci_high": 1.0000000199999992,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.0283109321937557,
+          "ci_high": 1.0000000310536,
+          "max_rel_diff": 4.797103526569222e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.15584415584415584,
+        "ci_low": 0.013055826935802052,
+        "ci_high": 1.267519756422541,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.013055826935801994,
+          "ci_high": 1.2675197564225402,
+          "max_rel_diff": 4.384699260240146e-15,
+          "tolerance": 1e-06
+        }
+      }
+    },
+    {
+      "set": "sweep",
+      "label": "seeded small-table sweep",
+      "a": 10,
+      "b": 6,
+      "c": 7,
+      "d": 1,
+      "koopman": {
+        "value": 0.714285714285714,
+        "ci_low": 0.426897287851569,
+        "ci_high": 1.27294511365588,
+        "authority": "PropCIs::riskscoreci(a, a + b, c, c + d, conf.level = 0.95)"
+      },
+      "katz": {
+        "value": 0.714285714285714,
+        "ci_low": 0.450402119007446,
+        "ci_high": 1.13277460318569,
+        "authority": "epitools::riskratio.wald(rbind(c(d, c), c(b, a)), conf.level = 0.95)$measure[2, ]"
+      },
+      "haldane_anscombe": {
+        "value": 0.323076923076923,
+        "ci_low": 0.0433974630465121,
+        "ci_high": 2.40517972474525,
+        "authority": "DescTools::OddsRatio(matrix(c(a, b, c, d), 2, byrow = TRUE) + 0.5, method = 'wald', conf.level = 0.95)"
+      },
+      "baptista_pike": {
+        "value": 0.23809523809523808,
+        "ci_low": 0.009234441443834885,
+        "ci_high": 2.6981569965104244,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "exact2x2_minlike",
+          "ci_low": 0.009234441,
+          "ci_high": 2.698156943,
+          "max_rel_diff": 4.806299202936746e-08,
+          "tolerance": 1e-06
+        }
+      },
+      "baptista_pike_midp": {
+        "value": 0.23809523809523808,
+        "ci_low": 0.01844835190460871,
+        "ci_high": 1.8220164617888424,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "contingencytables_midp",
+          "ci_low": 0.018448351500042,
+          "ci_high": 1.82201645834578,
+          "max_rel_diff": 2.192969388733443e-08,
+          "tolerance": 0.0001
+        }
+      },
+      "cornfield": {
+        "value": 0.23809523809523808,
+        "ci_low": 0.004539268774973471,
+        "ci_high": 2.865686865121362,
+        "set_has_gaps": false,
+        "authority": "tests/reference/hp_exact_or.py (mpmath, 60 digits)",
+        "cross_check": {
+          "source": "scipy_conditional",
+          "ci_low": 0.004539268774972226,
+          "ci_high": 2.8656868651213556,
+          "max_rel_diff": 2.741992500808973e-13,
+          "tolerance": 1e-06
+        }
+      }
+    }
+  ]
+}

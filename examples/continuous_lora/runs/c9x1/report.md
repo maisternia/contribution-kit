@@ -57,19 +57,19 @@ How much more often rows matching each condition have prediction different from 
 
 | Regime | Regime mismatch rate | Rest mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
-| class_sf_match | 18.77% (1125:4868) | 21.53% (888:3236) | 0.87 (0.75 to 1.07) | 0.84 (0.76 to 0.93) |
-| class_bw within tol & sf wrong | 98.86% (261:3) | 17.78% (1752:8101) | 5.56 (5.32 to 5.81) | 402.28 (135.80 to 1964.55) |
-| class_unworkable | 72.02% (1588:617) | 5.37% (425:7487) | 13.41 (12.18 to 14.76) | 45.34 (39.53 to 52.01) |
-| class_ok & measured_ok | 8.81% (271:2804) | 24.74% (1742:5300) | 0.36 (0.31 to 0.41) | 0.29 (0.26 to 0.34) |
-| class_ok & measured_off | 61.90% (13:8) | 19.81% (2000:8096) | 3.12 (2.05 to 4.04) | 6.58 (2.52 to 18.33) |
-| upscale & measured_ok | 24.58% (1089:3342) | 16.25% (924:4762) | 1.51 (1.29 to 1.87) | 1.68 (1.52 to 1.85) |
-| upscale & measured_off | 25.71% (99:286) | 19.67% (1914:7818) | 1.31 (1.08 to 1.57) | 1.41 (1.11 to 1.79) |
-| downscale & measured_ok | 23.77% (504:1616) | 18.87% (1509:6488) | 1.26 (1.12 to 1.43) | 1.34 (1.19 to 1.51) |
-| downscale & measured_off | 43.53% (37:48) | 19.70% (1976:8056) | 2.21 (1.69 to 2.78) | 3.14 (1.98 to 4.94) |
+| class_sf_match | 18.77% (1125:4868) | 21.53% (888:3236) | 0.87 (0.81 to 0.94) | 0.84 (0.76 to 0.93) |
+| class_bw within tol & sf wrong | 98.86% (261:3) | 17.78% (1752:8101) | 5.56 (5.31 to 5.81) | 402.28 (133.53 to 1485.68) |
+| class_unworkable | 72.02% (1588:617) | 5.37% (425:7487) | 13.41 (12.18 to 14.76) | 45.34 (39.53 to 51.91) |
+| class_ok & measured_ok | 8.81% (271:2804) | 24.74% (1742:5300) | 0.36 (0.32 to 0.40) | 0.29 (0.26 to 0.34) |
+| class_ok & measured_off | 61.90% (13:8) | 19.81% (2000:8096) | 3.12 (2.06 to 4.02) | 6.58 (2.73 to 16.47) |
+| upscale & measured_ok | 24.58% (1089:3342) | 16.25% (924:4762) | 1.51 (1.40 to 1.64) | 1.68 (1.52 to 1.85) |
+| upscale & measured_off | 25.71% (99:286) | 19.67% (1914:7818) | 1.31 (1.09 to 1.55) | 1.41 (1.12 to 1.79) |
+| downscale & measured_ok | 23.77% (504:1616) | 18.87% (1509:6488) | 1.26 (1.15 to 1.38) | 1.34 (1.20 to 1.51) |
+| downscale & measured_off | 43.53% (37:48) | 19.70% (1976:8056) | 2.21 (1.70 to 2.76) | 3.14 (2.04 to 4.84) |
 | class_workable & bw_neutral | 4.06% (314:7429) | 71.57% (1699:675) | 0.06 (0.05 to 0.06) | 0.02 (0.01 to 0.02) |
-| class_workable & bw_shifts | 65.68% (111:58) | 19.12% (1902:8046) | 3.44 (2.99 to 3.89) | 8.10 (5.81 to 11.37) |
-| class_unworkable & bw_neutral | 82.32% (1550:333) | 5.62% (463:7771) | 14.64 (13.37 to 16.03) | 78.12 (66.98 to 91.13) |
-| class_unworkable & bw_shifts | 11.80% (38:284) | 20.16% (1975:7820) | 0.59 (0.43 to 0.79) | 0.53 (0.37 to 0.75) |
+| class_workable & bw_shifts | 65.68% (111:58) | 19.12% (1902:8046) | 3.44 (3.03 to 3.82) | 8.10 (5.86 to 11.25) |
+| class_unworkable & bw_neutral | 82.32% (1550:333) | 5.62% (463:7771) | 14.64 (13.37 to 16.03) | 78.12 (67.00 to 90.95) |
+| class_unworkable & bw_shifts | 11.80% (38:284) | 20.16% (1975:7820) | 0.59 (0.43 to 0.78) | 0.53 (0.37 to 0.75) |
 
 **In short:** `class_unworkable & bw_neutral` carries the highest mismatch risk (risk ratio 14.64).
 
@@ -83,10 +83,10 @@ Rows split by where the nominal class BW sits relative to GT BW, and so by which
 
 | Row level | measured_ok | measured_off | Row marginal |
 |---|---|---|---|
-| class_ok | n=3075, mismatch=8.81%, RR=0.36 (0.31 to 0.41) | n=21, mismatch=61.90%, RR=3.12 (2.05 to 4.04) | n=3096, mismatch=9.17%, RR=0.37 (0.33 to 0.43) |
-| upscale | n=4431, mismatch=24.58%, RR=1.51 (1.29 to 1.87) | n=385, mismatch=25.71%, RR=1.31 (1.08 to 1.57) | n=4816, mismatch=24.67%, RR=1.59 (1.32 to 2.05) |
-| downscale | n=2120, mismatch=23.77%, RR=1.26 (1.12 to 1.43) | n=85, mismatch=43.53%, RR=2.21 (1.69 to 2.78) | n=2205, mismatch=24.54%, RR=1.32 (1.17 to 1.50) |
-| Column marginal | n=9626, mismatch=19.36%, RR=0.64 (0.55 to 0.73) | n=491, mismatch=30.35%, RR=1.57 (1.34 to 1.82) | n/a |
+| class_ok | n=3075, mismatch=8.81%, RR=0.36 (0.32 to 0.40) | n=21, mismatch=61.90%, RR=3.12 (2.06 to 4.02) | n=3096, mismatch=9.17%, RR=0.37 (0.33 to 0.42) |
+| upscale | n=4431, mismatch=24.58%, RR=1.51 (1.40 to 1.64) | n=385, mismatch=25.71%, RR=1.31 (1.09 to 1.55) | n=4816, mismatch=24.67%, RR=1.59 (1.46 to 1.72) |
+| downscale | n=2120, mismatch=23.77%, RR=1.26 (1.15 to 1.38) | n=85, mismatch=43.53%, RR=2.21 (1.70 to 2.76) | n=2205, mismatch=24.54%, RR=1.32 (1.21 to 1.44) |
+| Column marginal | n=9626, mismatch=19.36%, RR=0.64 (0.56 to 0.74) | n=491, mismatch=30.35%, RR=1.57 (1.36 to 1.80) | n/a |
 
 ### Class decision × BW measurement
 
@@ -94,65 +94,65 @@ Each axis holds one Shapley player at its observed value and every other player 
 
 | Row level | bw_neutral | bw_shifts | Row marginal |
 |---|---|---|---|
-| class_workable | n=7743, mismatch=4.06%, RR=0.06 (0.05 to 0.06) | n=169, mismatch=65.68%, RR=3.44 (2.99 to 3.89) | n=7912, mismatch=5.37%, RR=0.07 (0.07 to 0.08) |
-| class_unworkable | n=1883, mismatch=82.32%, RR=14.64 (13.37 to 16.03) | n=322, mismatch=11.80%, RR=0.59 (0.43 to 0.79) | n=2205, mismatch=72.02%, RR=13.41 (12.18 to 14.76) |
-| Column marginal | n=9626, mismatch=19.36%, RR=0.64 (0.55 to 0.73) | n=491, mismatch=30.35%, RR=1.57 (1.34 to 1.82) | n/a |
+| class_workable | n=7743, mismatch=4.06%, RR=0.06 (0.05 to 0.06) | n=169, mismatch=65.68%, RR=3.44 (3.03 to 3.82) | n=7912, mismatch=5.37%, RR=0.07 (0.07 to 0.08) |
+| class_unworkable | n=1883, mismatch=82.32%, RR=14.64 (13.37 to 16.03) | n=322, mismatch=11.80%, RR=0.59 (0.43 to 0.78) | n=2205, mismatch=72.02%, RR=13.41 (12.18 to 14.76) |
+| Column marginal | n=9626, mismatch=19.36%, RR=0.64 (0.56 to 0.74) | n=491, mismatch=30.35%, RR=1.57 (1.36 to 1.80) | n/a |
 
 ## Within-stratum contrasts
 
-Sibling-level contrasts within each stratum reuse Koopman risk-ratio and Baptista-Pike odds-ratio intervals.
+Sibling-level contrasts within each stratum use the same risk-ratio and odds-ratio intervals as the mismatch-risk table.
 
 ### BW quality × scaling direction :: columns=measured_off
 
 | Comparison | A mismatch rate | B mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
-| class_ok vs upscale | 61.90% (13:8) | 25.71% (99:286) | 2.41 (1.47 to 4.56) | 4.69 (1.74 to 13.42) |
-| class_ok vs downscale | 61.90% (13:8) | 43.53% (37:48) | 1.42 (0.94 to 2.15) | 2.11 (0.72 to 6.48) |
-| upscale vs downscale | 25.71% (99:286) | 43.53% (37:48) | 0.59 (0.44 to 0.79) | 0.45 (0.27 to 0.76) |
+| class_ok vs upscale | 61.90% (13:8) | 25.71% (99:286) | 2.41 (1.54 to 3.30) | 4.69 (1.83 to 11.88) |
+| class_ok vs downscale | 61.90% (13:8) | 43.53% (37:48) | 1.42 (0.89 to 2.07) | 2.11 (0.77 to 5.68) |
+| upscale vs downscale | 25.71% (99:286) | 43.53% (37:48) | 0.59 (0.45 to 0.80) | 0.45 (0.28 to 0.75) |
 
 ### BW quality × scaling direction :: columns=measured_ok
 
 | Comparison | A mismatch rate | B mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
-| class_ok vs upscale | 8.81% (271:2804) | 24.58% (1089:3342) | 0.36 (0.31 to 0.42) | 0.30 (0.26 to 0.34) |
-| class_ok vs downscale | 8.81% (271:2804) | 23.77% (504:1616) | 0.37 (0.31 to 0.46) | 0.31 (0.26 to 0.36) |
-| upscale vs downscale | 24.58% (1089:3342) | 23.77% (504:1616) | 1.03 (0.82 to 1.64) | 1.04 (0.92 to 1.18) |
+| class_ok vs upscale | 8.81% (271:2804) | 24.58% (1089:3342) | 0.36 (0.32 to 0.41) | 0.30 (0.26 to 0.34) |
+| class_ok vs downscale | 8.81% (271:2804) | 23.77% (504:1616) | 0.37 (0.32 to 0.42) | 0.31 (0.26 to 0.36) |
+| upscale vs downscale | 24.58% (1089:3342) | 23.77% (504:1616) | 1.03 (0.94 to 1.13) | 1.04 (0.92 to 1.18) |
 
 ### BW quality × scaling direction :: rows=class_ok
 
 | Comparison | A mismatch rate | B mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
-| measured_ok vs measured_off | 8.81% (271:2804) | 61.90% (13:8) | 0.14 (0.10 to 0.20) | 0.06 (0.02 to 0.16) |
+| measured_ok vs measured_off | 8.81% (271:2804) | 61.90% (13:8) | 0.14 (0.11 to 0.22) | 0.06 (0.02 to 0.15) |
 
 ### BW quality × scaling direction :: rows=downscale
 
 | Comparison | A mismatch rate | B mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
-| measured_ok vs measured_off | 23.77% (504:1616) | 43.53% (37:48) | 0.55 (0.42 to 0.70) | 0.40 (0.25 to 0.65) |
+| measured_ok vs measured_off | 23.77% (504:1616) | 43.53% (37:48) | 0.55 (0.43 to 0.72) | 0.40 (0.26 to 0.63) |
 
 ### BW quality × scaling direction :: rows=upscale
 
 | Comparison | A mismatch rate | B mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
-| measured_ok vs measured_off | 24.58% (1089:3342) | 25.71% (99:286) | 0.96 (0.80 to 1.14) | 0.94 (0.74 to 1.21) |
+| measured_ok vs measured_off | 24.58% (1089:3342) | 25.71% (99:286) | 0.96 (0.80 to 1.15) | 0.94 (0.74 to 1.20) |
 
 ### Class decision × BW measurement :: columns=bw_neutral
 
 | Comparison | A mismatch rate | B mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
-| class_workable vs class_unworkable | 4.06% (314:7429) | 82.32% (1550:333) | 0.05 (0.04 to 0.06) | 0.01 (0.01 to 0.01) |
+| class_workable vs class_unworkable | 4.06% (314:7429) | 82.32% (1550:333) | 0.05 (0.04 to 0.05) | 0.01 (0.01 to 0.01) |
 
 ### Class decision × BW measurement :: columns=bw_shifts
 
 | Comparison | A mismatch rate | B mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
-| class_workable vs class_unworkable | 65.68% (111:58) | 11.80% (38:284) | 5.57 (4.05 to 7.65) | 14.30 (8.77 to 23.40) |
+| class_workable vs class_unworkable | 65.68% (111:58) | 11.80% (38:284) | 5.57 (4.07 to 7.67) | 14.30 (8.87 to 23.04) |
 
 ### Class decision × BW measurement :: rows=class_unworkable
 
 | Comparison | A mismatch rate | B mismatch rate | Risk ratio (95% CI) | Odds ratio (95% CI) |
 |---|---:|---:|---:|---:|
-| bw_neutral vs bw_shifts | 82.32% (1550:333) | 11.80% (38:284) | 6.98 (5.17 to 9.41) | 34.79 (24.12 to 51.11) |
+| bw_neutral vs bw_shifts | 82.32% (1550:333) | 11.80% (38:284) | 6.98 (5.21 to 9.45) | 34.79 (24.26 to 49.99) |
 
 ### Class decision × BW measurement :: rows=class_workable
 
