@@ -32,6 +32,11 @@ How much each condition (regime) contributes to the total observed prediction er
 | class_sf_match | 8314 | 0.0449 | 373.00 | 75.05 |
 | class_bw within tol & sf wrong | 9 | 1.0000 | 9.00 | 1.81 |
 | class_unworkable | 379 | 0.7361 | 279.00 | 56.14 |
+| class_bw_under | 994 | 0.2495 | 248.00 | 49.90 |
+| class_bw_over | 1562 | 0.1370 | 214.00 | 43.06 |
+| class_sf_wrong | 364 | 0.3407 | 124.00 | 24.95 |
+| measured_bw_off | 235 | 0.3574 | 84.00 | 16.90 |
+| clean | 6002 | 0.0000 | 0.00 | 0.00 |
 | class_ok & measured_ok | 6093 | 0.0033 | 20.00 | 4.02 |
 | class_ok & measured_off | 29 | 0.5172 | 15.00 | 3.02 |
 | upscale & measured_ok | 973 | 0.2425 | 236.00 | 47.48 |
@@ -60,6 +65,10 @@ How much more often rows matching each condition have prediction different from 
 | class_sf_match | 4.49% (373:7941) | 34.07% (124:240) | 0.13 (0.11 to 0.16) | 0.09 (0.07 to 0.12) |
 | class_bw within tol & sf wrong | 100.00% (9:0) | 5.63% (488:8181) | 17.76 (12.39 to 19.37) | inf (n/a) |
 | class_unworkable | 73.61% (279:100) | 2.63% (218:8081) | 28.02 (24.25 to 32.35) | 103.42 (78.70 to 134.97) |
+| class_bw_under | 24.95% (248:746) | 3.24% (249:7435) | 7.70 (6.54 to 9.05) | 9.93 (8.16 to 12.03) |
+| class_bw_over | 13.70% (214:1348) | 3.98% (283:6833) | 3.44 (2.91 to 4.08) | 3.83 (3.17 to 4.63) |
+| class_sf_wrong | 34.07% (124:240) | 4.49% (373:7941) | 7.59 (6.36 to 9.00) | 11.00 (8.58 to 14.02) |
+| measured_bw_off | 35.74% (84:151) | 4.89% (413:8030) | 7.31 (5.98 to 8.83) | 10.82 (8.09 to 14.40) |
 | class_ok & measured_ok | 0.33% (20:6073) | 18.45% (477:2108) | 0.02 (0.01 to 0.03) | 0.01 (0.01 to 0.02) |
 | class_ok & measured_off | 51.72% (15:14) | 5.57% (482:8167) | 9.28 (6.13 to 12.52) | 18.15 (8.69 to 38.44) |
 | upscale & measured_ok | 24.25% (236:737) | 3.39% (261:7444) | 7.16 (6.08 to 8.42) | 9.13 (7.53 to 11.11) |

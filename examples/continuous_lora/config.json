@@ -43,6 +43,26 @@
     "class_unworkable": {
       "label": "Class decision the geometric regression cannot rescue",
       "condition": "coalition_score('class') != 0"
+    },
+    "class_bw_under": {
+      "label": "Class BW more than 10% below GT BW",
+      "condition": "(col('Class BW') - col('GT BW')) / col('GT BW') < -0.10"
+    },
+    "class_bw_over": {
+      "label": "Class BW more than 10% above GT BW",
+      "condition": "(col('Class BW') - col('GT BW')) / col('GT BW') > 0.10"
+    },
+    "class_sf_wrong": {
+      "label": "Class SF differs from GT SF",
+      "condition": "col('Class SF') != col('GT SF')"
+    },
+    "measured_bw_off": {
+      "label": "Measured BW more than 10% off GT BW",
+      "condition": "abs(col('Measured BW') - col('GT BW')) / col('GT BW') > 0.10"
+    },
+    "clean": {
+      "label": "Every input within tolerance (none of the four above)",
+      "condition": "abs(col('Class BW') - col('GT BW')) / col('GT BW') <= 0.10 and col('Class SF') == col('GT SF') and abs(col('Measured BW') - col('GT BW')) / col('GT BW') <= 0.10"
     }
   },
   "factorials": [
