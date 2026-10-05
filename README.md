@@ -490,9 +490,11 @@ tests/                  — pytest suite
 examples/               — example configs and data
   continuous_lora/      — config.json + measurements.csv (8,678-row real sample used in The result)
                           measurements_c9x1.csv (C9x1 detector, continuous set) and
-                          measurements_standard.csv (2,382 rows, standard set: nominal
-                          125/250/500 kHz bandwidths only); each sample's shipped-config
-                          run is under runs/{c18x2,c9x1,standard}/
+                          measurements_standard.csv (8,932 rows at the nominal 125/250/500
+                          kHz bandwidths only: the synthetic standard set plus ExpressLRS
+                          and Heltec over-the-air captures, named per row in a Source
+                          column); each sample's shipped-config run is under
+                          runs/{c18x2,c9x1,standard}/
 openspec/               — spec-driven development artifacts (see Generative AI usage notice)
   specs/                — current capability specifications
   changes/archive/      — every applied change: proposal.md, design.md, tasks.md, spec deltas
