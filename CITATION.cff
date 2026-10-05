@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+type: software
+title: "contribution-kit: Reusable toolkit for attributing a modeled quantity to its contributing factors"
+abstract: >-
+  Declarative error attribution for prediction pipelines. Failure regimes are
+  Boolean conditions over CSV columns, tested with risk and odds ratios;
+  crossed regimes form a factorial table whose cells are ranked by
+  attributable burden against an analyst-chosen baseline; and an exact
+  Shapley decomposition of the prediction formula screens its inputs, with
+  jointly determined inputs grouped into one player.
+authors:
+  - family-names: Dudarek
+    given-names: Gennadii
+    affiliation: >-
+      National Technical University of Ukraine "Igor Sikorsky Kyiv
+      Polytechnic Institute"
+repository-code: "https://github.com/maisternia/contribution-kit"
+license: MIT
+version: 0.3.1
+date-released: 2026-10-05
+keywords:
+  - error attribution
+  - Shapley value
+  - grouped features
+  - risk ratio
+  - odds ratio
+  - attributable burden
