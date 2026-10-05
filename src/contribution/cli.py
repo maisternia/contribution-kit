@@ -82,6 +82,7 @@ def _result_from_run(payload: dict[str, Any]) -> AssessmentResult:
                 entries=[BurdenRankingEntry(**entry) for entry in item.get("entries", [])],
                 overlap_suppressed=item.get("overlap_suppressed", False),
                 coverage_gap_excluded_rows=item.get("coverage_gap_excluded_rows", 0),
+                empty_cells=list(item.get("empty_cells", [])),
                 baseline_sanity_warning=item.get("baseline_sanity_warning"),
                 observed_accuracy_pct=item.get("observed_accuracy_pct", 0.0),
                 ceiling_accuracy_pct=item.get("ceiling_accuracy_pct", 0.0),

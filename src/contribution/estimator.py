@@ -1154,15 +1154,20 @@ class Estimator:
 
             baseline_rate = baseline_mismatches / baseline_count
 
+            # An empty cell has no rows to recover and no mismatch rate, so it is
+            # neither ranked nor compared against the baseline.
             baseline_sanity_warning: str | None = None
             all_cell_rates: list[float] = []
+            empty_cells: list[str] = []
             for row_level in plan.row_levels:
                 for column_level in plan.column_levels:
                     cell_count, cell_mismatches = self._mask_mismatch_count(
                         plan.cell_masks[(row_level, column_level)], mismatch_fn
                     )
-                    rate = (cell_mismatches / cell_count) if cell_count else 0.0
-                    all_cell_rates.append(rate)
+                    if cell_count == 0:
+                        empty_cells.append(plan.cell_names[(row_level, column_level)])
+                        continue
+                    all_cell_rates.append(cell_mismatches / cell_count)
             if any(rate < baseline_rate for rate in all_cell_rates):
                 baseline_sanity_warning = (
                     f"Declared baseline '{baseline_cell_name}' is not the lowest mismatch-rate cell in '{plan.label}'."
@@ -1176,6 +1181,7 @@ class Estimator:
                         entries=[],
                         overlap_suppressed=True,
                         coverage_gap_excluded_rows=coverage_gap_excluded_rows,
+                        empty_cells=empty_cells,
                         baseline_sanity_warning=baseline_sanity_warning,
                         observed_accuracy_pct=observed_accuracy_pct,
                         ceiling_accuracy_pct=observed_accuracy_pct,
@@ -1193,7 +1199,9 @@ class Estimator:
                     cell_count, cell_mismatches = self._mask_mismatch_count(
                         plan.cell_masks[(row_level, column_level)], mismatch_fn
                     )
-                    cell_rate = (cell_mismatches / cell_count) if cell_count else 0.0
+                    if cell_count == 0:
+                        continue
+                    cell_rate = cell_mismatches / cell_count
                     excess = cell_count * (cell_rate - baseline_rate)
                     risk_difference = risk_difference_with_guardrail(
                         cell_mismatches,
@@ -1264,6 +1272,7 @@ class Estimator:
                     entries=entries,
                     overlap_suppressed=False,
                     coverage_gap_excluded_rows=coverage_gap_excluded_rows,
+                    empty_cells=empty_cells,
                     baseline_sanity_warning=baseline_sanity_warning,
                     observed_accuracy_pct=observed_accuracy_pct,
                     ceiling_accuracy_pct=(

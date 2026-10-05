@@ -652,6 +652,38 @@ def test_burden_raises_on_empty_baseline_cell() -> None:
         Estimator.from_dataframe(rows, spec).assess(exact=True)
 
 
+def test_burden_skips_empty_non_baseline_cell() -> None:
+    rows = [
+        {"target": 0, "prediction": 1, "row": "a", "axis_col": "x"},
+        {"target": 0, "prediction": 0, "row": "a", "axis_col": "x"},
+        {"target": 0, "prediction": 0, "row": "a", "axis_col": "x"},
+        {"target": 0, "prediction": 0, "row": "a", "axis_col": "x"},
+        {"target": 0, "prediction": 1, "row": "a", "axis_col": "y"},
+        {"target": 0, "prediction": 1, "row": "a", "axis_col": "y"},
+        {"target": 0, "prediction": 1, "row": "b", "axis_col": "x"},
+        {"target": 0, "prediction": 0, "row": "b", "axis_col": "x"},
+    ]
+    spec = AttributionSpec(
+        target="target",
+        prediction="prediction",
+        prediction_expr="1",
+        regimes=[Hypothesis(name="all", condition="1 == 1")],
+        factorials=[
+            FactorialCrossing(
+                rows={"a": "col('row') == 'a'", "b": "col('row') == 'b'"},
+                columns={"x": "col('axis_col') == 'x'", "y": "col('axis_col') == 'y'"},
+                baseline={"rows": "a", "columns": "x"},
+                label="Sparse",
+            )
+        ],
+    )
+    result = Estimator.from_dataframe(rows, spec).assess(exact=True)
+    ranking = result.burden_rankings[0]
+    assert [entry.cell for entry in ranking.entries] == ["a & y", "b & x"]
+    assert ranking.empty_cells == ["b & y"]
+    assert ranking.baseline_sanity_warning is None
+
+
 def test_baseline_free_outputs_do_not_add_burden_fields(tmp_path: Path) -> None:
     rows = [
         {"target": 0, "prediction": 0, "row": "a", "axis_col": "x"},

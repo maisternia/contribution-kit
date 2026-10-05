@@ -321,11 +321,17 @@ def test_markdown_and_json_include_burden_when_present(tmp_path) -> None:
     assert "## Attributable burden" in markdown
     assert "Counterfactual caveat" in markdown
     assert "Risk difference CI: Miettinen & Nurminen (1985)" in markdown
+    assert "Empty cells note" not in markdown
 
     json_path = tmp_path / "run.json"
     result.to_json(json_path)
     payload = json.loads(json_path.read_text(encoding="utf-8"))
     assert "burden_rankings" in payload
+    assert payload["burden_rankings"][0]["empty_cells"] == []
+
+    result.burden_rankings[0].empty_cells = ["upscale & measured_off"]
+    markdown = result.to_markdown()
+    assert "Empty cells note: left out of the ranking because they matched no rows: `upscale & measured_off`." in markdown
 
 
 def test_markdown_omits_burden_reference_without_burden_table() -> None:

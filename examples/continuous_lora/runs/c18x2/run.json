@@ -368,6 +368,7 @@
       "ceiling_accuracy_pct": 99.67175447234531,
       "coverage_gap_excluded_rows": 0,
       "crossing_label": "BW quality \u00d7 scaling direction",
+      "empty_cells": [],
       "entries": [
         {
           "baseline_rate_pct": 0.32824552765468573,
@@ -465,6 +466,7 @@
       "ceiling_accuracy_pct": 97.83796914854854,
       "coverage_gap_excluded_rows": 0,
       "crossing_label": "Class decision \u00d7 BW measurement",
+      "empty_cells": [],
       "entries": [
         {
           "baseline_rate_pct": 2.1620308514514757,

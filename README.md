@@ -443,6 +443,7 @@ Burden table semantics:
 
 - Recoverable mismatches for a cell are `n_cell * (p_cell - p_baseline)`.
 - Non-positive recoverable cells are listed last and shown as not recoverable.
+- Empty non-baseline cells are not ranked; the report lists them in a note under the table, and `run.json` keeps them in `empty_cells`.
 - Accuracy-if-eliminated is cumulative and always uses all dataset rows as denominator.
 - Counterfactual caveat: recoverable counts assume rows in a fixed regime revert to the baseline mismatch rate.
 
@@ -488,6 +489,10 @@ tests/                  — pytest suite
   smoke/                — lightweight API smoke checks
 examples/               — example configs and data
   continuous_lora/      — config.json + measurements.csv (8,678-row real sample used in The result)
+                          measurements_c9x1.csv (C9x1 detector, continuous set) and
+                          measurements_standard.csv (2,382 rows, standard set: nominal
+                          125/250/500 kHz bandwidths only); each sample's shipped-config
+                          run is under runs/{c18x2,c9x1,standard}/
 openspec/               — spec-driven development artifacts (see Generative AI usage notice)
   specs/                — current capability specifications
   changes/archive/      — every applied change: proposal.md, design.md, tasks.md, spec deltas

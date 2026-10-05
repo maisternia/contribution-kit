@@ -272,6 +272,7 @@ class BurdenRankingResult:
     entries: list[BurdenRankingEntry] = field(default_factory=list)
     overlap_suppressed: bool = False
     coverage_gap_excluded_rows: int = 0
+    empty_cells: list[str] = field(default_factory=list)
     baseline_sanity_warning: str | None = None
     observed_accuracy_pct: float = 0.0
     ceiling_accuracy_pct: float = 0.0
@@ -634,6 +635,10 @@ class AssessmentResult:
                     lines.append(
                         f"Coverage gap note: {ranking.coverage_gap_excluded_rows} rows were outside all crossing cells and were excluded from ranking, but kept in the accuracy denominator."
                     )
+                if ranking.empty_cells:
+                    names = ", ".join(f"`{name}`" for name in ranking.empty_cells)
+                    lines.append("")
+                    lines.append(f"Empty cells note: left out of the ranking because they matched no rows: {names}.")
                 if ranking.baseline_sanity_warning:
                     lines.append("")
                     lines.append(f"Baseline sanity warning: {ranking.baseline_sanity_warning}")
