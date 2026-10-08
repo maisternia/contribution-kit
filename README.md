@@ -571,7 +571,7 @@ Each folder ships a `config.json` and a matching `measurements.csv` that can be 
 [Xu et al. 2025] Xu, F., Zhou, Z.-J., Ni, J., & Gao, W. (2025). Interpretation with baseline Shapley value for feature groups on tree models. *Frontiers of Computer Science*, 19(5), 195316.
 
 <a id="ref-dudarek26"></a>
-[Dudarek & Martyniuk 2026] Dudarek, G., & Martyniuk, A. (2026). From Discrete to Continuous LoRa Parameter Estimation Using Vision-Based Deep Learning. *Preprint*. SSRN. http://ssrn.com/abstract=6891362
+[Dudarek & Martyniuk 2026] Dudarek, G., & Martyniuk, S. (2026). From Discrete to Continuous LoRa Parameter Estimation Using Vision-Based Deep Learning. *Preprint*. SSRN. http://ssrn.com/abstract=6891362
 
 ## Generative AI usage notice
 
