@@ -1,6 +1,7 @@
 # contribution-kit
 
 [![GitHub](https://img.shields.io/badge/GitHub-maisternia%2Fcontribution--kit-blue)](https://github.com/maisternia/contribution-kit)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23234346.svg)](https://doi.org/10.5281/zenodo.23234346)
 
 Answers *"what should we fix first?"* for any prediction pipeline. You declare failure **regimes** as boolean conditions over CSV columns and mark one factorial cell as the healthy **baseline**; the kit ranks every other cell by *recoverable mismatches* — how many errors would disappear if that cell reverted to the baseline rate — together with the accuracy you would reach by eliminating each cause.
 
@@ -581,6 +582,10 @@ Everything in this repository — the source code, tests, CLI, example configura
 Development followed spec-driven development (SDD) with [OpenSpec](https://github.com/Fission-AI/OpenSpec). Every capability was first captured as a proposal, a design, a task list, and a specification delta that the authors reviewed and approved before any code was applied. All SDD artifacts are retained in [openspec/](openspec): the current specifications live under `openspec/specs/`, and the complete change history, including the artifacts of every archived change, lives under `openspec/changes/archive/`, so each capability can be traced from its proposal to the code that implements it.
 
 While the AI contribution is significant, the ideas, the decisions on methods, the CLI and configuration design, and the fine-tuning remain solely the credit and responsibility of the authors. The authors reviewed and edited all generated content as needed and take full responsibility for the content of this repository.
+
+## Citing
+
+If you use the kit, please cite the archived release you ran. Each release is archived on Zenodo with its own DOI; version 0.3.1 is [10.5281/zenodo.23234347](https://doi.org/10.5281/zenodo.23234347), and [10.5281/zenodo.23234346](https://doi.org/10.5281/zenodo.23234346) always resolves to the latest release. [CITATION.cff](CITATION.cff) holds the citation metadata, and GitHub's "Cite this repository" button exports it as APA or BibTeX.
 
 ## License
 
